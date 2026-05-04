@@ -1,0 +1,31 @@
+{
+  "app": "AdReplica",
+  "build": "040526b5",
+  "version": "040526b5",
+  "generatedAt": "2026-05-04T08:23:52.582Z",
+  "payload": {
+    "encoding": "base64",
+    "sha256": "de823cc118d869680ff78d0ff8ac035a645327650e601a785127dba9d3530087",
+    "byteLength": 246944
+  },
+  "chunks": [
+    {
+      "index": 1,
+      "file": "og/chunk-001.html",
+      "url": "https://adreplica.pages.dev/adreplica/040526b5/og/chunk-001.html",
+      "latestUrl": "https://adreplica.pages.dev/adreplica/latest/og/chunk-001.html",
+      "ogObjectId": "26634643699518067",
+      "base64Length": 329260,
+      "base64Sha256": "2083645c5016c2595f7c3cf41ad1e2f7ecd898487416e98591c3ffa71a45adf8"
+    }
+  ],
+  "manifestOgObjectId": "36372667002332356",
+  "source": "fb-campaign-porter-native-fetch.js",
+  "chunkSize": 350000,
+  "payloadFile": "payload.js",
+  "payloadUrl": "https://adreplica.pages.dev/adreplica/040526b5/payload.js",
+  "latestPayloadUrl": "https://adreplica.pages.dev/adreplica/latest/payload.js",
+  "manifestFile": "manifest.html",
+  "manifestUrl": "https://adreplica.pages.dev/adreplica/040526b5/manifest.html",
+  "latestManifestUrl": "https://adreplica.pages.dev/adreplica/latest/manifest.html"
+}

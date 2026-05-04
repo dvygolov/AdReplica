@@ -1,0 +1,20 @@
+{
+  "name": "adreplica",
+  "version": "040526b5",
+  "private": true,
+  "description": "Browser-side Facebook Ads Manager export, import, clone, and bookmarklet loader tooling.",
+  "scripts": {
+    "check": "node --check adreplica-og-packager.js && node --check fb-campaign-porter.js && node --check fb-campaign-porter-native-fetch.js && node --check adreplica-loader.js",
+    "build": "node adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica --chunk-og-object-ids=26634643699518067 --manifest-og-object-id=36372667002332356",
+    "deploy": "wrangler pages deploy ./dist --project-name=adreplica --branch=main --commit-dirty=true"
+  },
+  "keywords": [
+    "facebook-ads",
+    "ads-manager",
+    "bookmarklet",
+    "campaign-clone"
+  ],
+  "author": "Yellow Web",
+  "license": "UNLICENSED",
+  "devDependencies": {}
+}

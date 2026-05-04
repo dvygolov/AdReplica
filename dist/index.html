@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AdReplica Loader</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="description" content="AdReplica bookmarklet loader for Facebook Ads Manager campaign export, import, and clone workflows." />
+  <style>
+    :root {
+      --bg: #141414;
+      --panel: #202020;
+      --panel-2: #292929;
+      --ink: #f8f0c8;
+      --muted: #a5a08f;
+      --gold: #ffd000;
+      --gold-2: #ffab00;
+      --line: rgba(255, 208, 0, 0.34);
+      --soft: rgba(255, 208, 0, 0.11);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: 'Trebuchet MS', Verdana, sans-serif;
+      background:
+        radial-gradient(circle at 16% 12%, rgba(255, 208, 0, 0.28) 0 10rem, transparent 26rem),
+        radial-gradient(circle at 92% 18%, rgba(255, 171, 0, 0.18) 0 12rem, transparent 30rem),
+        linear-gradient(135deg, #101010, #1b1b1b 52%, #111);
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.12;
+      background-image: linear-gradient(90deg, var(--gold) 1px, transparent 1px), linear-gradient(var(--gold) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, black, transparent 85%);
+    }
+    a { color: inherit; }
+    main {
+      width: min(1180px, calc(100vw - 36px));
+      margin: 0 auto;
+      padding: 38px 0 72px;
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .brand-wrap { display: grid; gap: 2px; }
+    .brand { color: var(--gold); font-size: 30px; font-weight: 900; letter-spacing: -0.05em; }
+    .byline { color: var(--muted); font-size: 13px; }
+    .byline a { color: var(--gold); text-decoration: none; }
+    .byline a:hover, .nav-links a:hover { text-decoration: underline; }
+    .nav-links { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .nav-links a { color: var(--muted); text-decoration: none; }
+    .tg-link {
+      display: inline-grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 208, 0, 0.08);
+      color: var(--gold);
+    }
+    .tg-link svg { width: 16px; height: 16px; display: block; }
+    .hero {
+      width: 100%;
+      border: 2px solid var(--gold);
+      border-radius: 22px;
+      background: linear-gradient(145deg, rgba(32, 32, 32, 0.98), rgba(18, 18, 18, 0.96));
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.44), 0 0 0 8px rgba(255, 208, 0, 0.05);
+      padding: clamp(24px, 4vw, 54px);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      right: -80px;
+      top: -80px;
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+    }
+    .eyebrow {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      border: 1px solid var(--gold);
+      border-radius: 999px;
+      background: rgba(255, 208, 0, 0.08);
+      color: var(--gold);
+      font: 800 12px/1.2 Verdana, sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+      gap: clamp(28px, 5vw, 64px);
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+    h1 {
+      max-width: 680px;
+      margin: 26px 0 16px;
+      color: #fff6c8;
+      font-size: clamp(50px, 7vw, 102px);
+      line-height: 0.88;
+      letter-spacing: -0.08em;
+    }
+    .lead {
+      max-width: 660px;
+      margin: 0;
+      color: #c9c1a5;
+      font: 18px/1.55 Verdana, sans-serif;
+    }
+    .shot {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #0f0f0f;
+      padding: 10px;
+      box-shadow: 18px 18px 0 rgba(255, 208, 0, 0.08);
+      transform: rotate(1deg);
+    }
+    .shot img {
+      display: block;
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .install {
+      display: grid;
+      grid-template-columns: minmax(220px, 320px) 1fr;
+      gap: 18px;
+      align-items: center;
+      margin-top: 34px;
+    }
+    .bookmarklet {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 74px;
+      padding: 0 28px;
+      border: 3px solid #050505;
+      border-radius: 14px;
+      color: #111;
+      background: linear-gradient(135deg, var(--gold), var(--gold-2));
+      box-shadow: 8px 8px 0 #050505;
+      text-decoration: none;
+      font: 900 24px/1 Verdana, sans-serif;
+      cursor: grab;
+      user-select: none;
+      transform: rotate(-1.2deg);
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+    .bookmarklet:hover { transform: rotate(0deg) translate(-2px, -2px); box-shadow: 11px 11px 0 #050505; }
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font: 15px/1.6 Verdana, sans-serif;
+    }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 208, 0, 0.08);
+      color: var(--gold);
+      padding: 12px 16px;
+      font: 700 14px/1 Verdana, sans-serif;
+      cursor: pointer;
+    }
+    code {
+      display: inline-block;
+      margin-top: 22px;
+      color: #4f472f;
+      font: 13px/1.4 Consolas, monospace;
+      word-break: break-word;
+    }
+    .section { margin-top: 28px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      min-height: 154px;
+      border: 1px solid rgba(255, 208, 0, 0.25);
+      border-radius: 18px;
+      background: rgba(32, 32, 32, 0.82);
+      padding: 20px;
+    }
+    .card strong { display: block; color: var(--gold); font-size: 18px; margin-bottom: 10px; }
+    .card p { margin: 0; color: #c9c1a5; font: 14px/1.55 Verdana, sans-serif; }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 208, 0, 0.25);
+      border-radius: 18px;
+      background: rgba(255, 208, 0, 0.25);
+    }
+    .step { background: #1d1d1d; padding: 18px; color: #d7cfb3; font: 14px/1.55 Verdana, sans-serif; }
+    .step b { color: var(--gold); display: block; margin-bottom: 8px; }
+    .footer { margin-top: 22px; color: var(--muted); font: 13px/1.5 Verdana, sans-serif; }
+    @media (max-width: 760px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .cards, .steps { grid-template-columns: 1fr; }
+      .install { grid-template-columns: 1fr; }
+      .bookmarklet { width: 100%; }
+      .shot { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <nav class="nav">
+      <div class="brand-wrap">
+        <div class="brand">AdReplica</div>
+        <div class="byline">by <a href="https://yellowweb.top" target="_blank" rel="noopener">Yellow Web</a></div>
+      </div>
+      <div class="nav-links"><a href="#install">Install</a><a href="#features">Features</a><a href="#how">How it works</a><a class="tg-link" href="https://t.me/yellow_web" target="_blank" rel="noopener" aria-label="Yellow Web Telegram"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.8 4.6 18.6 19.7c-.2 1.1-.9 1.4-1.8.9l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1 9.3-8.4c.4-.4-.1-.6-.6-.2L6 13.2 1.1 11.7c-1.1-.3-1.1-1.1.2-1.6L20.5 2.7c.9-.3 1.7.2 1.3 1.9Z"/></svg></a></div>
+    </nav>
+    <section class="hero" id="install">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">AdReplica build 040526b5</div>
+          <h1>Campaign cloning without leaving Ads Manager.</h1>
+          <p class="lead">AdReplica is a browser-side tool for exporting, importing, and cloning Facebook Ads Manager campaigns, including drafts, media, pages, pixels, dynamic creatives, and catalog-aware flows.</p>
+          <div class="install">
+            <a class="bookmarklet" href="javascript:(function%20adReplicaLoader(config)%20%7B%0A%20%20%22use%20strict%22%3B%0A%0A%20%20const%20loaderConfig%20%3D%20Object.assign(%7B%0A%20%20%20%20app%3A%20%22AdReplica%22%2C%0A%20%20%20%20manifestOgObjectId%3A%20%2236372667002332356%22%2C%0A%20%20%20%20cacheKey%3A%20%22adreplica.loader.cache.v1%22%2C%0A%20%20%20%20timeoutMs%3A%2045000%2C%0A%20%20%7D%2C%20config%20%7C%7C%20%7B%7D)%3B%0A%20%20const%20guardKey%20%3D%20%22__AdReplicaLoader%22%3B%0A%20%20const%20host%20%3D%20String(location.hostname%20%7C%7C%20%22%22)%3B%0A%0A%20%20if%20(!%2F(%5E%7C%5C.)facebook%5C.com%24%2F.test(host))%20%7B%0A%20%20%20%20location.href%20%3D%20%22https%3A%2F%2Fadsmanager.facebook.com%2F%22%3B%0A%20%20%20%20return%3B%0A%20%20%7D%0A%20%20if%20(window%5BguardKey%5D%3F.loading)%20%7B%0A%20%20%20%20console.warn(%60%5B%24%7BloaderConfig.app%7D%5D%20Loader%20is%20already%20running.%60)%3B%0A%20%20%20%20return%3B%0A%20%20%7D%0A%20%20window%5BguardKey%5D%20%3D%20%7B%20loading%3A%20true%2C%20build%3A%20%22latest%22%2C%20startedAt%3A%20Date.now()%2C%20source%3A%20%22%22%20%7D%3B%0A%0A%20%20const%20log%20%3D%20(message)%20%3D%3E%20console.log(%60%5B%24%7BloaderConfig.app%7D%20loader%5D%20%24%7Bmessage%7D%60)%3B%0A%20%20const%20fail%20%3D%20(error)%20%3D%3E%20%7B%0A%20%20%20%20console.error(%60%5B%24%7BloaderConfig.app%7D%20loader%5D%20Failed.%60%2C%20error)%3B%0A%20%20%20%20alert(%60%24%7BloaderConfig.app%7D%20loader%20failed%3A%20%24%7Berror%3F.message%20%7C%7C%20error%7D%60)%3B%0A%20%20%7D%3B%0A%20%20const%20withTimeout%20%3D%20(promise%2C%20label)%20%3D%3E%20Promise.race(%5B%0A%20%20%20%20promise%2C%0A%20%20%20%20new%20Promise((_%2C%20reject)%20%3D%3E%20setTimeout(()%20%3D%3E%20reject(new%20Error(%60%24%7Blabel%7D%20timed%20out%60))%2C%20loaderConfig.timeoutMs))%2C%0A%20%20%5D)%3B%0A%20%20const%20decodeBase64Utf8%20%3D%20(base64)%20%3D%3E%20%7B%0A%20%20%20%20const%20binary%20%3D%20atob(String(base64%20%7C%7C%20%22%22).replace(%2F%5Cs%2B%2Fg%2C%20%22%22))%3B%0A%20%20%20%20const%20bytes%20%3D%20new%20Uint8Array(binary.length)%3B%0A%20%20%20%20for%20(let%20index%20%3D%200%3B%20index%20%3C%20binary.length%3B%20index%20%2B%3D%201)%20%7B%0A%20%20%20%20%20%20bytes%5Bindex%5D%20%3D%20binary.charCodeAt(index)%3B%0A%20%20%20%20%7D%0A%20%20%20%20return%20new%20TextDecoder().decode(bytes)%3B%0A%20%20%7D%3B%0A%20%20const%20fetchJson%20%3D%20async%20(url)%20%3D%3E%20%7B%0A%20%20%20%20const%20response%20%3D%20await%20withTimeout(fetch(url%2C%20%7B%20credentials%3A%20%22include%22%2C%20cache%3A%20%22no-store%22%20%7D)%2C%20url)%3B%0A%20%20%20%20const%20text%20%3D%20await%20response.text()%3B%0A%20%20%20%20if%20(!response.ok)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%60%24%7Bresponse.status%7D%20%24%7Btext.slice(0%2C%20200)%7D%60)%3B%0A%20%20%20%20%7D%0A%20%20%20%20const%20clean%20%3D%20text.replace(%2F%5Efor%5Cs*%5C(%3B%3B%5C)%3B%5Cs*%2F%2C%20%22%22)%3B%0A%20%20%20%20return%20JSON.parse(clean)%3B%0A%20%20%7D%3B%0A%20%20const%20getAdsManagerAccessToken%20%3D%20()%20%3D%3E%20%7B%0A%20%20%20%20if%20(window.__accessToken)%20%7B%0A%20%20%20%20%20%20return%20window.__accessToken%3B%0A%20%20%20%20%7D%0A%20%20%20%20const%20entries%20%3D%20performance.getEntriesByType(%22resource%22)%0A%20%20%20%20%20%20.map((entry)%20%3D%3E%20entry.name%20%7C%7C%20%22%22)%0A%20%20%20%20%20%20.filter((url)%20%3D%3E%20url.includes(%22adsmanager-graph.facebook.com%22)%20%26%26%20url.includes(%22access_token%3D%22))%3B%0A%20%20%20%20for%20(const%20entry%20of%20entries)%20%7B%0A%20%20%20%20%20%20try%20%7B%0A%20%20%20%20%20%20%20%20const%20token%20%3D%20new%20URL(entry).searchParams.get(%22access_token%22)%3B%0A%20%20%20%20%20%20%20%20if%20(token)%20%7B%0A%20%20%20%20%20%20%20%20%20%20return%20token%3B%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%7D%20catch%20(error)%20%7B%0A%20%20%20%20%20%20%20%20%2F%2F%20Ignore%20malformed%20performance%20entries.%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%20%20%20%20return%20%22%22%3B%0A%20%20%7D%3B%0A%20%20const%20sha256Hex%20%3D%20async%20(text)%20%3D%3E%20%7B%0A%20%20%20%20if%20(!crypto%3F.subtle)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%22crypto.subtle%20is%20not%20available%20for%20payload%20verification.%22)%3B%0A%20%20%20%20%7D%0A%20%20%20%20const%20buffer%20%3D%20await%20crypto.subtle.digest(%22SHA-256%22%2C%20new%20TextEncoder().encode(text))%3B%0A%20%20%20%20return%20Array.from(new%20Uint8Array(buffer))%0A%20%20%20%20%20%20.map((byte)%20%3D%3E%20byte.toString(16).padStart(2%2C%20%220%22))%0A%20%20%20%20%20%20.join(%22%22)%3B%0A%20%20%7D%3B%0A%20%20const%20readCache%20%3D%20()%20%3D%3E%20%7B%0A%20%20%20%20try%20%7B%0A%20%20%20%20%20%20const%20raw%20%3D%20localStorage.getItem(loaderConfig.cacheKey)%3B%0A%20%20%20%20%20%20if%20(!raw)%20%7B%0A%20%20%20%20%20%20%20%20return%20null%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20const%20cached%20%3D%20JSON.parse(raw)%3B%0A%20%20%20%20%20%20if%20(!cached%3F.source%20%7C%7C%20!cached%3F.version%20%7C%7C%20!cached%3F.sha256)%20%7B%0A%20%20%20%20%20%20%20%20return%20null%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20return%20cached%3B%0A%20%20%20%20%7D%20catch%20(error)%20%7B%0A%20%20%20%20%20%20console.warn(%60%5B%24%7BloaderConfig.app%7D%20loader%5D%20Ignoring%20unreadable%20cache.%60%2C%20error)%3B%0A%20%20%20%20%20%20return%20null%3B%0A%20%20%20%20%7D%0A%20%20%7D%3B%0A%20%20const%20writeCache%20%3D%20(manifest%2C%20source)%20%3D%3E%20%7B%0A%20%20%20%20try%20%7B%0A%20%20%20%20%20%20localStorage.setItem(loaderConfig.cacheKey%2C%20JSON.stringify(%7B%0A%20%20%20%20%20%20%20%20app%3A%20loaderConfig.app%2C%0A%20%20%20%20%20%20%20%20version%3A%20manifest.version%2C%0A%20%20%20%20%20%20%20%20sha256%3A%20manifest.payload.sha256%2C%0A%20%20%20%20%20%20%20%20byteLength%3A%20manifest.payload.byteLength%2C%0A%20%20%20%20%20%20%20%20source%2C%0A%20%20%20%20%20%20%20%20savedAt%3A%20new%20Date().toISOString()%2C%0A%20%20%20%20%20%20%7D))%3B%0A%20%20%20%20%7D%20catch%20(error)%20%7B%0A%20%20%20%20%20%20console.warn(%60%5B%24%7BloaderConfig.app%7D%20loader%5D%20Payload%20loaded%2C%20but%20cache%20write%20failed.%60%2C%20error)%3B%0A%20%20%20%20%7D%0A%20%20%7D%3B%0A%20%20const%20fetchOgObject%20%3D%20async%20(id)%20%3D%3E%20%7B%0A%20%20%20%20if%20(!id)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%22No%20manifest%20OG%20object%20ID%20configured.%22)%3B%0A%20%20%20%20%7D%0A%20%20%20%20const%20accessToken%20%3D%20getAdsManagerAccessToken()%3B%0A%20%20%20%20if%20(!accessToken)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%22Cannot%20find%20Ads%20Manager%20access_token%20in%20current%20page%20runtime.%22)%3B%0A%20%20%20%20%7D%0A%20%20%20%20return%20fetchJson(%0A%20%20%20%20%20%20%60https%3A%2F%2Fadsmanager-graph.facebook.com%2Fv23.0%2F%24%7BencodeURIComponent(id)%7D%3Ffields%3Dtitle%2Cdescription%2Cupdated_time%26access_token%3D%24%7BencodeURIComponent(accessToken)%7D%60%2C%0A%20%20%20%20)%3B%0A%20%20%7D%3B%0A%20%20const%20fetchManifest%20%3D%20async%20()%20%3D%3E%20%7B%0A%20%20%20%20const%20object%20%3D%20await%20fetchOgObject(loaderConfig.manifestOgObjectId)%3B%0A%20%20%20%20const%20manifest%20%3D%20JSON.parse(decodeBase64Utf8(object%3F.description%20%7C%7C%20%22%22))%3B%0A%20%20%20%20if%20(manifest%3F.app%20!%3D%3D%20loaderConfig.app%20%7C%7C%20!manifest%3F.version%20%7C%7C%20!manifest%3F.payload%3F.sha256)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%22Manifest%20is%20malformed%20or%20belongs%20to%20another%20app.%22)%3B%0A%20%20%20%20%7D%0A%20%20%20%20if%20(!Array.isArray(manifest.chunks)%20%7C%7C%20!manifest.chunks.length)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%22Manifest%20does%20not%20contain%20payload%20chunks.%22)%3B%0A%20%20%20%20%7D%0A%20%20%20%20return%20manifest%3B%0A%20%20%7D%3B%0A%20%20const%20fetchOgPayload%20%3D%20async%20(manifest)%20%3D%3E%20%7B%0A%20%20%20%20const%20ids%20%3D%20manifest.chunks.map((chunk)%20%3D%3E%20chunk.ogObjectId).filter(Boolean)%3B%0A%20%20%20%20if%20(ids.length%20!%3D%3D%20manifest.chunks.length)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%22Manifest%20has%20chunks%20without%20OG%20object%20IDs.%22)%3B%0A%20%20%20%20%7D%0A%20%20%20%20const%20chunks%20%3D%20await%20Promise.all(ids.map((id)%20%3D%3E%20fetchOgObject(id)))%3B%0A%20%20%20%20const%20encoded%20%3D%20chunks.map((chunk)%20%3D%3E%20chunk%3F.description%20%7C%7C%20%22%22).join(%22%22)%3B%0A%20%20%20%20if%20(!encoded)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%22OG%20chunks%20did%20not%20contain%20description%20payloads.%22)%3B%0A%20%20%20%20%7D%0A%20%20%20%20const%20source%20%3D%20decodeBase64Utf8(encoded)%3B%0A%20%20%20%20const%20actualSha256%20%3D%20await%20sha256Hex(source)%3B%0A%20%20%20%20if%20(actualSha256%20!%3D%3D%20manifest.payload.sha256)%20%7B%0A%20%20%20%20%20%20throw%20new%20Error(%60Payload%20checksum%20mismatch%3A%20%24%7BactualSha256%7D%20!%3D%3D%20%24%7Bmanifest.payload.sha256%7D%60)%3B%0A%20%20%20%20%7D%0A%20%20%20%20return%20source%3B%0A%20%20%7D%3B%0A%20%20const%20loadPayload%20%3D%20async%20()%20%3D%3E%20%7B%0A%20%20%20%20const%20cached%20%3D%20readCache()%3B%0A%20%20%20%20let%20manifest%20%3D%20null%3B%0A%20%20%20%20try%20%7B%0A%20%20%20%20%20%20manifest%20%3D%20await%20fetchManifest()%3B%0A%20%20%20%20%7D%20catch%20(error)%20%7B%0A%20%20%20%20%20%20if%20(cached)%20%7B%0A%20%20%20%20%20%20%20%20log(%60manifest%20unavailable%2C%20using%20cached%20%24%7Bcached.version%7D%60)%3B%0A%20%20%20%20%20%20%20%20window%5BguardKey%5D.source%20%3D%20%22cache-no-manifest%22%3B%0A%20%20%20%20%20%20%20%20return%20%7B%20source%3A%20cached.source%2C%20build%3A%20cached.version%20%7D%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20throw%20error%3B%0A%20%20%20%20%7D%0A%20%20%20%20window%5BguardKey%5D.remoteVersion%20%3D%20manifest.version%3B%0A%20%20%20%20if%20(cached%20%26%26%20cached.version%20%3D%3D%3D%20manifest.version%20%26%26%20cached.sha256%20%3D%3D%3D%20manifest.payload.sha256)%20%7B%0A%20%20%20%20%20%20log(%60using%20cached%20%24%7Bcached.version%7D%60)%3B%0A%20%20%20%20%20%20window%5BguardKey%5D.source%20%3D%20%22cache%22%3B%0A%20%20%20%20%20%20return%20%7B%20source%3A%20cached.source%2C%20build%3A%20cached.version%20%7D%3B%0A%20%20%20%20%7D%0A%20%20%20%20const%20source%20%3D%20await%20fetchOgPayload(manifest)%3B%0A%20%20%20%20writeCache(manifest%2C%20source)%3B%0A%20%20%20%20log(%60downloaded%20and%20cached%20%24%7Bmanifest.version%7D%60)%3B%0A%20%20%20%20window%5BguardKey%5D.source%20%3D%20%22remote%22%3B%0A%20%20%20%20return%20%7B%20source%2C%20build%3A%20manifest.version%20%7D%3B%0A%20%20%7D%3B%0A%20%20const%20executePayload%20%3D%20(source%2C%20build)%20%3D%3E%20new%20Promise((resolve%2C%20reject)%20%3D%3E%20%7B%0A%20%20%20%20const%20blob%20%3D%20new%20Blob(%5B%0A%20%20%20%20%20%20source%2C%0A%20%20%20%20%20%20%60%5Cn%2F%2F%23%20sourceURL%3Dadreplica%3A%2F%2F%24%7Bbuild%7D%2Fpayload.js%60%2C%0A%20%20%20%20%5D%2C%20%7B%20type%3A%20%22application%2Fjavascript%22%20%7D)%3B%0A%20%20%20%20const%20blobUrl%20%3D%20URL.createObjectURL(blob)%3B%0A%20%20%20%20const%20script%20%3D%20document.createElement(%22script%22)%3B%0A%20%20%20%20script.src%20%3D%20blobUrl%3B%0A%20%20%20%20script.onload%20%3D%20()%20%3D%3E%20%7B%0A%20%20%20%20%20%20setTimeout(()%20%3D%3E%20URL.revokeObjectURL(blobUrl)%2C%2010000)%3B%0A%20%20%20%20%20%20script.remove()%3B%0A%20%20%20%20%20%20resolve()%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20script.onerror%20%3D%20()%20%3D%3E%20%7B%0A%20%20%20%20%20%20URL.revokeObjectURL(blobUrl)%3B%0A%20%20%20%20%20%20script.remove()%3B%0A%20%20%20%20%20%20reject(new%20Error(%22Blob%20script%20injection%20failed.%22))%3B%0A%20%20%20%20%7D%3B%0A%20%20%20%20(document.head%20%7C%7C%20document.documentElement).appendChild(script)%3B%0A%20%20%7D)%3B%0A%0A%20%20(async%20()%20%3D%3E%20%7B%0A%20%20%20%20try%20%7B%0A%20%20%20%20%20%20const%20payload%20%3D%20await%20loadPayload()%3B%0A%20%20%20%20%20%20await%20executePayload(payload.source%2C%20payload.build)%3B%0A%20%20%20%20%20%20window%5BguardKey%5D.build%20%3D%20payload.build%3B%0A%20%20%20%20%20%20log(%60loaded%20%24%7Bpayload.build%7D%20payload%20from%20%24%7Bwindow%5BguardKey%5D.source%7D%60)%3B%0A%20%20%20%20%7D%20catch%20(error)%20%7B%0A%20%20%20%20%20%20fail(error)%3B%0A%20%20%20%20%7D%20finally%20%7B%0A%20%20%20%20%20%20if%20(window%5BguardKey%5D)%20%7B%0A%20%20%20%20%20%20%20%20window%5BguardKey%5D.loading%20%3D%20false%3B%0A%20%20%20%20%20%20%20%20window%5BguardKey%5D.finishedAt%20%3D%20Date.now()%3B%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%20%20%7D)()%3B%0A%7D)()%3B%0A" onclick="event.preventDefault(); window.setStatus('Drag this button to your bookmarks bar, or use Copy bookmarklet.');">AdReplica</a>
+            <p class="hint">Drag the yellow button to the bookmarks bar. Then open Ads Manager and click the bookmark.</p>
+          </div>
+          <div class="actions">
+            <button id="copyBookmarklet" type="button">Copy bookmarklet</button>
+            <button id="copyUrl" type="button">Copy page URL</button>
+          </div>
+          <code>manifest OG: 36372667002332356</code>
+        </div>
+        <figure class="shot">
+          <img src="assets/adreplica-ui.png" alt="AdReplica running inside Facebook Ads Manager" />
+        </figure>
+      </div>
+    </section>
+    <section class="section cards" id="features">
+      <div class="card"><strong>Export</strong><p>Save campaign structure to JSON and collect required media for reproducible imports and comparisons.</p></div>
+      <div class="card"><strong>Import</strong><p>Create real objects or drafts with page, pixel, schedule, media, dynamic creative, and catalog remapping.</p></div>
+      <div class="card"><strong>Clone</strong><p>Copy a source campaign into another ad account in DRAFT, PAUSED, or ACTIVE mode without writing files to disk.</p></div>
+      <div class="card"><strong>Draft-safe</strong><p>Uses Ads Manager draft fragments and validates against editor behavior instead of trusting Graph parity alone.</p></div>
+      <div class="card"><strong>Catalog-aware</strong><p>Detects Advantage+ catalog ads, product sets, feeds, and BM constraints before cloning catalog campaigns.</p></div>
+      <div class="card"><strong>Languages</strong><p>Preserves language/asset customization setups used by webmasters who localize creatives through Facebook's Languages flow.</p></div>
+      <div class="card"><strong>Self-updating</strong><p>The bookmarklet loads a small OG manifest, verifies payload SHA-256, and caches the latest payload locally.</p></div>
+    </section>
+    <section class="section steps" id="how">
+      <div class="step"><b>1. Install</b>Drag the AdReplica button to your bookmarks bar or copy it into a new bookmark URL.</div>
+      <div class="step"><b>2. Open Ads Manager</b>Use the Facebook profile and ad account you want to work with, then click the bookmark.</div>
+      <div class="step"><b>3. Export, import, clone</b>The loader checks the manifest, uses cache when current, and opens the AdReplica panel in-page.</div>
+    </section>
+    <p class="footer">by <a href="https://yellowweb.top" target="_blank" rel="noopener">Yellow Web</a> · <a href="https://t.me/yellow_web" target="_blank" rel="noopener">Telegram</a>. The tool runs in your current Facebook Ads Manager session. No external direct payload fetch is attempted from Ads Manager; runtime loading uses Facebook OG metadata through Ads Manager Graph.</p>
+  </main>
+  <script>
+    window.setStatus = function(message) {
+      var hint = document.querySelector('.hint');
+      if (hint) hint.textContent = message;
+    };
+    document.getElementById('copyBookmarklet').addEventListener('click', async function() {
+      try {
+        await navigator.clipboard.writeText(document.querySelector('.bookmarklet').href);
+        window.setStatus('Bookmarklet copied. Create a new bookmark and paste it into the URL field.');
+      } catch (error) {
+        window.setStatus('Copy failed. Drag the yellow button to the bookmarks bar instead.');
+      }
+    });
+    document.getElementById('copyUrl').addEventListener('click', async function() {
+      await navigator.clipboard.writeText(location.href);
+      window.setStatus('Page URL copied.');
+    });
+  </script>
+</body>
+</html>

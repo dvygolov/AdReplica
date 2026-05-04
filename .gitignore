@@ -1,0 +1,20 @@
+node_modules/
+.wrangler/
+.env
+.env.*
+.runtime/
+*.log
+*.tmp
+*.bak
+
+# Local export/debug outputs.
+adreplica-last-*.json
+exports/
+downloads/
+media/
+
+# Local secret stores or accidental dumps.
+*.kdbx
+*token*
+*secret*
+*password*
