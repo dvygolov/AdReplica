@@ -11,6 +11,7 @@ const LOADER_SOURCE = path.join(ROOT, "adreplica-loader.js");
 const LANDING_SCREENSHOT = path.join(ROOT, "target-current.png");
 const OUT_ROOT = path.join(ROOT, "dist", "adreplica");
 const CHUNK_SIZE = 350000;
+const APP_MARK_FILE = "assets/adreplica-mark.svg";
 
 function readArg(name, fallback = "") {
   const prefix = `--${name}=`;
@@ -37,6 +38,24 @@ function splitString(input, chunkSize) {
 
 function sha256Hex(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function buildAppMarkSvg() {
+  return [
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="AdReplica mark">',
+    '  <defs>',
+    '    <linearGradient id="adreplica-gold" x1="0%" x2="100%" y1="0%" y2="100%">',
+    '      <stop offset="0%" stop-color="#ffe16a"/>',
+    '      <stop offset="55%" stop-color="#ffd000"/>',
+    '      <stop offset="100%" stop-color="#ffab00"/>',
+    '    </linearGradient>',
+    '  </defs>',
+    '  <rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#adreplica-gold)" stroke-width="6"/>',
+    '  <path d="M28 67V29h16.5c10.8 0 17 5.8 17 14.8 0 9.2-6.2 15-17 15H39v8.2Zm11-17.9h5.2c4.5 0 7-1.8 7-5.3 0-3.4-2.5-5.1-7-5.1H39Z" fill="url(#adreplica-gold)"/>',
+    '  <path d="M52.5 28.5h14.8c7.9 0 12.7 4.6 12.7 11.2 0 5-2.5 8.4-6.8 10.1L81 67H69.7l-6-14h-1.4V42.7h3.2c2.7 0 4.3-1.2 4.3-3.4 0-2.2-1.6-3.5-4.3-3.5h-13Z" fill="#fff2bd" fill-opacity="0.96"/>',
+    '  <circle cx="69.5" cy="65.5" r="5.5" fill="url(#adreplica-gold)"/>',
+    '</svg>',
+  ].join("\n");
 }
 
 function parseListArg(name) {
@@ -101,8 +120,9 @@ function buildManifestHtml({ appName, build, manifestBase64 }) {
   ].join("\n");
 }
 
-function buildLandingHtml({ appName, build, bookmarklet, manifestOgObjectId, screenshotUrl }) {
+function buildLandingHtml({ appName, build, bookmarklet, manifestOgObjectId, screenshotUrl, iconUrl }) {
   const title = `${appName} Loader`;
+  const inlineMark = buildAppMarkSvg();
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -112,6 +132,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestOgObjectId, scr
     `  <title>${escapeHtml(title)}</title>`,
     '  <meta name="robots" content="noindex,nofollow" />',
     `  <meta name="description" content="${escapeHtml(appName)} bookmarklet loader for Facebook Ads Manager campaign export, import, and clone workflows." />`,
+    `  <link rel="icon" href="${escapeHtml(iconUrl)}" type="image/svg+xml" />`,
     "  <style>",
     "    :root {",
     "      --bg: #141414;",
@@ -163,6 +184,8 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestOgObjectId, scr
     "      font-size: 13px;",
     "    }",
     "    .brand-wrap { display: grid; gap: 2px; }",
+    "    .brand-line { display: inline-flex; align-items: center; gap: 12px; }",
+    "    .brand-mark { width: 42px; height: 42px; display: block; flex: 0 0 auto; filter: drop-shadow(0 8px 18px rgba(255, 208, 0, 0.14)); }",
     "    .brand { color: var(--gold); font-size: 30px; font-weight: 900; letter-spacing: -0.05em; }",
     "    .byline { color: var(--muted); font-size: 13px; }",
     "    .byline a { color: var(--gold); text-decoration: none; }",
@@ -339,7 +362,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestOgObjectId, scr
     "  <main>",
     "    <nav class=\"nav\">",
     "      <div class=\"brand-wrap\">",
-    `        <div class="brand">${escapeHtml(appName)}</div>`,
+    `        <div class="brand-line"><span class="brand-mark">${inlineMark}</span><div class="brand">${escapeHtml(appName)}</div></div>`,
     "        <div class=\"byline\">by <a href=\"https://yellowweb.top\" target=\"_blank\" rel=\"noopener\">Yellow Web</a></div>",
     "      </div>",
     "      <div class=\"nav-links\"><a href=\"#install\">Install</a><a href=\"#features\">Features</a><a href=\"#how\">How it works</a><a class=\"tg-link\" href=\"https://t.me/yellow_web\" target=\"_blank\" rel=\"noopener\" aria-label=\"Yellow Web Telegram\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M21.8 4.6 18.6 19.7c-.2 1.1-.9 1.4-1.8.9l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1 9.3-8.4c.4-.4-.1-.6-.6-.2L6 13.2 1.1 11.7c-1.1-.3-1.1-1.1.2-1.6L20.5 2.7c.9-.3 1.7.2 1.3 1.9Z\"/></svg></a></div>",
@@ -486,16 +509,19 @@ function main() {
   const loaderSource = fs.readFileSync(LOADER_SOURCE, "utf8");
   const bookmarklet = `javascript:${encodeURIComponent(loaderSource)}`;
   const screenshotUrl = "assets/adreplica-ui.png";
+  const iconUrl = APP_MARK_FILE;
   if (fs.existsSync(LANDING_SCREENSHOT)) {
     fs.mkdirSync(path.join(distRoot, "assets"), { recursive: true });
     fs.copyFileSync(LANDING_SCREENSHOT, path.join(distRoot, screenshotUrl));
   }
+  writeFile(path.join(distRoot, APP_MARK_FILE), `${buildAppMarkSvg()}\n`);
   writeFile(path.join(distRoot, "index.html"), buildLandingHtml({
     appName,
     build,
     bookmarklet,
     manifestOgObjectId,
     screenshotUrl,
+    iconUrl,
   }));
   writeFile(path.join(distRoot, "_headers"), [
     "/",

@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "040526b5",
+    VERSION: "060526b1",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -11,6 +11,7 @@
 
   const APP_ID = "fb-sk-ad-replica";
   const APP_TITLE = "AdReplica";
+  const APP_MARK_SVG = `<svg class="sk-mark" viewBox="0 0 96 96" aria-hidden="true"><defs><linearGradient id="${APP_ID}-gold" x1="0%" x2="100%" y1="0%" y2="100%"><stop offset="0%" stop-color="#ffe16a"/><stop offset="55%" stop-color="#ffd000"/><stop offset="100%" stop-color="#ffab00"/></linearGradient></defs><rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#${APP_ID}-gold)" stroke-width="6"/><path d="M28 67V29h16.5c10.8 0 17 5.8 17 14.8 0 9.2-6.2 15-17 15H39v8.2Zm11-17.9h5.2c4.5 0 7-1.8 7-5.3 0-3.4-2.5-5.1-7-5.1H39Z" fill="url(#${APP_ID}-gold)"/><path d="M52.5 28.5h14.8c7.9 0 12.7 4.6 12.7 11.2 0 5-2.5 8.4-6.8 10.1L81 67H69.7l-6-14h-1.4V42.7h3.2c2.7 0 4.3-1.2 4.3-3.4 0-2.2-1.6-3.5-4.3-3.5h-13Z" fill="#fff2bd" fill-opacity="0.96"/><circle cx="69.5" cy="65.5" r="5.5" fill="url(#${APP_ID}-gold)"/></svg>`;
   const NATIVE_FETCH_FRAME_ID = `${APP_ID}-native-fetch-frame`;
   const PAGE_IDENTITY_HINTS_KEY = "adreplica.pageIdentityHints.v1";
 
@@ -1084,8 +1085,13 @@
     return getMediaSlotsFromPackage(state.importPackage);
   }
 
+  function getSharedMediaOverrideKey(expectedFileName) {
+    return `expected:${String(expectedFileName || "")}`;
+  }
+
   function getDefaultMediaFile(slot, mediaOverrides = state.importMediaOverrides, mediaFiles = state.importMediaFiles) {
     return mediaOverrides.get(slot.key)
+      || mediaOverrides.get(getSharedMediaOverrideKey(slot.expectedFileName))
       || mediaFiles.get(slot.expectedFileName)
       || null;
   }
@@ -1379,13 +1385,15 @@
           <div class="sk-creative-info">
             <div class="sk-creative-name">
               <span class="sk-badge sk-badge-${escapeHtml(slot.type)}">${typeBadge}</span>
-              ${escapeHtml(slot.creativeName || slot.creativeId)}
+              ${escapeHtml(slot.expectedFileName)}
             </div>
-            <div class="sk-creative-file">${escapeHtml(file ? file.name : "file not loaded")}</div>
+            <div class="sk-creative-file">${escapeHtml(slot.creativeName || slot.creativeId)}</div>
+            <div class="sk-creative-status">${escapeHtml(file ? `Selected: ${file.name}` : "file not loaded")}</div>
           </div>
           <input type="file"
             data-action="${escapeHtml(mediaAction)}"
             data-media-key="${escapeHtml(slot.key)}"
+            data-expected-file="${escapeHtml(slot.expectedFileName)}"
             accept="${slot.type === "video" ? "video/*" : "image/*"}" />
         </div>
       `;
@@ -1612,6 +1620,8 @@
       dom.exportCampaignSelect.innerHTML = renderCampaignOptions();
     }
     if (dom.importModeSelect) {
+      dom.importModeSelect.innerHTML = getModeOptionsMarkup(importRequiresDraftOnly());
+      dom.importModeSelect.disabled = importRequiresDraftOnly();
       dom.importModeSelect.value = state.importAsDraft ? "DRAFT" : state.importStatus;
     }
     if (dom.cloneSourceAccountSelect) {
@@ -1624,6 +1634,8 @@
       dom.cloneTargetAccountSelect.innerHTML = renderAccountOptions(state.cloneTargetAccountId);
     }
     if (dom.cloneModeSelect) {
+      dom.cloneModeSelect.innerHTML = getModeOptionsMarkup(cloneRequiresDraftOnly());
+      dom.cloneModeSelect.disabled = cloneRequiresDraftOnly();
       dom.cloneModeSelect.value = state.cloneAsDraft ? "DRAFT" : state.cloneStatus;
     }
     if (dom.cloneCampaignName && dom.cloneCampaignName.value !== state.cloneCampaignName) {
@@ -1647,7 +1659,7 @@
         </div>
         <div class="sk-head">
           <div>
-            <h2>${APP_TITLE} <span class="sk-build">build ${Config.VERSION}</span></h2>
+            <div class="sk-title-row">${APP_MARK_SVG}<h2>${APP_TITLE} <span class="sk-build">build ${Config.VERSION}</span></h2></div>
             <a class="sk-byline" href="https://yellowweb.top" target="_blank">by Yellow Web</a>
           </div>
           <button id="${APP_ID}-close" class="sk-close" title="Close">&#x2715;</button>
@@ -1804,6 +1816,12 @@
     });
     dom.importModeSelect.addEventListener("change", (event) => {
       const val = event.target.value;
+      if (importRequiresDraftOnly()) {
+        state.importAsDraft = true;
+        state.importStatus = "PAUSED";
+        renderUI();
+        return;
+      }
       state.importAsDraft = val === "DRAFT";
       state.importStatus = val === "DRAFT" ? "PAUSED" : val;
     });
@@ -1849,12 +1867,19 @@
     });
     dom.cloneModeSelect.addEventListener("change", (event) => {
       const val = event.target.value;
+      if (cloneRequiresDraftOnly()) {
+        state.cloneAsDraft = true;
+        state.cloneStatus = "PAUSED";
+        renderUI();
+        return;
+      }
       state.cloneAsDraft = val === "DRAFT";
       state.cloneStatus = val === "DRAFT" ? "PAUSED" : val;
     });
     dom.importMappings.addEventListener("change", (event) => {
       const target = event.target;
       if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+      let shouldRerender = true;
       if (target.dataset.action === "page-map") {
         state.importPageMappings[target.dataset.sourcePageId] = target.value;
       }
@@ -1866,14 +1891,36 @@
       }
       if (target.dataset.action === "media-override" && target instanceof HTMLInputElement) {
         const file = target.files && target.files[0] ? target.files[0] : null;
+        const expectedFile = String(target.dataset.expectedFile || "");
+        const sharedKey = getSharedMediaOverrideKey(target.dataset.expectedFile || "");
         if (file) {
           state.importMediaOverrides.set(target.dataset.mediaKey, file);
+          if (sharedKey !== getSharedMediaOverrideKey("")) {
+            state.importMediaOverrides.set(sharedKey, file);
+          }
+          if (expectedFile) {
+            state.importMediaFiles.set(expectedFile, file);
+          }
           log("info", `Selected replacement media: ${file.name}`);
         } else {
           state.importMediaOverrides.delete(target.dataset.mediaKey);
+          if (sharedKey !== getSharedMediaOverrideKey("")) {
+            state.importMediaOverrides.delete(sharedKey);
+          }
+          if (expectedFile) {
+            state.importMediaFiles.delete(expectedFile);
+          }
         }
+        const row = target.closest(".sk-creative-row");
+        const statusNode = row?.querySelector(".sk-creative-status");
+        if (statusNode) {
+          statusNode.textContent = file ? `Selected: ${file.name}` : "file not loaded";
+        }
+        shouldRerender = false;
       }
-      renderImportMappings();
+      if (shouldRerender) {
+        renderImportMappings();
+      }
     });
     dom.cloneMappings.addEventListener("change", (event) => {
       const target = event.target;
@@ -1951,6 +1998,18 @@
         align-items: flex-start;
         justify-content: space-between;
         margin-bottom: 14px;
+      }
+      #${APP_ID} .sk-title-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      #${APP_ID} .sk-mark {
+        width: 34px;
+        height: 34px;
+        display: block;
+        flex: 0 0 auto;
+        filter: drop-shadow(0 6px 14px rgba(255, 193, 7, 0.18));
       }
       #${APP_ID} .sk-head h2 {
         margin: 0;
@@ -2356,6 +2415,13 @@
         state.privateTokens = runtimeDtsg && runtimeLsd
           ? { fbDtsg: runtimeDtsg, asyncGetToken: "", lsd: runtimeLsd }
           : null;
+        if (!state.privateTokens) {
+          const session = await discoverSession();
+          state.privateTokens = session.privateTokens;
+          if (!state.token && session.token) {
+            state.token = session.token;
+          }
+        }
       } else {
         const session = await discoverSession();
         state.privateTokens = session.privateTokens;
@@ -2898,6 +2964,43 @@
         ? catalog.id
         : "";
     }
+  }
+
+  function packageUsesCatalogs(packageData) {
+    return getSourceCatalogsFromPackage(packageData).length > 0;
+  }
+
+  function importRequiresDraftOnly(packageData = state.importPackage) {
+    return packageUsesCatalogs(packageData);
+  }
+
+  function cloneRequiresDraftOnly(packageData = state.clonePackage) {
+    return packageUsesCatalogs(packageData) || Boolean(state.cloneManualSourceCatalogId);
+  }
+
+  function getModeOptionsMarkup(draftOnly) {
+    return `
+      <option value="DRAFT">DRAFT</option>
+      ${draftOnly ? "" : `
+      <option value="ACTIVE">ACTIVE</option>
+      <option value="PAUSED">PAUSED</option>`}
+    `;
+  }
+
+  function enforceImportModeConstraints() {
+    if (!importRequiresDraftOnly()) {
+      return;
+    }
+    state.importAsDraft = true;
+    state.importStatus = "PAUSED";
+  }
+
+  function enforceCloneModeConstraints() {
+    if (!cloneRequiresDraftOnly()) {
+      return;
+    }
+    state.cloneAsDraft = true;
+    state.cloneStatus = "PAUSED";
   }
 
   async function refreshImportAccountContext() {
@@ -3537,6 +3640,12 @@
       return candidate;
     }
 
+    function makeFriendlyMediaFileName(baseName, type, index, ext) {
+      const safeType = type === "video" ? "video" : "image";
+      const ordinal = Number.isFinite(index) ? String(index).padStart(2, "0") : "01";
+      return makeFriendlyFileName(`${baseName}__${safeType}_${ordinal}`, ext);
+    }
+
     for (const creativeId of creativeIds) {
       const creative = await graphFetch(creativeId, {
         query: {
@@ -3611,7 +3720,7 @@
             const image = images.data?.[0];
             const imageUrl = image?.url || image?.permalink_url;
             if (imageUrl) {
-              const friendly = makeFriendlyFileName(adName, ".jpg");
+              const friendly = makeFriendlyMediaFileName(adName, "image", afs.images.indexOf(img) + 1, ".jpg");
               sourceToFriendly.set(originalName, friendly);
               fileNameMap[originalName] = friendly;
               downloadQueue.push({
@@ -3635,7 +3744,7 @@
               query: { fields: "id,source" },
             });
             if (video.source) {
-              const friendly = makeFriendlyFileName(adName, ".mp4");
+              const friendly = makeFriendlyMediaFileName(adName, "video", afs.videos.indexOf(vid) + 1, ".mp4");
               sourceToFriendly.set(originalName, friendly);
               fileNameMap[originalName] = friendly;
               downloadQueue.push({
@@ -3655,7 +3764,7 @@
             const video = await graphFetch(videoId, {
               query: { fields: "id,source" },
             });
-            const friendly = makeFriendlyFileName(adName, ".mp4");
+            const friendly = makeFriendlyMediaFileName(adName, "video", 1, ".mp4");
             sourceToFriendly.set(originalName, friendly);
             fileNameMap[originalName] = friendly;
             downloadQueue.push({
@@ -3677,7 +3786,7 @@
             const image = images.data?.[0];
             const imageUrl = image?.url || image?.permalink_url;
             if (imageUrl) {
-              const friendly = makeFriendlyFileName(adName, ".jpg");
+              const friendly = makeFriendlyMediaFileName(adName, "image", 1, ".jpg");
               sourceToFriendly.set(originalName, friendly);
               fileNameMap[originalName] = friendly;
               downloadQueue.push({
@@ -3850,6 +3959,7 @@
     state.importAsDraft = options.asDraft ?? true;
     state.importStatus = options.status ?? "PAUSED";
     state.importPreserveSchedule = options.preserveSchedule ?? false;
+    enforceImportModeConstraints();
     if (dom.importCampaignName) {
       dom.importCampaignName.value = state.importCampaignName;
     }
@@ -3890,6 +4000,7 @@
       state.clonePageMappings = existingPageMappings;
       state.clonePixelMappings = existingPixelMappings;
       state.cloneCatalogMappings = existingCatalogMappings;
+      enforceCloneModeConstraints();
       if (dom.cloneCampaignName) {
         dom.cloneCampaignName.value = state.cloneCampaignName;
       }
@@ -4261,11 +4372,6 @@
     }
 
     const template = getAssetFeedFallbackTemplate(creative.id, "image");
-    if (!template) {
-      log("warn", `Creative ${creative.name} skipped: no asset_feed_spec fallback template available.`);
-      return null;
-    }
-
     const slot = getCreativeMediaSlots(creative).find((item) => item.type === "image");
     const mediaFile = slot ? getDefaultMediaFile(slot) : null;
     let uploadedHash = String(linkData.image_hash);
@@ -4276,6 +4382,20 @@
         uploadedHash = await uploadImage(accountId, mediaFile);
         mediaCache.images.set(mediaFile.name, uploadedHash);
       }
+    }
+
+    if (!template) {
+      const objectStorySpec = deepClone(raw.object_story_spec || {});
+      objectStorySpec.link_data = {
+        ...deepClone(linkData),
+        image_hash: uploadedHash,
+      };
+      delete objectStorySpec.video_data;
+      log("info", `Creative ${creative.name}: rebuilt unsupported audio-only draft into object_story_spec fallback.`);
+      return appendCreativeUrlTags({
+        name: raw.name || creative.name,
+        object_story_spec: objectStorySpec,
+      }, raw);
     }
 
     const ctaType = String(
@@ -4362,6 +4482,8 @@
         const originalKey = `${oldHash}.jpg`;
         const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
         const mediaFile = state.importMediaOverrides.get(`${creative.id}:afs_image_${afs.images.indexOf(img)}`)
+          || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
+          || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
           || state.importMediaFiles.get(mappedKey)
           || state.importMediaFiles.get(originalKey);
         if (mediaFile) {
@@ -4383,6 +4505,8 @@
         const originalKey = `${oldVideoId}.mp4`;
         const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
         const mediaFile = state.importMediaOverrides.get(`${creative.id}:afs_video_${afs.videos.indexOf(vid)}`)
+          || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
+          || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
           || state.importMediaFiles.get(mappedKey)
           || state.importMediaFiles.get(originalKey);
         if (mediaFile) {
@@ -4402,6 +4526,8 @@
       const originalKey = `${oldVideoId}.mp4`;
       const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
       const mediaFile = state.importMediaOverrides.get(`${creative.id}:video`)
+        || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
+        || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
         || state.importMediaFiles.get(mappedKey)
         || state.importMediaFiles.get(originalKey);
       if (mediaFile) {
@@ -4425,6 +4551,8 @@
       const originalKey = `${oldHash}.jpg`;
       const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
       const mediaFile = state.importMediaOverrides.get(`${creative.id}:image`)
+        || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
+        || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
         || state.importMediaFiles.get(mappedKey)
         || state.importMediaFiles.get(originalKey);
       if (mediaFile) {
@@ -6568,6 +6696,7 @@
     try {
       await initializeSession();
       await refreshImportAccountContext();
+      enforceImportModeConstraints();
       if (importOptions.pageMappings) {
         state.importPageMappings = {
           ...state.importPageMappings,

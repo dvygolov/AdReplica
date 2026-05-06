@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="AdReplica mark">
+  <defs>
+    <linearGradient id="adreplica-gold" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffe16a"/>
+      <stop offset="55%" stop-color="#ffd000"/>
+      <stop offset="100%" stop-color="#ffab00"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#adreplica-gold)" stroke-width="6"/>
+  <path d="M28 67V29h16.5c10.8 0 17 5.8 17 14.8 0 9.2-6.2 15-17 15H39v8.2Zm11-17.9h5.2c4.5 0 7-1.8 7-5.3 0-3.4-2.5-5.1-7-5.1H39Z" fill="url(#adreplica-gold)"/>
+  <path d="M52.5 28.5h14.8c7.9 0 12.7 4.6 12.7 11.2 0 5-2.5 8.4-6.8 10.1L81 67H69.7l-6-14h-1.4V42.7h3.2c2.7 0 4.3-1.2 4.3-3.4 0-2.2-1.6-3.5-4.3-3.5h-13Z" fill="#fff2bd" fill-opacity="0.96"/>
+  <circle cx="69.5" cy="65.5" r="5.5" fill="url(#adreplica-gold)"/>
+</svg>
