@@ -11,7 +11,7 @@
 
   const APP_ID = "fb-sk-ad-replica";
   const APP_TITLE = "AdReplica";
-  const APP_MARK_SVG = `<svg class="sk-mark" viewBox="0 0 96 96" aria-hidden="true"><defs><linearGradient id="${APP_ID}-gold" x1="0%" x2="100%" y1="0%" y2="100%"><stop offset="0%" stop-color="#ffe16a"/><stop offset="55%" stop-color="#ffd000"/><stop offset="100%" stop-color="#ffab00"/></linearGradient></defs><rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#${APP_ID}-gold)" stroke-width="6"/><path d="M28 67V29h16.5c10.8 0 17 5.8 17 14.8 0 9.2-6.2 15-17 15H39v8.2Zm11-17.9h5.2c4.5 0 7-1.8 7-5.3 0-3.4-2.5-5.1-7-5.1H39Z" fill="url(#${APP_ID}-gold)"/><path d="M52.5 28.5h14.8c7.9 0 12.7 4.6 12.7 11.2 0 5-2.5 8.4-6.8 10.1L81 67H69.7l-6-14h-1.4V42.7h3.2c2.7 0 4.3-1.2 4.3-3.4 0-2.2-1.6-3.5-4.3-3.5h-13Z" fill="#fff2bd" fill-opacity="0.96"/><circle cx="69.5" cy="65.5" r="5.5" fill="url(#${APP_ID}-gold)"/></svg>`;
+  const APP_MARK_SVG = `<svg class="sk-mark" viewBox="0 0 96 96" aria-hidden="true"><defs><linearGradient id="${APP_ID}-gold" x1="0%" x2="100%" y1="0%" y2="100%"><stop offset="0%" stop-color="#ffe16a"/><stop offset="55%" stop-color="#ffd000"/><stop offset="100%" stop-color="#ffab00"/></linearGradient></defs><rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#${APP_ID}-gold)" stroke-width="6"/><path d="M21 67 34.8 29h12.4L61 67H50.2l-2.2-6.8H34.1L31.9 67Zm16.5-15.3h7l-3.5-10.8Z" fill="url(#${APP_ID}-gold)"/><path d="M50.5 67V29h16.1c8.9 0 14.1 4.6 14.1 12.1 0 5.2-2.6 8.9-7 10.7L82 67H71.1l-6.3-13.5h-1.7V45h2.9c3 0 4.8-1.4 4.8-4 0-2.6-1.8-4-4.8-4h-4.7V67Z" fill="#fff2bd" fill-opacity="0.97"/><path d="M63.4 53.4 72.6 67h-8.4l-5.9-13.6Z" fill="url(#${APP_ID}-gold)"/></svg>`;
   const NATIVE_FETCH_FRAME_ID = `${APP_ID}-native-fetch-frame`;
   const PAGE_IDENTITY_HINTS_KEY = "adreplica.pageIdentityHints.v1";
 
@@ -290,16 +290,6 @@
     }
 
     return `(${adReplicaLoader.toString()})(${JSON.stringify(loaderConfig)});`;
-  }
-
-  function buildAdReplicaBookmarklet() {
-    const source = buildAdReplicaLoaderSource({
-      app: APP_TITLE,
-      manifestOgObjectId: "36372667002332356",
-      cacheKey: "adreplica.loader.cache.v1",
-      timeoutMs: 45000,
-    });
-    return `javascript:${encodeURIComponent(source)}`;
   }
 
   function log(level, message, details) {
@@ -1388,13 +1378,16 @@
               ${escapeHtml(slot.expectedFileName)}
             </div>
             <div class="sk-creative-file">${escapeHtml(slot.creativeName || slot.creativeId)}</div>
-            <div class="sk-creative-status">${escapeHtml(file ? `Selected: ${file.name}` : "file not loaded")}</div>
+            <div class="sk-creative-status">${escapeHtml(file ? `Selected: ${file.name}` : "Awaiting file selection")}</div>
           </div>
-          <input type="file"
-            data-action="${escapeHtml(mediaAction)}"
-            data-media-key="${escapeHtml(slot.key)}"
-            data-expected-file="${escapeHtml(slot.expectedFileName)}"
-            accept="${slot.type === "video" ? "video/*" : "image/*"}" />
+          <label class="sk-file-trigger">
+            <span>Choose file</span>
+            <input class="sk-file-input" type="file"
+              data-action="${escapeHtml(mediaAction)}"
+              data-media-key="${escapeHtml(slot.key)}"
+              data-expected-file="${escapeHtml(slot.expectedFileName)}"
+              accept="${slot.type === "video" ? "video/*" : "image/*"}" />
+          </label>
         </div>
       `;
     }).join("");
@@ -1757,7 +1750,6 @@
           <textarea id="${APP_ID}-logs" class="sk-log-area" readonly></textarea>
         </details>
 
-        <a href="#" class="sk-bookmark-link" id="${APP_ID}-copy-bookmark">Copy as bookmark</a>
       </div>
     `;
 
@@ -1914,7 +1906,7 @@
         const row = target.closest(".sk-creative-row");
         const statusNode = row?.querySelector(".sk-creative-status");
         if (statusNode) {
-          statusNode.textContent = file ? `Selected: ${file.name}` : "file not loaded";
+          statusNode.textContent = file ? `Selected: ${file.name}` : "Awaiting file selection";
         }
         shouldRerender = false;
       }
@@ -1944,11 +1936,6 @@
         state.cloneCatalogMappings[target.dataset.sourceCatalogId] = target.value;
       }
       renderCloneMappings();
-    });
-
-    root.querySelector(`#${APP_ID}-copy-bookmark`).addEventListener("click", (e) => {
-      e.preventDefault();
-      copyAsBookmarklet();
     });
 
     state.uiReady = true;
@@ -2247,6 +2234,27 @@
         align-items: center;
         font-weight: 600;
       }
+      #${APP_ID} .sk-file-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: fit-content;
+        min-width: 104px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #595959;
+        background: #1e1e1e;
+        color: #f5f5f5;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      #${APP_ID} .sk-file-trigger:hover {
+        border-color: #ffc107;
+      }
+      #${APP_ID} .sk-file-input {
+        display: none;
+      }
       #${APP_ID} .sk-badge {
         font-size: 10px;
         font-weight: 700;
@@ -2278,17 +2286,6 @@
         white-space: pre;
         overflow: auto;
       }
-      #${APP_ID} .sk-bookmark-link {
-        display: block;
-        text-align: center;
-        margin-top: 12px;
-        font-size: 12px;
-        color: #ffc107;
-        text-decoration: underline;
-        cursor: pointer;
-        opacity: 0.7;
-      }
-      #${APP_ID} .sk-bookmark-link:hover { opacity: 1; }
       @media (max-width: 640px) {
         #${APP_ID} { inset: 10px; }
         #${APP_ID} .sk-summary-grid { grid-template-columns: 1fr; }
@@ -6888,26 +6885,6 @@
     } finally {
       state.importPackage = originalImportPackage;
       setBusy(false);
-    }
-  }
-
-  function copyAsBookmarklet() {
-    try {
-      const bookmarklet = buildAdReplicaBookmarklet();
-
-      navigator.clipboard.writeText(bookmarklet).then(() => {
-        alert("Loader bookmarklet copied to clipboard!");
-      }).catch(() => {
-        const ta = document.createElement("textarea");
-        ta.value = bookmarklet;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        alert("Loader bookmarklet copied to clipboard!");
-      });
-    } catch (error) {
-      log("error", "Failed to copy bookmarklet.", String(error));
     }
   }
 
