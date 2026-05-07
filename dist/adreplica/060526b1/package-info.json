@@ -2,10 +2,10 @@
   "app": "AdReplica",
   "build": "060526b1",
   "version": "060526b1",
-  "generatedAt": "2026-05-07T04:43:34.957Z",
+  "generatedAt": "2026-05-07T06:26:22.394Z",
   "payload": {
     "encoding": "base64",
-    "sha256": "f21ba05df9ca8a1b6ad15f4bfd204b5352ee96439f243cec1cebbe489c58da82",
+    "sha256": "de521d89a755c41b2f5a3c3c9bd33d28b71f0a9e78830e14d6cad3ba7085bec0",
     "byteLength": 252064
   },
   "chunks": [
@@ -16,7 +16,7 @@
       "latestUrl": "https://adreplica.pages.dev/adreplica/latest/og/chunk-001.html",
       "ogObjectId": "26634643699518067",
       "base64Length": 336088,
-      "base64Sha256": "2f2d706c378efecee2211cd2998fb60b7648a85513f14cebf97182112c6c8c42"
+      "base64Sha256": "33ecc8ea3b4d5de02042ffba29b5daeb3cdd27ef0e7ba7f6b467371ae227d8a5"
     }
   ],
   "manifestOgObjectId": "36372667002332356",
