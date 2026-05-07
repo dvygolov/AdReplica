@@ -1,31 +1,31 @@
 {
   "app": "AdReplica",
-  "build": "060526b1",
-  "version": "060526b1",
-  "generatedAt": "2026-05-07T06:55:32.853Z",
+  "build": "070526b1",
+  "version": "070526b1",
+  "generatedAt": "2026-05-07T07:34:55.787Z",
   "payload": {
     "encoding": "base64",
-    "sha256": "6be259b4a758c5a0d7c79e5f82977c4f4e7c6a2a3cb3863ff749db91aff8705e",
+    "sha256": "8e1130efcb8cbe85a8be75ad9835212ba7ba445147117188b825de457a0aad34",
     "byteLength": 251990
   },
   "chunks": [
     {
       "index": 1,
       "file": "og/chunk-001.html",
-      "url": "https://adreplica.pages.dev/adreplica/060526b1/og/chunk-001.html",
+      "url": "https://adreplica.pages.dev/adreplica/070526b1/og/chunk-001.html",
       "latestUrl": "https://adreplica.pages.dev/adreplica/latest/og/chunk-001.html",
       "ogObjectId": "26634643699518067",
       "base64Length": 335988,
-      "base64Sha256": "b0a8c799ac2744bfd6e596167bc369e3ed6a63b05bc92bfdcf88a025605f47f1"
+      "base64Sha256": "2168bee16fa1128658683786c701f44af443d5c84e67547b23139c31f2fec1fa"
     }
   ],
   "manifestOgObjectId": "36372667002332356",
-  "source": "fb-campaign-porter.js",
+  "source": "adreplica.js",
   "chunkSize": 350000,
   "payloadFile": "payload.js",
-  "payloadUrl": "https://adreplica.pages.dev/adreplica/060526b1/payload.js",
+  "payloadUrl": "https://adreplica.pages.dev/adreplica/070526b1/payload.js",
   "latestPayloadUrl": "https://adreplica.pages.dev/adreplica/latest/payload.js",
   "manifestFile": "manifest.html",
-  "manifestUrl": "https://adreplica.pages.dev/adreplica/060526b1/manifest.html",
+  "manifestUrl": "https://adreplica.pages.dev/adreplica/070526b1/manifest.html",
   "latestManifestUrl": "https://adreplica.pages.dev/adreplica/latest/manifest.html"
 }

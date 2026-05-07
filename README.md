@@ -23,7 +23,7 @@ Then open Facebook Ads Manager and click the bookmark.
 
 ## Files
 
-- `fb-campaign-porter.js` is the AdReplica payload.
+- `adreplica.js` is the AdReplica payload.
 - `adreplica-loader.js` is the small bookmarklet loader.
 - `adreplica-og-packager.js` builds the landing page, OG manifest/chunks, and deployable `dist` folder.
 - `dist/` is the Cloudflare Pages static root.

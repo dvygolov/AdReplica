@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "060526b1",
+    VERSION: "070526b1",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",

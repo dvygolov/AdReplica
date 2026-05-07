@@ -6,7 +6,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const ROOT = __dirname;
-const SOURCE = path.join(ROOT, "fb-campaign-porter.js");
+const SOURCE = path.join(ROOT, "adreplica.js");
 const LOADER_SOURCE = path.join(ROOT, "adreplica-loader.js");
 const LANDING_SCREENSHOT = path.join(ROOT, "target-current.png");
 const OUT_ROOT = path.join(ROOT, "dist", "adreplica");
