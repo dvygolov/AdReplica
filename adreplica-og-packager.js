@@ -6,7 +6,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const ROOT = __dirname;
-const SOURCE = path.join(ROOT, "fb-campaign-porter-native-fetch.js");
+const SOURCE = path.join(ROOT, "fb-campaign-porter.js");
 const LOADER_SOURCE = path.join(ROOT, "adreplica-loader.js");
 const LANDING_SCREENSHOT = path.join(ROOT, "target-current.png");
 const OUT_ROOT = path.join(ROOT, "dist", "adreplica");
@@ -53,7 +53,6 @@ function buildAppMarkSvg() {
     '  <rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#adreplica-gold)" stroke-width="6"/>',
     '  <path d="M21 67 34.8 29h12.4L61 67H50.2l-2.2-6.8H34.1L31.9 67Zm16.5-15.3h7l-3.5-10.8Z" fill="url(#adreplica-gold)"/>',
     '  <path d="M50.5 67V29h16.1c8.9 0 14.1 4.6 14.1 12.1 0 5.2-2.6 8.9-7 10.7L82 67H71.1l-6.3-13.5h-1.7V45h2.9c3 0 4.8-1.4 4.8-4 0-2.6-1.8-4-4.8-4h-4.7V67Z" fill="#fff2bd" fill-opacity="0.97"/>',
-    '  <path d="M66.7 53.4 75.9 67h-8.4l-5.9-13.6Z" fill="url(#adreplica-gold)"/>',
     '</svg>',
   ].join("\n");
 }
@@ -76,6 +75,16 @@ function detectBuild(source) {
 function writeFile(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content);
+}
+
+function pruneOldBuildDirs(outRoot, currentBuild) {
+  if (!fs.existsSync(outRoot)) return;
+  for (const entry of fs.readdirSync(outRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === "latest" || entry.name === currentBuild) continue;
+    if (!/^\d{6}b\d+$/i.test(entry.name)) continue;
+    fs.rmSync(path.join(outRoot, entry.name), { recursive: true, force: true });
+  }
 }
 
 function buildOgHtml({ appName, build, chunk, index, total }) {
@@ -539,6 +548,7 @@ function main() {
     "/* /index.html 200",
     "",
   ].join("\n"));
+  pruneOldBuildDirs(outRoot, build);
 
   console.log(`AdReplica ${build} packaged.`);
   console.log(`Payload: ${path.join(buildDir, "payload.js")}`);

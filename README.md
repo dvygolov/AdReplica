@@ -6,7 +6,7 @@ AdReplica runs inside the current Ads Manager tab. It can export campaign struct
 
 ## Install
 
-Open the landing page and drag the yellow `AdReplica` button to the bookmarks bar:
+Open the landing page, click the yellow `AdReplica` button to copy the bookmarklet, then create a browser bookmark and paste it into the bookmark URL field:
 
 https://adreplica.pages.dev/
 
@@ -23,8 +23,7 @@ Then open Facebook Ads Manager and click the bookmark.
 
 ## Files
 
-- `fb-campaign-porter.js` is the main AdReplica payload.
-- `fb-campaign-porter-native-fetch.js` is the payload variant that prefers a clean native iframe fetch to reduce Meta instrumentation noise.
+- `fb-campaign-porter.js` is the AdReplica payload.
 - `adreplica-loader.js` is the small bookmarklet loader.
 - `adreplica-og-packager.js` builds the landing page, OG manifest/chunks, and deployable `dist` folder.
 - `dist/` is the Cloudflare Pages static root.

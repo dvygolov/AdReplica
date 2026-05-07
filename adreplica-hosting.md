@@ -10,7 +10,7 @@ Use Cloudflare Pages or a Cloudflare Worker-backed static route.
 
 ## Runtime Flow
 
-1. The root `https://adreplica.pages.dev/` page serves a branded install landing with a draggable bookmarklet.
+1. The root `https://adreplica.pages.dev/` page serves a branded install landing with a one-click bookmarklet copy button.
 2. The bookmarklet stays small and only contains the loader.
 3. The loader runs only on `*.facebook.com`.
 4. The loader reads an OG-backed manifest through `adsmanager-graph.facebook.com`, using the current Ads Manager runtime token.
@@ -24,10 +24,10 @@ Use Cloudflare Pages or a Cloudflare Worker-backed static route.
 Generate deployable files:
 
 ```powershell
-node D:\YandexDisk\Coding\Arbitrazh\FB.SwissKnife\browser-tools\adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica
+node D:\YandexDisk\Coding\Arbitrazh\AdReplica\adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica
 ```
 
-Deploy `D:\YandexDisk\Coding\Arbitrazh\FB.SwissKnife\browser-tools\dist` as the Cloudflare Pages root.
+Deploy `D:\YandexDisk\Coding\Arbitrazh\AdReplica\dist` as the Cloudflare Pages root.
 
 After deploy, scrape the generated `latest/manifest.html` and every generated `latest/og/chunk-*.html` URL:
 

@@ -12,6 +12,7 @@ adreplica-last-*.json
 exports/
 downloads/
 media/
+qa/
 
 # Local secret stores or accidental dumps.
 *.kdbx
