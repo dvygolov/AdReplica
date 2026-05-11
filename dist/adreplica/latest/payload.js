@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "070526b1",
+    VERSION: "110526b1",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -526,6 +526,45 @@
       body.url_tags = raw.url_tags;
     }
     return body;
+  }
+
+  function buildDraftStandaloneVideoCreative(raw, fallbackName = "") {
+    if (!raw || typeof raw !== "object") {
+      return {};
+    }
+    const osp = raw.object_story_spec || {};
+    const videoData = osp.video_data || {};
+    const payload = {};
+    if (raw.name || fallbackName) {
+      payload.name = raw.name || fallbackName;
+    }
+    payload.actor_type = raw.actor_type || "PAGE";
+    payload.enable_direct_install = raw.enable_direct_install !== undefined
+      ? Boolean(raw.enable_direct_install)
+      : false;
+    payload.object_type = raw.object_type || "VIDEO";
+    if (raw.url_tags) {
+      payload.url_tags = raw.url_tags;
+    }
+    const objectStorySpec = {};
+    for (const field of ["page_id", "instagram_user_id", "instagram_actor_id"]) {
+      if (osp[field] !== undefined && osp[field] !== null && osp[field] !== "") {
+        objectStorySpec[field] = osp[field];
+      }
+    }
+    const normalizedVideoData = {};
+    for (const field of ["video_id", "title", "message", "image_url", "video_thumbnail_source", "call_to_action"]) {
+      if (videoData[field] !== undefined && videoData[field] !== null && videoData[field] !== "") {
+        normalizedVideoData[field] = deepClone(videoData[field]);
+      }
+    }
+    if (Object.keys(normalizedVideoData).length) {
+      objectStorySpec.video_data = normalizedVideoData;
+    }
+    if (Object.keys(objectStorySpec).length) {
+      payload.object_story_spec = objectStorySpec;
+    }
+    return payload;
   }
 
   function buildImportedCreativePayload(raw) {
@@ -5169,14 +5208,23 @@
       }
     }
 
-    const payload = appendCreativeUrlTags({
-      name: raw.name || creative.name,
-      object_story_spec: osp,
-    }, raw);
+    const payload = slot.type === "video"
+      ? buildDraftStandaloneVideoCreative({
+        ...raw,
+        object_story_spec: osp,
+      }, raw.name || creative.name)
+      : appendCreativeUrlTags({
+        name: raw.name || creative.name,
+        object_story_spec: osp,
+      }, raw);
     if (!await validateDraftCreativePayload(accountId, raw.name || creative.name, payload, {
       forceVideoRetry: slot.type === "video",
     })) {
       return null;
+    }
+
+    if (slot.type === "video") {
+      return payload;
     }
 
     raw.object_story_spec = osp;
