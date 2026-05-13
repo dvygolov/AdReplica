@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "110526b1",
+    VERSION: "130526b1",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -2913,6 +2913,79 @@
       (left.name || left.id).localeCompare(right.name || right.id, "ru"));
   }
 
+  async function fetchEligibleCatalogsForAccount(accountId) {
+    const normalizedAccountId = String(accountId || "").replace(/^act_/, "");
+    if (!normalizedAccountId) {
+      return [];
+    }
+    try {
+      const result = await graphFetch(`act_${normalizedAccountId}/dpa_eligible_product_catalogs`, {
+        query: {
+          fields: "id,name,vertical,product_count",
+          limit: 100,
+          request_source: "PRODUCT_EXTENSIONS_ELIGIBILITY_CHECK",
+        },
+      });
+      return (result.data || [])
+        .map((row) => {
+          const id = String(row?.id || "");
+          if (!id) {
+            return null;
+          }
+          return {
+            id,
+            name: row.name || id,
+            vertical: row.vertical || "",
+            productCount: row.product_count ?? null,
+            edge: "dpa_eligible_product_catalogs",
+          };
+        })
+        .filter(Boolean)
+        .sort((left, right) => (left.name || left.id).localeCompare(right.name || right.id, "ru"));
+    } catch (error) {
+      const level = isPermissionDeniedGraphError(error) ? "info" : "warn";
+      log(level, `Eligible catalog lookup failed for act_${normalizedAccountId}.`, String(error));
+      return [];
+    }
+  }
+
+  function mergeCatalogLists(primaryCatalogs = [], secondaryCatalogs = []) {
+    const catalogMap = new Map();
+    for (const row of [...(primaryCatalogs || []), ...(secondaryCatalogs || [])]) {
+      const id = String(row?.id || "");
+      if (!id) {
+        continue;
+      }
+      if (!catalogMap.has(id)) {
+        catalogMap.set(id, {
+          id,
+          name: row.name || id,
+          vertical: row.vertical || "",
+          productCount: row.productCount ?? row.product_count ?? null,
+          edge: row.edge || "",
+        });
+        continue;
+      }
+      const existing = catalogMap.get(id);
+      if (!existing.name && row.name) {
+        existing.name = row.name;
+      }
+      if (!existing.vertical && row.vertical) {
+        existing.vertical = row.vertical;
+      }
+      if ((existing.productCount === null || existing.productCount === undefined) && (row.productCount !== null && row.productCount !== undefined)) {
+        existing.productCount = row.productCount;
+      }
+      if (!existing.edge && row.edge) {
+        existing.edge = row.edge;
+      } else if (row.edge && !String(existing.edge || "").includes(row.edge)) {
+        existing.edge = `${existing.edge},${row.edge}`;
+      }
+    }
+    return [...catalogMap.values()].sort((left, right) =>
+      (left.name || left.id).localeCompare(right.name || right.id, "ru"));
+  }
+
   async function fetchAccountContext(accountId) {
     const normalizedAccountId = String(accountId || "").replace(/^act_/, "");
     if (state.accountContextCache[normalizedAccountId]) {
@@ -2948,7 +3021,12 @@
       fields: "id,name",
     });
     const business = await fetchAdAccountBusiness(normalizedAccountId);
-    const catalogs = await fetchBusinessCatalogs(business?.id || "");
+    const businessCatalogs = await fetchBusinessCatalogs(business?.id || "");
+    const eligibleCatalogs = await fetchEligibleCatalogsForAccount(normalizedAccountId);
+    const catalogs = mergeCatalogLists(businessCatalogs, eligibleCatalogs);
+    if (eligibleCatalogs.length > businessCatalogs.length) {
+      log("info", `Expanded target catalog list for act_${normalizedAccountId} via dpa_eligible_product_catalogs: ${businessCatalogs.length} -> ${catalogs.length}.`);
+    }
     const context = {
       pages: state.accessiblePagesCache,
       pixels: pixels.map((pixel) => ({
