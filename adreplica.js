@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "140526b8",
+    VERSION: "140526b9",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -3500,6 +3500,7 @@
         id: String(productSet.id),
         name: productSet.name || `Product set ${productSet.id}`,
         filter: productSet.filter,
+        is_autogen_product_set: Boolean(productSet.is_autogen_product_set),
         product_catalog: {
           id: String(catalogId),
           name: productCatalog?.name || item?.name || `Catalog ${catalogId}`,
@@ -3516,10 +3517,9 @@
     const catalogMap = new Map();
     const productSetMap = new Map();
     const fields = [
-      "product_sets.limit(1).filtering([",
-      "{\"field\":\"product_count\",\"operator\":\"GREATER_THAN\",\"value\":0},",
-      "{\"field\":\"is_autogen_product_set\",\"operator\":\"EQUAL\",\"value\":0}",
-      "]){id,name,filter,capability,cpas_category_product_set_id,",
+      "product_sets.limit(10).filtering([",
+      "{\"field\":\"product_count\",\"operator\":\"GREATER_THAN\",\"value\":0}",
+      "]){id,name,filter,capability,cpas_category_product_set_id,is_autogen_product_set,",
       "is_eligible_for_value_optimization,is_eligible_for_value_optimization_new,",
       "da_approved_items_count,original_creation_source,checkout_eligible_item_count,",
       "collection{url},product_catalog{id,name,vertical,has_localized_overrides,catalog_item_type}}",
@@ -4157,6 +4157,15 @@
         if (creative?.raw && !creative.raw.product_set_id) {
           creative.raw.product_set_id = String(productSet.id);
         }
+      }
+    }
+    for (const ad of ads || []) {
+      const creative = creatives.find((item) => String(item.id) === String(ad?.creative?.id || ""));
+      if (!creative || !isLikelyCatalogCreative(creative)) {
+        continue;
+      }
+      if (!creative?.raw?.product_set_id) {
+        log("warn", `Catalog creative ${creative.name || creative.id} exported without product_set_id after DPA hint enrichment.`);
       }
     }
     const provisionalPackage = {
