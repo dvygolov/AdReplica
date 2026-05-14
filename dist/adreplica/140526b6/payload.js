@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "140526b5",
+    VERSION: "140526b6",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -618,6 +618,60 @@
     return body;
   }
 
+  function isGeneratedVideoThumbnailSource(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return !normalized || normalized === "generated_default" || normalized === "default" || normalized === "auto";
+  }
+
+  function extractMediaExtensionFromUrl(url, fallback = ".jpg") {
+    if (!url) {
+      return fallback;
+    }
+    try {
+      const pathname = new URL(String(url)).pathname || "";
+      const match = pathname.match(/(\.[a-z0-9]{2,5})$/i);
+      if (match) {
+        const ext = match[1].toLowerCase();
+        if ([".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
+          return ext === ".jpeg" ? ".jpg" : ext;
+        }
+      }
+    } catch (_error) {
+      // noop
+    }
+    return fallback;
+  }
+
+  function hasStandaloneCustomVideoThumbnail(videoData) {
+    if (!videoData || typeof videoData !== "object") {
+      return false;
+    }
+    if (videoData.image_hash) {
+      return true;
+    }
+    if (videoData.image_url && !isGeneratedVideoThumbnailSource(videoData.video_thumbnail_source)) {
+      return true;
+    }
+    return false;
+  }
+
+  function hasAssetFeedCustomVideoThumbnail(videoSpec) {
+    if (!videoSpec || typeof videoSpec !== "object") {
+      return false;
+    }
+    if (videoSpec.thumbnail_hash) {
+      return true;
+    }
+    if (videoSpec.thumbnail_url && !isGeneratedVideoThumbnailSource(videoSpec.thumbnail_source)) {
+      return true;
+    }
+    return false;
+  }
+
+  function getVideoThumbnailOriginalName(videoId, ext = ".jpg") {
+    return `${String(videoId || "")}__preview${ext}`;
+  }
+
   function buildDraftStandaloneVideoCreative(raw, fallbackName = "") {
     if (!raw || typeof raw !== "object") {
       return {};
@@ -643,7 +697,7 @@
       }
     }
     const normalizedVideoData = {};
-    for (const field of ["video_id", "title", "message", "image_url", "video_thumbnail_source", "call_to_action"]) {
+    for (const field of ["video_id", "title", "message", "image_hash", "image_url", "video_thumbnail_source", "call_to_action"]) {
       if (videoData[field] !== undefined && videoData[field] !== null && videoData[field] !== "") {
         normalizedVideoData[field] = deepClone(videoData[field]);
       }
@@ -877,6 +931,18 @@
               expectedFileName: (fnMap && fnMap[originalName]) || originalName,
               sourceId: videoId,
             });
+            if (hasAssetFeedCustomVideoThumbnail(vid)) {
+              const ext = extractMediaExtensionFromUrl(vid.thumbnail_url, ".jpg");
+              const thumbOriginalName = getVideoThumbnailOriginalName(videoId, ext);
+              slots.push({
+                key: `${creative.id}:afs_video_thumb_${index}`,
+                creativeId: creative.id,
+                creativeName: creative.name,
+                type: "image",
+                expectedFileName: (fnMap && fnMap[thumbOriginalName]) || thumbOriginalName,
+                sourceId: `${videoId}:preview`,
+              });
+            }
           }
         });
       }
@@ -897,6 +963,18 @@
         expectedFileName: (fnMap && fnMap[originalName]) || originalName,
         sourceId: videoId,
       });
+      if (hasStandaloneCustomVideoThumbnail(osp.video_data)) {
+        const ext = extractMediaExtensionFromUrl(osp.video_data.image_url, ".jpg");
+        const thumbOriginalName = getVideoThumbnailOriginalName(videoId, ext);
+        slots.push({
+          key: `${creative.id}:video_preview`,
+          creativeId: creative.id,
+          creativeName: creative.name,
+          type: "image",
+          expectedFileName: (fnMap && fnMap[thumbOriginalName]) || thumbOriginalName,
+          sourceId: `${videoId}:preview`,
+        });
+      }
     } else if (osp.link_data?.image_hash) {
       const imageHash = String(osp.link_data.image_hash);
       const originalName = `${imageHash}.jpg`;
@@ -3853,7 +3931,7 @@
     }
 
     function makeFriendlyMediaFileName(baseName, type, index, ext) {
-      const safeType = type === "video" ? "video" : "image";
+      const safeType = sanitizeFileName(type === "video" || type === "image" ? type : String(type || "media")) || "media";
       const ordinal = Number.isFinite(index) ? String(index).padStart(2, "0") : "01";
       return makeFriendlyFileName(`${baseName}__${safeType}_${ordinal}`, ext);
     }
@@ -3965,6 +4043,33 @@
                 sourceUrl: video.source,
               });
             }
+            if (hasAssetFeedCustomVideoThumbnail(vid)) {
+              const previewExt = extractMediaExtensionFromUrl(vid.thumbnail_url, ".jpg");
+              const previewOriginalName = getVideoThumbnailOriginalName(videoId, previewExt);
+              if (!sourceToFriendly.has(previewOriginalName)) {
+                let previewUrl = vid.thumbnail_url || "";
+                if (!previewUrl && vid.thumbnail_hash) {
+                  const images = await graphFetch(`act_${accountId}/adimages`, {
+                    query: {
+                      hashes: [String(vid.thumbnail_hash)],
+                      fields: "hash,url,permalink_url",
+                    },
+                  });
+                  const image = images.data?.[0];
+                  previewUrl = image?.url || image?.permalink_url || "";
+                }
+                if (previewUrl) {
+                  const friendly = makeFriendlyMediaFileName(adName, "preview", afs.videos.indexOf(vid) + 1, previewExt);
+                  sourceToFriendly.set(previewOriginalName, friendly);
+                  fileNameMap[previewOriginalName] = friendly;
+                  downloadQueue.push({
+                    type: "image",
+                    fileName: friendly,
+                    sourceUrl: previewUrl,
+                  });
+                }
+              }
+            }
           }
         }
       }
@@ -3984,6 +4089,33 @@
               fileName: friendly,
               sourceUrl: video.source,
             });
+          }
+          if (hasStandaloneCustomVideoThumbnail(osp.video_data)) {
+            const previewExt = extractMediaExtensionFromUrl(osp.video_data.image_url, ".jpg");
+            const previewOriginalName = getVideoThumbnailOriginalName(videoId, previewExt);
+            if (!sourceToFriendly.has(previewOriginalName)) {
+              let previewUrl = osp.video_data.image_url || "";
+              if (!previewUrl && osp.video_data.image_hash) {
+                const images = await graphFetch(`act_${accountId}/adimages`, {
+                  query: {
+                    hashes: [String(osp.video_data.image_hash)],
+                    fields: "hash,url,permalink_url",
+                  },
+                });
+                const image = images.data?.[0];
+                previewUrl = image?.url || image?.permalink_url || "";
+              }
+              if (previewUrl) {
+                const friendly = makeFriendlyMediaFileName(adName, "preview", 1, previewExt);
+                sourceToFriendly.set(previewOriginalName, friendly);
+                fileNameMap[previewOriginalName] = friendly;
+                downloadQueue.push({
+                  type: "image",
+                  fileName: friendly,
+                  sourceUrl: previewUrl,
+                });
+              }
+            }
           }
         } else if (osp.link_data?.image_hash) {
           const imageHash = String(osp.link_data.image_hash);
@@ -4692,20 +4824,10 @@
         if (!img.hash) continue;
         const oldHash = String(img.hash);
         const originalKey = `${oldHash}.jpg`;
-        const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
-        const mediaFile = state.importMediaOverrides.get(`${creative.id}:afs_image_${afs.images.indexOf(img)}`)
-          || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
-          || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
-          || state.importMediaFiles.get(mappedKey)
-          || state.importMediaFiles.get(originalKey);
+        const mediaFile = resolveImportedMediaFile(`${creative.id}:afs_image_${afs.images.indexOf(img)}`, originalKey, fnMap);
         if (mediaFile) {
-          let newHash = mediaCache.images.get(mediaFile.name);
-          if (!newHash) {
-            log("info", `Uploading image ${mediaFile.name}...`);
-            newHash = await uploadImage(accountId, mediaFile);
-            mediaCache.images.set(mediaFile.name, newHash);
-          }
-          img.hash = newHash;
+          const uploaded = await uploadImageAsset(accountId, mediaFile, mediaCache);
+          img.hash = uploaded.hash;
         }
       }
     }
@@ -4714,13 +4836,9 @@
       for (const vid of afs.videos) {
         if (!vid.video_id) continue;
         const oldVideoId = String(vid.video_id);
+        const videoIndex = afs.videos.indexOf(vid);
         const originalKey = `${oldVideoId}.mp4`;
-        const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
-        const mediaFile = state.importMediaOverrides.get(`${creative.id}:afs_video_${afs.videos.indexOf(vid)}`)
-          || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
-          || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
-          || state.importMediaFiles.get(mappedKey)
-          || state.importMediaFiles.get(originalKey);
+        const mediaFile = resolveImportedMediaFile(`${creative.id}:afs_video_${videoIndex}`, originalKey, fnMap);
         if (mediaFile) {
           let newId = mediaCache.videos.get(mediaFile.name);
           if (!newId) {
@@ -4729,6 +4847,20 @@
             mediaCache.videos.set(mediaFile.name, newId);
           }
           vid.video_id = newId;
+          const previewOriginalKey = getVideoThumbnailOriginalName(oldVideoId, extractMediaExtensionFromUrl(vid.thumbnail_url, ".jpg"));
+          const previewFile = resolveImportedMediaFile(`${creative.id}:afs_video_thumb_${videoIndex}`, previewOriginalKey, fnMap);
+          if (previewFile) {
+            const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
+            if (uploadedPreview.url) {
+              vid.thumbnail_url = uploadedPreview.url;
+            }
+            vid.thumbnail_hash = uploadedPreview.hash;
+            vid.thumbnail_source = "custom";
+          } else {
+            vid.thumbnail_url = await getPreferredVideoThumbnail(newId);
+            delete vid.thumbnail_hash;
+            vid.thumbnail_source = "generated_default";
+          }
         }
       }
     }
@@ -4736,12 +4868,7 @@
     if (osp.video_data?.video_id) {
       const oldVideoId = String(osp.video_data.video_id);
       const originalKey = `${oldVideoId}.mp4`;
-      const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
-      const mediaFile = state.importMediaOverrides.get(`${creative.id}:video`)
-        || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
-        || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
-        || state.importMediaFiles.get(mappedKey)
-        || state.importMediaFiles.get(originalKey);
+      const mediaFile = resolveImportedMediaFile(`${creative.id}:video`, originalKey, fnMap);
       if (mediaFile) {
         let newId = mediaCache.videos.get(mediaFile.name);
         if (!newId) {
@@ -4753,31 +4880,33 @@
           osp.video_data = {};
         }
         osp.video_data.video_id = newId;
-        delete osp.video_data.image_hash;
-        if (!osp.video_data.image_url) {
+        const previewOriginalKey = getVideoThumbnailOriginalName(oldVideoId, extractMediaExtensionFromUrl(osp.video_data.image_url, ".jpg"));
+        const previewFile = resolveImportedMediaFile(`${creative.id}:video_preview`, previewOriginalKey, fnMap);
+        if (previewFile) {
+          const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
+          osp.video_data.image_hash = uploadedPreview.hash;
+          if (uploadedPreview.url) {
+            osp.video_data.image_url = uploadedPreview.url;
+          } else {
+            delete osp.video_data.image_url;
+          }
+          osp.video_data.video_thumbnail_source = "custom";
+        } else {
+          delete osp.video_data.image_hash;
           osp.video_data.image_url = await getPreferredVideoThumbnail(newId);
+          osp.video_data.video_thumbnail_source = "generated_default";
         }
       }
     } else if (osp.link_data?.image_hash) {
       const oldHash = String(osp.link_data.image_hash);
       const originalKey = `${oldHash}.jpg`;
-      const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
-      const mediaFile = state.importMediaOverrides.get(`${creative.id}:image`)
-        || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
-        || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
-        || state.importMediaFiles.get(mappedKey)
-        || state.importMediaFiles.get(originalKey);
+      const mediaFile = resolveImportedMediaFile(`${creative.id}:image`, originalKey, fnMap);
       if (mediaFile) {
-        let newHash = mediaCache.images.get(mediaFile.name);
-        if (!newHash) {
-          log("info", `Uploading image ${mediaFile.name}...`);
-          newHash = await uploadImage(accountId, mediaFile);
-          mediaCache.images.set(mediaFile.name, newHash);
-        }
+        const uploaded = await uploadImageAsset(accountId, mediaFile, mediaCache);
         if (!osp.link_data) {
           osp.link_data = {};
         }
-        osp.link_data.image_hash = newHash;
+        osp.link_data.image_hash = uploaded.hash;
       }
     }
   }
@@ -4977,6 +5106,50 @@
     return videoId;
   }
 
+  async function getAdImageUrlByHash(accountId, imageHash) {
+    if (!imageHash) {
+      return "";
+    }
+    const images = await graphFetch(`act_${accountId}/adimages`, {
+      query: {
+        hashes: [String(imageHash)],
+        fields: "hash,url,permalink_url",
+      },
+    });
+    const image = images.data?.[0];
+    return image?.url || image?.permalink_url || "";
+  }
+
+  async function uploadImageAsset(accountId, file, mediaCache) {
+    let hash = mediaCache.images.get(file.name);
+    if (!hash) {
+      log("info", `Uploading image ${file.name}...`);
+      hash = await uploadImage(accountId, file);
+      mediaCache.images.set(file.name, hash);
+    }
+    let url = mediaCache.imageUrls?.get(String(hash)) || "";
+    if (!url) {
+      url = await getAdImageUrlByHash(accountId, hash);
+      if (!mediaCache.imageUrls) {
+        mediaCache.imageUrls = new Map();
+      }
+      if (url) {
+        mediaCache.imageUrls.set(String(hash), url);
+      }
+    }
+    return { hash, url };
+  }
+
+  function resolveImportedMediaFile(mediaKey, originalKey, fnMap = state.importPackage?.fileNameMap) {
+    const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
+    return state.importMediaOverrides.get(mediaKey)
+      || state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey))
+      || state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey))
+      || state.importMediaFiles.get(mappedKey)
+      || state.importMediaFiles.get(originalKey)
+      || null;
+  }
+
   async function getVideoProcessingSnapshot(videoId) {
     try {
       return await graphFetch(videoId, {
@@ -5148,14 +5321,23 @@
     return createAdCreativeWithRetries(accountId, raw.name || creative.name, body);
   }
 
-  async function createVideoCreative(accountId, creative, uploadedVideoId, mappedPageId) {
+  async function createVideoCreative(accountId, creative, uploadedVideoId, mappedPageId, customPreview = null) {
     const raw = deepClone(creative.raw);
     const osp = raw.object_story_spec || {};
     const videoData = osp.video_data || {};
     videoData.video_id = uploadedVideoId;
-    delete videoData.image_hash;
-    if (!videoData.image_url) {
+    if (customPreview?.hash) {
+      videoData.image_hash = customPreview.hash;
+      if (customPreview.url) {
+        videoData.image_url = customPreview.url;
+      } else {
+        delete videoData.image_url;
+      }
+      videoData.video_thumbnail_source = "custom";
+    } else {
+      delete videoData.image_hash;
       videoData.image_url = await getPreferredVideoThumbnail(uploadedVideoId);
+      videoData.video_thumbnail_source = "generated_default";
     }
     osp.video_data = videoData;
     await applyInstagramIdentity(osp, mappedPageId, raw.name || creative.name, accountId);
@@ -5238,13 +5420,8 @@
     }
 
     if (slot.type === "image") {
-      let uploadedHash = mediaCache.images.get(mediaFile.name);
-      if (!uploadedHash) {
-        log("info", `Uploading image ${mediaFile.name}...`);
-        uploadedHash = await uploadImage(accountId, mediaFile);
-        mediaCache.images.set(mediaFile.name, uploadedHash);
-      }
-      return createImageCreative(accountId, creative, uploadedHash, mappedPageId);
+      const uploadedImage = await uploadImageAsset(accountId, mediaFile, mediaCache);
+      return createImageCreative(accountId, creative, uploadedImage.hash, mappedPageId);
     }
 
     if (slot.type === "video") {
@@ -5254,7 +5431,11 @@
         uploadedId = await uploadVideo(accountId, mediaFile);
         mediaCache.videos.set(mediaFile.name, uploadedId);
       }
-      return createVideoCreative(accountId, creative, uploadedId, mappedPageId);
+      const videoData = creative.raw?.object_story_spec?.video_data || {};
+      const previewOriginalKey = getVideoThumbnailOriginalName(String(videoData.video_id || ""), extractMediaExtensionFromUrl(videoData.image_url, ".jpg"));
+      const previewFile = resolveImportedMediaFile(`${creative.id}:video_preview`, previewOriginalKey);
+      const customPreview = previewFile ? await uploadImageAsset(accountId, previewFile, mediaCache) : null;
+      return createVideoCreative(accountId, creative, uploadedId, mappedPageId, customPreview);
     }
 
     return null;
@@ -5355,16 +5536,11 @@
     }
 
     if (slot.type === "image") {
-      let uploadedHash = mediaCache.images.get(mediaFile.name);
-      if (!uploadedHash) {
-        log("info", `Uploading image ${mediaFile.name}...`);
-        uploadedHash = await uploadImage(accountId, mediaFile);
-        mediaCache.images.set(mediaFile.name, uploadedHash);
-      }
+      const uploadedImage = await uploadImageAsset(accountId, mediaFile, mediaCache);
       if (!osp.link_data) {
         osp.link_data = {};
       }
-      osp.link_data.image_hash = uploadedHash;
+      osp.link_data.image_hash = uploadedImage.hash;
     }
 
     if (slot.type === "video") {
@@ -5378,9 +5554,21 @@
         osp.video_data = {};
       }
       osp.video_data.video_id = uploadedId;
-      delete osp.video_data.image_hash;
-      if (!osp.video_data.image_url) {
+      const previewOriginalKey = getVideoThumbnailOriginalName(String(slot.sourceId || uploadedId), extractMediaExtensionFromUrl(osp.video_data.image_url, ".jpg"));
+      const previewFile = resolveImportedMediaFile(`${creative.id}:video_preview`, previewOriginalKey);
+      if (previewFile) {
+        const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
+        osp.video_data.image_hash = uploadedPreview.hash;
+        if (uploadedPreview.url) {
+          osp.video_data.image_url = uploadedPreview.url;
+        } else {
+          delete osp.video_data.image_url;
+        }
+        osp.video_data.video_thumbnail_source = "custom";
+      } else {
+        delete osp.video_data.image_hash;
         osp.video_data.image_url = await getPreferredVideoThumbnail(uploadedId);
+        osp.video_data.video_thumbnail_source = "generated_default";
       }
     }
 
@@ -6987,6 +7175,7 @@
       const creativeMap = new Map();
       const mediaCache = {
         images: new Map(),
+        imageUrls: new Map(),
         videos: new Map(),
       };
 
