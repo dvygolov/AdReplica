@@ -29,7 +29,7 @@ node D:\YandexDisk\Coding\Arbitrazh\AdReplica\adreplica-og-packager.js --base-ur
 
 Deploy `D:\YandexDisk\Coding\Arbitrazh\AdReplica\dist` as the Cloudflare Pages root.
 
-After deploy, you can scrape the generated `latest/manifest.html` and every generated `latest/og/chunk-*.html` URL to accelerate Facebook propagation:
+After deploy, scrape the generated `latest/manifest.html` and every generated `latest/og/chunk-*.html` URL as part of the release flow:
 
 ```js
 await fetch(`https://graph.facebook.com/?id=${encodeURIComponent(chunkUrl)}&scrape=true&access_token=${accessToken}`, {
@@ -42,7 +42,7 @@ const resolved = await fetch(`https://graph.facebook.com/?id=${encodeURIComponen
 console.log(resolved.og_object.id);
 ```
 
-The loader now pins only the stable latest manifest URL. On each run it first tries to force-refresh the latest manifest URL with `scrape=true`, then resolves the current manifest OG object and current chunk OG objects from URLs. If Facebook still returns an older remote manifest than the payload already cached locally, the loader refuses to downgrade and uses the cached newer payload instead, with a clear console warning explaining why. Users should not need a new bookmarklet just because Facebook rotated internal `og_object.id` values.
+The loader now pins only the stable latest manifest URL. On each run it resolves the current manifest OG object and current chunk OG objects from URLs without calling `scrape=true` from the client. The release flow is responsible for refreshing the `latest` URLs in Facebook OG after deploy. If Facebook still returns a stale OG manifest that is older than the payload already cached locally, the loader refuses to downgrade and uses the cached newer payload instead, with a clear console warning explaining why. Users should not need a new bookmarklet just because Facebook rotated internal `og_object.id` values.
 
 ## Why Not Load The Script Directly?
 

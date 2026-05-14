@@ -54,6 +54,6 @@ After deploying payload changes, refresh the Facebook OG scrape for:
 - `https://adreplica.pages.dev/adreplica/latest/manifest.html`
 - `https://adreplica.pages.dev/adreplica/latest/og/chunk-001.html`
 
-The current loader is configured with the stable latest manifest URL `https://adreplica.pages.dev/adreplica/latest/manifest.html`; it resolves the current Facebook OG object at runtime instead of pinning a manifest object ID into the bookmarklet.
+The current loader is configured with the stable latest manifest URL `https://adreplica.pages.dev/adreplica/latest/manifest.html`; it resolves the current Facebook OG object at runtime instead of pinning a manifest object ID into the bookmarklet. The client loader does not call `scrape=true`; the deploy/release flow is responsible for refreshing the latest manifest and chunk URLs in Facebook OG.
 
 See `adreplica-hosting.md` for the loader architecture and CSP notes.
