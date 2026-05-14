@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "140526b7",
+    VERSION: "140526b8",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -4885,11 +4885,7 @@
         if (previewFile) {
           const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
           osp.video_data.image_hash = uploadedPreview.hash;
-          if (uploadedPreview.url) {
-            osp.video_data.image_url = uploadedPreview.url;
-          } else {
-            delete osp.video_data.image_url;
-          }
+          delete osp.video_data.image_url;
           osp.video_data.video_thumbnail_source = "custom";
         } else {
           delete osp.video_data.image_hash;
@@ -5328,11 +5324,7 @@
     videoData.video_id = uploadedVideoId;
     if (customPreview?.hash) {
       videoData.image_hash = customPreview.hash;
-      if (customPreview.url) {
-        videoData.image_url = customPreview.url;
-      } else {
-        delete videoData.image_url;
-      }
+      delete videoData.image_url;
       videoData.video_thumbnail_source = "custom";
     } else {
       delete videoData.image_hash;
@@ -5559,11 +5551,7 @@
       if (previewFile) {
         const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
         osp.video_data.image_hash = uploadedPreview.hash;
-        if (uploadedPreview.url) {
-          osp.video_data.image_url = uploadedPreview.url;
-        } else {
-          delete osp.video_data.image_url;
-        }
+        delete osp.video_data.image_url;
         osp.video_data.video_thumbnail_source = "custom";
       } else {
         delete osp.video_data.image_hash;

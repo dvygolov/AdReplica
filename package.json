@@ -1,6 +1,6 @@
 {
   "name": "adreplica",
-  "version": "140526b7",
+  "version": "140526b8",
   "private": true,
   "description": "Browser-side Facebook Ads Manager export, import, clone, and bookmarklet loader tooling.",
   "scripts": {
