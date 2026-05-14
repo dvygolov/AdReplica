@@ -38,7 +38,7 @@ npm run build
 Equivalent direct command:
 
 ```powershell
-node .\adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica --chunk-og-object-ids=26634643699518067 --manifest-og-object-id=36372667002332356
+node .\adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica
 ```
 
 ## Deploy
@@ -54,6 +54,6 @@ After deploying payload changes, refresh the Facebook OG scrape for:
 - `https://adreplica.pages.dev/adreplica/latest/manifest.html`
 - `https://adreplica.pages.dev/adreplica/latest/og/chunk-001.html`
 
-The current loader is configured with manifest OG object ID `36372667002332356`; the current manifest points at chunk OG object ID `26634643699518067`.
+The current loader is configured with the stable latest manifest URL `https://adreplica.pages.dev/adreplica/latest/manifest.html`; it resolves the current Facebook OG object at runtime instead of pinning a manifest object ID into the bookmarklet.
 
 See `adreplica-hosting.md` for the loader architecture and CSP notes.

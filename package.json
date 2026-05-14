@@ -1,11 +1,11 @@
 {
   "name": "adreplica",
-  "version": "130526b1",
+  "version": "140526b2",
   "private": true,
   "description": "Browser-side Facebook Ads Manager export, import, clone, and bookmarklet loader tooling.",
   "scripts": {
     "check": "node --check adreplica-og-packager.js && node --check adreplica.js && node --check adreplica-loader.js",
-    "build": "node adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica --chunk-og-object-ids=26634643699518067 --manifest-og-object-id=36372667002332356",
+    "build": "node adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica",
     "deploy": "npx wrangler pages deploy ./dist --project-name=adreplica --branch=main --commit-dirty=true"
   },
   "keywords": [

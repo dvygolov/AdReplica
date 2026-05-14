@@ -29,7 +29,7 @@ node D:\YandexDisk\Coding\Arbitrazh\AdReplica\adreplica-og-packager.js --base-ur
 
 Deploy `D:\YandexDisk\Coding\Arbitrazh\AdReplica\dist` as the Cloudflare Pages root.
 
-After deploy, scrape the generated `latest/manifest.html` and every generated `latest/og/chunk-*.html` URL:
+After deploy, you can scrape the generated `latest/manifest.html` and every generated `latest/og/chunk-*.html` URL to accelerate Facebook propagation:
 
 ```js
 await fetch(`https://graph.facebook.com/?id=${encodeURIComponent(chunkUrl)}&scrape=true&access_token=${accessToken}`, {
@@ -42,7 +42,7 @@ const resolved = await fetch(`https://graph.facebook.com/?id=${encodeURIComponen
 console.log(resolved.og_object.id);
 ```
 
-Put the manifest OG object ID into `manifestOgObjectId` in `adreplica-loader.js` and the generated bookmarklet config. Pass the chunk OG object IDs back to `adreplica-og-packager.js` so the next manifest points at the stable chunk objects.
+The loader now pins only the stable latest manifest URL. At runtime it resolves the current manifest OG object and current chunk OG objects from URLs, and on remote validation problems it forces a `scrape=true` refresh before failing. Users should not need a new bookmarklet just because Facebook rotated internal `og_object.id` values.
 
 ## Why Not Load The Script Directly?
 

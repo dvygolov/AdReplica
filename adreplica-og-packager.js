@@ -129,7 +129,7 @@ function buildManifestHtml({ appName, build, manifestBase64 }) {
   ].join("\n");
 }
 
-function buildLandingHtml({ appName, build, bookmarklet, manifestOgObjectId, screenshotUrl, iconUrl }) {
+function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshotUrl, iconUrl }) {
   const title = `${appName} Loader`;
   const inlineMark = buildAppMarkSvg();
   return [
@@ -390,7 +390,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestOgObjectId, scr
     `            <button id="copyBookmarklet" type="button" data-bookmarklet="${escapeHtml(bookmarklet)}">Copy to clipboard</button>`,
     "            <button id=\"copyUrl\" type=\"button\">Copy page URL</button>",
     "          </div>",
-    `          <code>manifest OG: ${escapeHtml(manifestOgObjectId || "not configured")}</code>`,
+    `          <code>manifest URL: ${escapeHtml(manifestUrl || "not configured")}</code>`,
     "        </div>",
     "        <figure class=\"shot\">",
     `          <img src="${escapeHtml(screenshotUrl)}" alt="AdReplica running inside Facebook Ads Manager" />`,
@@ -444,7 +444,6 @@ function main() {
   const baseUrl = readArg("base-url", "");
   const appName = readArg("app", "AdReplica");
   const chunkOgObjectIds = parseListArg("chunk-og-object-ids");
-  const manifestOgObjectId = readArg("manifest-og-object-id", "");
   const source = fs.readFileSync(sourcePath, "utf8");
   const build = readArg("build", detectBuild(source));
   const buildDir = path.join(outRoot, build);
@@ -504,7 +503,6 @@ function main() {
 
   const packageInfo = {
     ...manifest,
-    manifestOgObjectId,
     source: path.relative(ROOT, sourcePath).replace(/\\/g, "/"),
     chunkSize: CHUNK_SIZE,
     payloadFile: "payload.js",
@@ -528,7 +526,7 @@ function main() {
     appName,
     build,
     bookmarklet,
-    manifestOgObjectId,
+    manifestUrl: publicUrl("latest/manifest.html"),
     screenshotUrl,
     iconUrl,
   }));
