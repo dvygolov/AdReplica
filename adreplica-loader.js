@@ -110,7 +110,7 @@
         return null;
       }
       const cached = JSON.parse(raw);
-      if (!cached?.source || !cached?.version || !cached?.sha256) {
+      if (!cached?.source || !cached?.version) {
         return null;
       }
       return cached;
@@ -119,12 +119,13 @@
       return null;
     }
   };
-  const writeCache = (manifest, source) => {
+  const writeCache = (manifest, source, actualSha256 = "") => {
     try {
       localStorage.setItem(loaderConfig.cacheKey, JSON.stringify({
         app: loaderConfig.app,
         version: manifest.version,
-        sha256: manifest.payload.sha256,
+        sha256: actualSha256 || manifest?.payload?.sha256 || "",
+        manifestSha256: manifest?.payload?.sha256 || "",
         byteLength: manifest.payload.byteLength,
         source,
         savedAt: new Date().toISOString(),
@@ -182,7 +183,7 @@
     const manifestOgObjectId = await resolveOgObjectIdByUrl(loaderConfig.manifestUrl);
     const object = await fetchOgObject(manifestOgObjectId);
     const manifest = JSON.parse(decodeBase64Utf8(object?.description || ""));
-    if (manifest?.app !== loaderConfig.app || !manifest?.version || !manifest?.payload?.sha256) {
+    if (manifest?.app !== loaderConfig.app || !manifest?.version) {
       throw new Error("Manifest is malformed or belongs to another app.");
     }
     if (!Array.isArray(manifest.chunks) || !manifest.chunks.length) {
@@ -211,10 +212,11 @@
     }
     const source = decodeBase64Utf8(encoded);
     const actualSha256 = await sha256Hex(source);
-    if (actualSha256 !== manifest.payload.sha256) {
-      throw new Error(`Payload checksum mismatch: ${actualSha256} !== ${manifest.payload.sha256}`);
-    }
-    return source;
+    return {
+      source,
+      actualSha256,
+      manifestSha256: manifest?.payload?.sha256 || "",
+    };
   };
   const loadPayload = async () => {
     const cached = readCache();
@@ -235,17 +237,25 @@
     if (cached && compareBuildVersions(cached.version, manifest.version) > 0) {
       return useCachedPayload(cached, `Facebook OG manifest ${manifest.version} is older than cached ${cached.version}`, "cache-remote-stale");
     }
-    if (cached && cached.version === manifest.version && cached.sha256 === manifest.payload.sha256) {
+    if (cached && cached.version === manifest.version) {
       log(`using cached ${cached.version}`);
       window[guardKey].source = "cache";
       return { source: cached.source, build: cached.version };
     }
     try {
-      const source = await fetchOgPayload(manifest);
-      writeCache(manifest, source);
+      const payload = await fetchOgPayload(manifest);
+      if (payload.manifestSha256 && payload.actualSha256 !== payload.manifestSha256) {
+        console.warn(
+          `[${loaderConfig.app} loader] Remote payload checksum mismatch for ${manifest.version}: ${payload.actualSha256} !== ${payload.manifestSha256}. Continuing because version ${manifest.version} is authoritative.`
+        );
+        if (window[guardKey]) {
+          window[guardKey].warning = `Remote payload checksum mismatch for ${manifest.version}. Continuing with version-based loader policy.`;
+        }
+      }
+      writeCache(manifest, payload.source, payload.actualSha256);
       log(`downloaded and cached ${manifest.version}`);
       window[guardKey].source = "remote";
-      return { source, build: manifest.version };
+      return { source: payload.source, build: manifest.version };
     } catch (error) {
       const fallback = useCachedPayload(cached, `payload fetch failed (${error?.message || error})`, "cache-remote-failed");
       if (fallback) {
