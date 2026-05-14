@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "140526b4",
+    VERSION: "140526b5",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -422,6 +422,11 @@
   function isPermissionDeniedGraphError(error) {
     const text = String(error || "");
     return /Permission Denied|OAuthException|["']code["']\s*:\s*10\b/i.test(text);
+  }
+
+  function isCatalogCreateAdminPermissionError(error) {
+    const text = String(error || "");
+    return /Permission Required to Create Catalogue|you aren't an admin of this business|you are not an admin of this business|don't have permission to create a catalogue/i.test(text);
   }
 
   function getNativeFetchWindow() {
@@ -1472,10 +1477,18 @@
             Select the same visible catalog, copy into a visible target catalog, or choose "Copy to target BM" to create/copy catalog settings when Meta permissions allow it.
             ${sourceProductSets.length ? `Product sets detected: ${escapeHtml(sourceProductSets.map((item) => item.id).join(", "))}.` : ""}
           </div>`
-        : `<div class="sk-note sk-warning">
-            Catalog campaign detected, but the target ad account has no visible Business Manager on its ad account object.
-            Catalog campaigns cannot be cloned/imported to standalone personal ad accounts because catalog access is BM-scoped. Choose a BM-owned or BM-assigned target ad account.
-          </div>`
+        : (catalogs || []).length
+          ? `<div class="sk-note sk-warning">
+              Catalog campaign detected. The target ad account has no visible Business Manager on its ad account object,
+              but Meta exposes ${escapeHtml(String((catalogs || []).length))} eligible target catalog(s) for this ad account.
+              You can map into one of those existing target catalogs, but "Copy to target BM" is unavailable without visible BM access.
+              ${sourceProductSets.length ? `Product sets detected: ${escapeHtml(sourceProductSets.map((item) => item.id).join(", "))}.` : ""}
+            </div>`
+          : `<div class="sk-note sk-warning">
+              Catalog campaign detected, but the target ad account has no visible Business Manager on its ad account object
+              and Meta does not expose any eligible target catalogs for this ad account.
+              Catalog campaigns cannot be cloned/imported here until Meta exposes a reusable target catalog or you choose a BM-owned or BM-assigned target ad account.
+            </div>`
       : "";
 
     const mediaRows = mediaSlots.map((slot) => {
@@ -6208,17 +6221,18 @@
       return;
     }
     const targetCatalogIds = new Set((targetContext?.catalogs || []).map((item) => String(item.id)));
-    if (!targetContext?.business?.id) {
-      throw new Error(
-        `Catalog campaign cannot be cloned to act_${state.importAccountId}: target account is not attached to a Business Manager or the business is not visible.`,
-      );
-    }
     const productSets = getSourceProductSetsFromPackage(packageData);
     for (const catalog of sourceCatalogs) {
       const sourceId = String(catalog.id);
       const selectedId = String(catalogMappings?.[sourceId] || "");
       if (!selectedId) {
         throw new Error(`Catalog campaign requires catalog mapping for source catalog ${sourceId}. Select a target catalog first.`);
+      }
+      if (selectedId === "__copy__" && !targetContext?.business?.id) {
+        throw new Error(
+          `Catalog ${sourceId} cannot be copied into target BM for act_${state.importAccountId}: the target account has no visible Business Manager. ` +
+          "Select an existing eligible target catalog instead.",
+        );
       }
       if (!targetCatalogIds.has(selectedId) && !copiedCatalogIds.has(selectedId)) {
         throw new Error(`Target account act_${state.importAccountId} does not have visible access to catalog ${selectedId}.`);
@@ -6302,6 +6316,12 @@
         log("info", "Catalog shell created via Commerce Manager mutation.");
         return String(catalogId);
       } catch (error) {
+        if (isCatalogCreateAdminPermissionError(error)) {
+          throw new Error(
+            `Cannot create a copied catalog in target business ${businessId}: Meta says this user is not a Business Manager admin. ` +
+            "Use a target account that already has visible access to the source catalog, or ask a BM admin to share/create the catalog first.",
+          );
+        }
         log("warn", "Commerce Manager catalog create mutation failed; trying public Graph fallback.", String(error?.message || error));
       }
     }
@@ -6315,6 +6335,12 @@
       });
       return String(created.id);
     } catch (firstError) {
+      if (isCatalogCreateAdminPermissionError(firstError) || isPermissionDeniedGraphError(firstError)) {
+        throw new Error(
+          `Cannot create a copied catalog in target business ${businessId}: target user lacks Business Manager rights to create catalogs. ` +
+          "Select an already visible target catalog instead, or ask a BM admin to grant catalog access / create the catalog.",
+        );
+      }
       const created = await graphPageFetch(`${businessId}/product_catalogs`, {
         method: "POST",
         body: {
