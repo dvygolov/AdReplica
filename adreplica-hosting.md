@@ -42,7 +42,7 @@ const resolved = await fetch(`https://graph.facebook.com/?id=${encodeURIComponen
 console.log(resolved.og_object.id);
 ```
 
-The loader now pins only the stable latest manifest URL. At runtime it resolves the current manifest OG object and current chunk OG objects from URLs, and on remote validation problems it forces a `scrape=true` refresh before failing. Users should not need a new bookmarklet just because Facebook rotated internal `og_object.id` values.
+The loader now pins only the stable latest manifest URL. On each run it first tries to force-refresh the latest manifest URL with `scrape=true`, then resolves the current manifest OG object and current chunk OG objects from URLs. If Facebook still returns an older remote manifest than the payload already cached locally, the loader refuses to downgrade and uses the cached newer payload instead, with a clear console warning explaining why. Users should not need a new bookmarklet just because Facebook rotated internal `og_object.id` values.
 
 ## Why Not Load The Script Directly?
 

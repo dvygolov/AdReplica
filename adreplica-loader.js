@@ -37,6 +37,32 @@
     }
     return new TextDecoder().decode(bytes);
   };
+  const compareBuildVersions = (left, right) => {
+    const pattern = /^(\d{2})(\d{2})(\d{2})b(\d+)$/i;
+    const leftMatch = String(left || "").match(pattern);
+    const rightMatch = String(right || "").match(pattern);
+    if (!leftMatch || !rightMatch) {
+      return String(left || "").localeCompare(String(right || ""));
+    }
+    const leftParts = [
+      Number(leftMatch[3]),
+      Number(leftMatch[2]),
+      Number(leftMatch[1]),
+      Number(leftMatch[4]),
+    ];
+    const rightParts = [
+      Number(rightMatch[3]),
+      Number(rightMatch[2]),
+      Number(rightMatch[1]),
+      Number(rightMatch[4]),
+    ];
+    for (let index = 0; index < leftParts.length; index += 1) {
+      if (leftParts[index] !== rightParts[index]) {
+        return leftParts[index] - rightParts[index];
+      }
+    }
+    return 0;
+  };
   const fetchJson = async (url, init = {}) => {
     const response = await withTimeout(fetch(url, Object.assign({
       credentials: "include",
@@ -106,6 +132,16 @@
     } catch (error) {
       console.warn(`[${loaderConfig.app} loader] Payload loaded, but cache write failed.`, error);
     }
+  };
+  const useCachedPayload = (cached, reason, sourceTag) => {
+    if (!cached) {
+      return null;
+    }
+    const warning = `Cannot load latest remote payload: ${reason}. Using cached ${cached.version}.`;
+    console.warn(`[${loaderConfig.app} loader] ${warning}`);
+    window[guardKey].warning = warning;
+    window[guardKey].source = sourceTag;
+    return { source: cached.source, build: cached.version };
   };
   const getGraphUrls = (accessToken) => {
     const encoded = encodeURIComponent(accessToken);
@@ -186,16 +222,23 @@
     const cached = readCache();
     let manifest = null;
     try {
-      manifest = await fetchManifest();
-    } catch (error) {
-      if (cached) {
-        log(`manifest unavailable, using cached ${cached.version}`);
-        window[guardKey].source = "cache-no-manifest";
-        return { source: cached.source, build: cached.version };
+      manifest = await fetchManifest({ forceRefresh: true });
+    } catch (refreshError) {
+      console.warn(`[${loaderConfig.app} loader] Forced manifest scrape failed, retrying without refresh.`, refreshError);
+      try {
+        manifest = await fetchManifest();
+      } catch (error) {
+        const fallback = useCachedPayload(cached, `manifest unavailable (${error?.message || error})`, "cache-no-manifest");
+        if (fallback) {
+          return fallback;
+        }
+        throw error;
       }
-      throw error;
     }
     window[guardKey].remoteVersion = manifest.version;
+    if (cached && compareBuildVersions(cached.version, manifest.version) > 0) {
+      return useCachedPayload(cached, `remote manifest ${manifest.version} is older than cached ${cached.version}`, "cache-remote-stale");
+    }
     if (cached && cached.version === manifest.version && cached.sha256 === manifest.payload.sha256) {
       log(`using cached ${cached.version}`);
       window[guardKey].source = "cache";
@@ -212,7 +255,10 @@
       try {
         manifest = await fetchManifest({ forceRefresh: true });
         window[guardKey].remoteVersion = manifest.version;
-        if (cached && cached.version === manifest.version && cached.sha256 === manifest.payload.sha256) {
+        if (cached && compareBuildVersions(cached.version, manifest.version) > 0) {
+          return useCachedPayload(cached, `remote manifest ${manifest.version} is older than cached ${cached.version} even after refresh`, "cache-remote-stale-after-refresh");
+        }
+        if (cached) {
           log(`using cached ${cached.version} after forced manifest refresh`);
           window[guardKey].source = "cache-after-refresh";
           return { source: cached.source, build: cached.version };
@@ -223,10 +269,9 @@
         window[guardKey].source = "remote-refreshed";
         return { source, build: manifest.version };
       } catch (refreshError) {
-        if (cached) {
-          log(`remote payload unavailable, using cached ${cached.version}`);
-          window[guardKey].source = "cache-remote-failed";
-          return { source: cached.source, build: cached.version };
+        const fallback = useCachedPayload(cached, `remote payload fetch failed (${refreshError?.message || refreshError})`, "cache-remote-failed");
+        if (fallback) {
+          return fallback;
         }
         throw refreshError;
       }
