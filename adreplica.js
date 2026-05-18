@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "140526b10",
+    VERSION: "180526b2",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -454,6 +454,27 @@
       return null;
     }
     const body = {};
+    for (const field of [
+      "degrees_of_freedom_spec",
+      "creative_sourcing_spec",
+      "contextual_multi_ads",
+      "actor_type",
+      "authorization_category",
+      "branded_content_sponsor_page_id",
+      "destination_spec",
+      "enable_direct_install",
+      "instagram_actor_id",
+      "product_set_id",
+      "template_url_spec",
+      "object_type",
+      "thumbnail_url",
+      "uca_draft_version",
+      "use_page_actor_override",
+    ]) {
+      if (payload[field] !== undefined) {
+        body[field] = deepClone(payload[field]);
+      }
+    }
     if (payload.object_story_id) {
       body.object_story_id = payload.object_story_id;
     }
@@ -462,9 +483,6 @@
     }
     if (payload.asset_feed_spec) {
       body.asset_feed_spec = deepClone(payload.asset_feed_spec);
-    }
-    if (payload.destination_spec) {
-      body.destination_spec = deepClone(payload.destination_spec);
     }
     if (payload.url_tags) {
       body.url_tags = payload.url_tags;
@@ -5003,6 +5021,10 @@
     if (payload.object_story_id) {
       return true;
     }
+    if (payload.product_set_id && payload.object_story_spec?.template_data) {
+      log("info", `Skipping validate_only for catalog draft creative ${creativeName}: product_set_id payload is validated by draft fragment flow.`);
+      return true;
+    }
     if (!payload.object_story_spec && !payload.asset_feed_spec) {
       return true;
     }
@@ -6657,10 +6679,154 @@
     };
   }
 
+  async function fetchTargetCatalogProductSets(catalogId) {
+    if (!catalogId) {
+      return [];
+    }
+    return graphGetAll(`${catalogId}/product_sets`, {
+      fields: [
+        "id",
+        "name",
+        "filter",
+        "capability",
+        "cpas_category_product_set_id",
+        "original_creation_source",
+        "is_autogen_product_set",
+        "product_catalog{id,name,vertical,catalog_item_type}",
+      ].join(","),
+      limit: 200,
+    }).then((items) => items.map((item) => ({ ...item, id: String(item.id) }))).catch((error) => {
+      log("warn", `Target catalog product set lookup failed for catalog ${catalogId}.`, String(error));
+      return [];
+    });
+  }
+
+  function getPackageProductSetById(packageData, productSetId) {
+    const normalizedId = String(productSetId || "");
+    if (!normalizedId || !packageData) {
+      return null;
+    }
+    const direct = (packageData.productSets || []).find((item) => String(item?.id || "") === normalizedId);
+    if (direct) {
+      return direct;
+    }
+    for (const snapshot of packageData.catalogExports || []) {
+      const found = (snapshot?.productSets || []).find((item) => String(item?.id || "") === normalizedId);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  function resolveSourceProductSetCatalogId(packageData, productSetId) {
+    const normalizedId = String(productSetId || "");
+    if (!normalizedId || !packageData) {
+      return "";
+    }
+    const productSet = getPackageProductSetById(packageData, normalizedId);
+    if (productSet?.product_catalog?.id) {
+      return String(productSet.product_catalog.id);
+    }
+    if (productSet?.catalog_id) {
+      return String(productSet.catalog_id);
+    }
+    const sourceCatalogs = getSourceCatalogsFromPackage(packageData);
+    if (sourceCatalogs.length === 1) {
+      return String(sourceCatalogs[0].id || "");
+    }
+    const candidateCatalogIds = new Set();
+    for (const creative of packageData.creatives || []) {
+      const raw = creative?.raw || {};
+      const matches =
+        String(raw.product_set_id || "") === normalizedId
+        || (Array.isArray(raw.product_set_ids) && raw.product_set_ids.some((item) => String(item) === normalizedId));
+      if (!matches) {
+        continue;
+      }
+      if (raw.product_catalog_id) {
+        candidateCatalogIds.add(String(raw.product_catalog_id));
+      }
+      if (raw.catalog_id) {
+        candidateCatalogIds.add(String(raw.catalog_id));
+      }
+    }
+    return candidateCatalogIds.size === 1 ? [...candidateCatalogIds][0] : "";
+  }
+
+  function pickFallbackTargetProductSet(sourceProductSet, targetProductSets) {
+    const normalizedName = String(sourceProductSet?.name || "").trim().toLowerCase();
+    const exactNameMatch = normalizedName
+      ? targetProductSets.find((item) => String(item?.name || "").trim().toLowerCase() === normalizedName)
+      : null;
+    if (exactNameMatch?.id) {
+      return exactNameMatch;
+    }
+    const cpasMatch = sourceProductSet?.cpas_category_product_set_id
+      ? targetProductSets.find((item) =>
+        String(item?.cpas_category_product_set_id || "") === String(sourceProductSet.cpas_category_product_set_id))
+      : null;
+    if (cpasMatch?.id) {
+      return cpasMatch;
+    }
+    const allProductsMatch = targetProductSets.find((item) => /^all products$/i.test(String(item?.name || "").trim()));
+    if (allProductsMatch?.id) {
+      return allProductsMatch;
+    }
+    const autogenMatch = targetProductSets.find((item) => Boolean(item?.is_autogen_product_set));
+    if (autogenMatch?.id) {
+      return autogenMatch;
+    }
+    if (targetProductSets.length === 1 && targetProductSets[0]?.id) {
+      return targetProductSets[0];
+    }
+    return null;
+  }
+
+  async function enrichFallbackProductSetMappings(packageData, catalogMappings, productSetMappings) {
+    const nextProductSetMappings = { ...(productSetMappings || {}) };
+    const sourceProductSets = getSourceProductSetsFromPackage(packageData);
+    const sourceCatalogs = getSourceCatalogsFromPackage(packageData);
+    const targetProductSetsByCatalog = new Map();
+    for (const sourceProductSet of sourceProductSets) {
+      const sourceProductSetId = String(sourceProductSet.id || "");
+      if (!sourceProductSetId || nextProductSetMappings[sourceProductSetId]) {
+        continue;
+      }
+      const sourceCatalogId = resolveSourceProductSetCatalogId(packageData, sourceProductSetId);
+      if (!sourceCatalogId) {
+        continue;
+      }
+      const targetCatalogId = String(catalogMappings?.[sourceCatalogId] || sourceCatalogId || "");
+      if (!targetCatalogId) {
+        continue;
+      }
+      if (!targetProductSetsByCatalog.has(targetCatalogId)) {
+        targetProductSetsByCatalog.set(targetCatalogId, await fetchTargetCatalogProductSets(targetCatalogId));
+      }
+      const targetProductSets = targetProductSetsByCatalog.get(targetCatalogId) || [];
+      if (!targetProductSets.length) {
+        continue;
+      }
+      const sourceProductSetMeta = getPackageProductSetById(packageData, sourceProductSetId) || sourceProductSet;
+      const targetProductSet = pickFallbackTargetProductSet(sourceProductSetMeta, targetProductSets);
+      if (!targetProductSet?.id) {
+        continue;
+      }
+      nextProductSetMappings[sourceProductSetId] = String(targetProductSet.id);
+      const sourceCatalogCount = sourceCatalogs.length;
+      const fallbackReason = sourceProductSetMeta?.product_catalog?.id || sourceProductSetMeta?.catalog_id
+        ? "name/CPAS match"
+        : (sourceCatalogCount === 1 ? "single-source-catalog fallback" : "target default set fallback");
+      log("warn", `Fallback-mapped source product set ${sourceProductSetId} -> ${targetProductSet.id} (${targetProductSet.name || targetProductSet.id}) using ${fallbackReason}.`);
+    }
+    return nextProductSetMappings;
+  }
+
   async function prepareCatalogMappingsForImport(packageData, targetContext, catalogMappings) {
     const sourceCatalogs = getSourceCatalogsFromPackage(packageData);
     const nextCatalogMappings = { ...(catalogMappings || {}) };
-    const productSetMappings = {};
+    let productSetMappings = {};
     const copiedCatalogIds = new Set();
     for (const catalog of sourceCatalogs) {
       const sourceId = String(catalog.id);
@@ -6677,6 +6843,11 @@
         Object.assign(productSetMappings, copied.productSetIdMap);
       }
     }
+    productSetMappings = await enrichFallbackProductSetMappings(
+      packageData,
+      nextCatalogMappings,
+      productSetMappings,
+    );
     validateCatalogMappingsForImport(packageData, targetContext, nextCatalogMappings, productSetMappings, copiedCatalogIds);
     return { catalogMappings: nextCatalogMappings, productSetMappings };
   }

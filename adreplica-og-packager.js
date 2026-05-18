@@ -475,6 +475,7 @@ function main() {
     if (!baseUrl) return "";
     return `${baseUrl.replace(/\/+$/, "")}/${relativePath.replace(/\\/g, "/")}`;
   };
+  const prettyPublicUrl = (relativePath) => publicUrl(relativePath).replace(/\.html(?=$|[?#])/, "");
   const manifest = {
     app: appName,
     build,
@@ -488,8 +489,8 @@ function main() {
     chunks: chunks.map((chunk, index) => ({
       index: index + 1,
       file: `og/chunk-${String(index + 1).padStart(3, "0")}.html`,
-      url: publicUrl(`${build}/og/chunk-${String(index + 1).padStart(3, "0")}.html`),
-      latestUrl: publicUrl(`latest/og/chunk-${String(index + 1).padStart(3, "0")}.html`),
+      url: prettyPublicUrl(`${build}/og/chunk-${String(index + 1).padStart(3, "0")}.html`),
+      latestUrl: prettyPublicUrl(`latest/og/chunk-${String(index + 1).padStart(3, "0")}.html`),
       ogObjectId: chunkOgObjectIds[index] || "",
       base64Length: chunk.length,
       base64Sha256: sha256Hex(chunk),
@@ -509,8 +510,8 @@ function main() {
     payloadUrl: publicUrl(`${build}/payload.js`),
     latestPayloadUrl: publicUrl("latest/payload.js"),
     manifestFile: "manifest.html",
-    manifestUrl: publicUrl(`${build}/manifest.html`),
-    latestManifestUrl: publicUrl("latest/manifest.html"),
+    manifestUrl: prettyPublicUrl(`${build}/manifest.html`),
+    latestManifestUrl: prettyPublicUrl("latest/manifest.html"),
   };
   writeFile(path.join(buildDir, "package-info.json"), `${JSON.stringify(packageInfo, null, 2)}\n`);
   const loaderSource = fs.readFileSync(LOADER_SOURCE, "utf8");
@@ -526,7 +527,7 @@ function main() {
     appName,
     build,
     bookmarklet,
-    manifestUrl: publicUrl("latest/manifest.html"),
+    manifestUrl: prettyPublicUrl("latest/manifest.html"),
     screenshotUrl,
     iconUrl,
   }));

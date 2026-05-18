@@ -3,7 +3,7 @@
 
   const loaderConfig = Object.assign({
     app: "AdReplica",
-    manifestUrl: "https://adreplica.pages.dev/adreplica/latest/manifest.html",
+    manifestUrl: "https://adreplica.pages.dev/adreplica/latest/manifest",
     cacheKey: "adreplica.loader.cache.v1",
     timeoutMs: 45000,
   }, config || {});
