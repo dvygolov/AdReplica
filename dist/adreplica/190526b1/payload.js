@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "180526b2",
+    VERSION: "190526b1",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -880,7 +880,11 @@
     const refs = getCatalogRefsFromPackage(packageData);
     return [...refs.productSets.values()].map((ref) => ({
       id: ref.id,
-      name: [...ref.names].filter(Boolean)[0] || `Product set ${ref.id}`,
+      name:
+        getPackageProductSetById(packageData, ref.id)?.name
+        || [...ref.names].find((name) => !isSyntheticProductSetName(name))
+        || [...ref.names].filter(Boolean)[0]
+        || `Product set ${ref.id}`,
       paths: ref.paths,
     }));
   }
@@ -3202,13 +3206,66 @@
     return false;
   }
 
+  function isSyntheticProductSetName(value) {
+    const name = String(value || "").trim();
+    if (!name) {
+      return true;
+    }
+    if (/\{\{\s*product\./i.test(name)) {
+      return true;
+    }
+    if (/^\{\{.+\}\}\s+\d{4}-\d{2}-\d{2}-[a-f0-9]{8,}$/i.test(name)) {
+      return true;
+    }
+    return false;
+  }
+
+  function rankProductSetMeta(item) {
+    if (!item || typeof item !== "object") {
+      return -1;
+    }
+    let score = 0;
+    if (item.product_catalog?.id || item.catalog_id) {
+      score += 8;
+    }
+    if (item.filter) {
+      score += 4;
+    }
+    if (item.cpas_category_product_set_id) {
+      score += 3;
+    }
+    if (item.source === "dpa_eligible_product_catalogs") {
+      score += 2;
+    }
+    if (item.name && !isSyntheticProductSetName(item.name)) {
+      score += 2;
+    }
+    return score;
+  }
+
   function normalizeDpaCatalogHint(item, fallbackAdName = "") {
-    const productSet = item?.product_sets?.data?.[0] || null;
-    const productCatalog = productSet?.product_catalog || item?.product_catalog || item;
+    const productCatalog = item?.product_catalog || item;
     const catalogId = productCatalog?.id || item?.id;
     if (!catalogId) {
       return null;
     }
+    const productSets = (item?.product_sets?.data || [])
+      .filter((productSet) => productSet?.id)
+      .map((productSet) => ({
+        id: String(productSet.id),
+        name: productSet.name || `Product set ${productSet.id}`,
+        filter: productSet.filter,
+        is_autogen_product_set: Boolean(productSet.is_autogen_product_set),
+        cpas_category_product_set_id: productSet.cpas_category_product_set_id || "",
+        capability: productSet.capability || "",
+        product_catalog: {
+          id: String(catalogId),
+          name: productCatalog?.name || item?.name || `Catalog ${catalogId}`,
+          vertical: productCatalog?.vertical || item?.vertical || "commerce",
+          catalog_item_type: productCatalog?.catalog_item_type || item?.catalog_item_type || "",
+        },
+        source: "dpa_eligible_product_catalogs",
+      }));
     return {
       catalog: {
         id: String(catalogId),
@@ -3217,19 +3274,7 @@
         catalog_item_type: productCatalog?.catalog_item_type || item?.catalog_item_type || "",
         source: "dpa_eligible_product_catalogs",
       },
-      productSet: productSet?.id ? {
-        id: String(productSet.id),
-        name: productSet.name || `Product set ${productSet.id}`,
-        filter: productSet.filter,
-        is_autogen_product_set: Boolean(productSet.is_autogen_product_set),
-        product_catalog: {
-          id: String(catalogId),
-          name: productCatalog?.name || item?.name || `Catalog ${catalogId}`,
-          vertical: productCatalog?.vertical || item?.vertical || "commerce",
-          catalog_item_type: productCatalog?.catalog_item_type || item?.catalog_item_type || "",
-        },
-        source: "dpa_eligible_product_catalogs",
-      } : null,
+      productSets,
     };
   }
 
@@ -3237,6 +3282,7 @@
     const creativeById = new Map((creatives || []).map((creative) => [String(creative.id), creative]));
     const catalogMap = new Map();
     const productSetMap = new Map();
+    const adCandidateProductSetIds = new Map();
     const fields = [
       "product_sets.limit(10).filtering([",
       "{\"field\":\"product_count\",\"operator\":\"GREATER_THAN\",\"value\":0}",
@@ -3289,21 +3335,54 @@
               existing.detectedFromAds.push(String(ad.id));
             }
           }
-          if (hint.productSet && !productSetMap.has(hint.productSet.id)) {
-            productSetMap.set(hint.productSet.id, {
-              ...hint.productSet,
-              detectedFromAds: [String(ad.id)],
-            });
-          } else if (hint.productSet) {
-            const existingSet = productSetMap.get(hint.productSet.id);
-            if (!existingSet.detectedFromAds.includes(String(ad.id))) {
-              existingSet.detectedFromAds.push(String(ad.id));
+          for (const productSet of hint.productSets || []) {
+            if (!adCandidateProductSetIds.has(String(ad.id))) {
+              adCandidateProductSetIds.set(String(ad.id), new Set());
+            }
+            adCandidateProductSetIds.get(String(ad.id)).add(String(productSet.id));
+            if (!productSetMap.has(productSet.id)) {
+              productSetMap.set(productSet.id, {
+                ...productSet,
+                detectedFromAds: [String(ad.id)],
+              });
+            } else {
+              const existingSet = productSetMap.get(productSet.id);
+              if (!existingSet.detectedFromAds.includes(String(ad.id))) {
+                existingSet.detectedFromAds.push(String(ad.id));
+              }
             }
           }
         }
       } catch (error) {
         log("warn", `Catalog discovery skipped for ad ${ad.name || ad.id}.`, String(error));
       }
+    }
+
+    for (const [adId, candidateIds] of adCandidateProductSetIds.entries()) {
+      const ad = ads.find((item) => String(item.id) === String(adId));
+      const creative = creatives.find((item) => String(item.id) === String(ad?.creative?.id || ""));
+      if (!creative?.raw || creative.raw.product_set_id) {
+        continue;
+      }
+      const candidates = [...candidateIds]
+        .map((id) => productSetMap.get(String(id)))
+        .filter(Boolean);
+      if (!candidates.length) {
+        continue;
+      }
+      const nonAutogenCandidates = candidates.filter((item) => !item.is_autogen_product_set);
+      if (nonAutogenCandidates.length === 1) {
+        creative.raw.product_set_id = String(nonAutogenCandidates[0].id);
+        continue;
+      }
+      if (candidates.length === 1) {
+        creative.raw.product_set_id = String(candidates[0].id);
+        continue;
+      }
+      log(
+        "warn",
+        `Catalog creative ${creative.name || creative.id} exported with ambiguous DPA product set hints (${candidates.map((item) => item.name || item.id).join(", ")}).`,
+      );
     }
 
     return {
@@ -3871,15 +3950,6 @@
     if (dpaCatalogHints.catalogs.length) {
       log("info", `Detected catalog ad source: ${dpaCatalogHints.catalogs.map((item) => `${item.name} (${item.id})`).join(", ")}`);
     }
-    for (const productSet of dpaCatalogHints.productSets || []) {
-      for (const adId of productSet.detectedFromAds || []) {
-        const ad = ads.find((item) => String(item.id) === String(adId));
-        const creative = creatives.find((item) => String(item.id) === String(ad?.creative?.id || ""));
-        if (creative?.raw && !creative.raw.product_set_id) {
-          creative.raw.product_set_id = String(productSet.id);
-        }
-      }
-    }
     for (const ad of ads || []) {
       const creative = creatives.find((item) => String(item.id) === String(ad?.creative?.id || ""));
       if (!creative || !isLikelyCatalogCreative(creative)) {
@@ -4367,14 +4437,21 @@
 
   async function applyInstagramIdentity(osp, pageId, itemName, accountId = "") {
     osp.page_id = pageId;
+    const existingInstagramUserId = String(osp.instagram_user_id || "");
+    const existingInstagramActorId = String(osp.instagram_actor_id || "");
+    const existingThreadsUserId = String(osp.threads_user_id || osp.th_user_id || "");
     const identity = await ensurePageIdentityProfiles(pageId, itemName, accountId);
     if (identity.instagramUserId) {
       osp.instagram_user_id = identity.instagramUserId;
+    } else if (existingInstagramUserId) {
+      osp.instagram_user_id = existingInstagramUserId;
     } else {
       delete osp.instagram_user_id;
     }
     if (identity.instagramActorId) {
       osp.instagram_actor_id = identity.instagramActorId;
+    } else if (existingInstagramActorId && existingInstagramActorId !== existingInstagramUserId) {
+      osp.instagram_actor_id = existingInstagramActorId;
     } else {
       delete osp.instagram_actor_id;
     }
@@ -4384,6 +4461,8 @@
     if (Object.prototype.hasOwnProperty.call(osp, "threads_user_id")) {
       if (identity.threadsUserId) {
         osp.threads_user_id = identity.threadsUserId;
+      } else if (existingThreadsUserId) {
+        osp.threads_user_id = existingThreadsUserId;
       } else {
         delete osp.threads_user_id;
       }
@@ -4391,11 +4470,14 @@
     if (Object.prototype.hasOwnProperty.call(osp, "th_user_id")) {
       if (identity.threadsUserId) {
         osp.th_user_id = identity.threadsUserId;
+      } else if (existingThreadsUserId) {
+        osp.th_user_id = existingThreadsUserId;
       } else {
         delete osp.th_user_id;
       }
     }
-    if (!identity.instagramUserId && itemName) {
+    const hasUsableInstagramIdentity = Boolean(osp.instagram_user_id) && Boolean(osp.instagram_actor_id);
+    if (!hasUsableInstagramIdentity && itemName) {
       log("warn", `Page ${pageId} has no accessible Instagram identity for ${itemName}.`);
     }
     return identity;
@@ -6706,17 +6788,24 @@
     if (!normalizedId || !packageData) {
       return null;
     }
-    const direct = (packageData.productSets || []).find((item) => String(item?.id || "") === normalizedId);
-    if (direct) {
-      return direct;
+    const candidates = [];
+    for (const item of packageData.productSets || []) {
+      if (String(item?.id || "") === normalizedId) {
+        candidates.push(item);
+      }
     }
     for (const snapshot of packageData.catalogExports || []) {
       const found = (snapshot?.productSets || []).find((item) => String(item?.id || "") === normalizedId);
       if (found) {
-        return found;
+        candidates.push(found);
       }
     }
-    return null;
+    if (!candidates.length) {
+      return null;
+    }
+    return candidates.reduce((best, current) => (
+      rankProductSetMeta(current) > rankProductSetMeta(best) ? current : best
+    ));
   }
 
   function resolveSourceProductSetCatalogId(packageData, productSetId) {
@@ -6799,6 +6888,9 @@
       }
       const targetCatalogId = String(catalogMappings?.[sourceCatalogId] || sourceCatalogId || "");
       if (!targetCatalogId) {
+        continue;
+      }
+      if (targetCatalogId === sourceCatalogId) {
         continue;
       }
       if (!targetProductSetsByCatalog.has(targetCatalogId)) {

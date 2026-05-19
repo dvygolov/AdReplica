@@ -1,39 +1,39 @@
 {
   "app": "AdReplica",
-  "build": "180526b2",
-  "version": "180526b2",
-  "generatedAt": "2026-05-18T14:27:41.257Z",
+  "build": "190526b1",
+  "version": "190526b1",
+  "generatedAt": "2026-05-19T18:12:49.003Z",
   "payload": {
     "encoding": "base64",
-    "sha256": "87fade8ed95e0a609da39e0b959aae72b049ea3f9c8d327f760396c63b96a1da",
-    "byteLength": 264731
+    "sha256": "2b9529f48fa31a0076f4d0950cff106282cf3887373c20f40fabaa5958449f22",
+    "byteLength": 267893
   },
   "chunks": [
     {
       "index": 1,
       "file": "og/chunk-001.html",
-      "url": "https://adreplica.pages.dev/adreplica/180526b2/og/chunk-001",
+      "url": "https://adreplica.pages.dev/adreplica/190526b1/og/chunk-001",
       "latestUrl": "https://adreplica.pages.dev/adreplica/latest/og/chunk-001",
       "ogObjectId": "",
       "base64Length": 350000,
-      "base64Sha256": "5235f874b74e389cda9bdf60c26f10b6b2205817a6437083f563837d221fa28f"
+      "base64Sha256": "c4ed4d0bd5ebcea34bfa853b18ff5e5228654dfa844efbed4e18997f313c9d52"
     },
     {
       "index": 2,
       "file": "og/chunk-002.html",
-      "url": "https://adreplica.pages.dev/adreplica/180526b2/og/chunk-002",
+      "url": "https://adreplica.pages.dev/adreplica/190526b1/og/chunk-002",
       "latestUrl": "https://adreplica.pages.dev/adreplica/latest/og/chunk-002",
       "ogObjectId": "",
-      "base64Length": 2976,
-      "base64Sha256": "4fc01a04bed3b256a3a3ff526118c3e440f033a3bdc5843a2bd1ba7229e747b7"
+      "base64Length": 7192,
+      "base64Sha256": "0af037d5a805fb4575f46594ac52336a57c31d57240b2b1998da5cf48980305b"
     }
   ],
   "source": "adreplica.js",
   "chunkSize": 350000,
   "payloadFile": "payload.js",
-  "payloadUrl": "https://adreplica.pages.dev/adreplica/180526b2/payload.js",
+  "payloadUrl": "https://adreplica.pages.dev/adreplica/190526b1/payload.js",
   "latestPayloadUrl": "https://adreplica.pages.dev/adreplica/latest/payload.js",
   "manifestFile": "manifest.html",
-  "manifestUrl": "https://adreplica.pages.dev/adreplica/180526b2/manifest",
+  "manifestUrl": "https://adreplica.pages.dev/adreplica/190526b1/manifest",
   "latestManifestUrl": "https://adreplica.pages.dev/adreplica/latest/manifest"
 }
