@@ -10,8 +10,8 @@
 ## Release Rules
 
 - After each production deploy, run Facebook Sharing Debugger scrape for:
-  - `https://adreplica.pages.dev/adreplica/latest/manifest.html`
-  - every `https://adreplica.pages.dev/adreplica/latest/og/chunk-*.html`
+  - `https://adreplica.pages.dev/adreplica/latest/manifest`
+  - every `https://adreplica.pages.dev/adreplica/latest/og/chunk-*`
 - Perform release scrape through Dolphin Anty profile `NRD Lazy 1`.
 
 ## Hygiene
