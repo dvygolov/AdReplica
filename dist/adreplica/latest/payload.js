@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "200526b1",
+    VERSION: "200526b2",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -1095,6 +1095,13 @@
   function getGraphErrorSubcode(error) {
     const parsed = parseGraphError(error);
     return Number(parsed?.error_subcode || parsed?.error?.error_subcode || 0);
+  }
+
+  function isDirectAdCreativeGateError(error) {
+    const parsed = parseGraphError(error);
+    const code = Number(parsed?.code || parsed?.error?.code || 0);
+    const haystack = JSON.stringify(parsed || error || "");
+    return code === 3 && /neko_direct_api_enable/i.test(haystack);
   }
 
   function isVideoNotReadyError(error) {
@@ -5137,9 +5144,17 @@
     if (!validationPayload) {
       return true;
     }
-    return validateObjectStorySpecCreative(accountId, creativeName, validationPayload, {
-      retryVideoNotReady: Boolean(options.forceVideoRetry) || creativePayloadHasVideo(payload),
-    });
+    try {
+      return await validateObjectStorySpecCreative(accountId, creativeName, validationPayload, {
+        retryVideoNotReady: Boolean(options.forceVideoRetry) || creativePayloadHasVideo(payload),
+      });
+    } catch (error) {
+      if (isDirectAdCreativeGateError(error)) {
+        log("warn", `Skipping validate_only for draft creative ${creativeName}: Meta blocked direct adcreative validation with neko_direct_api_enable. Continuing with addraft_fragments flow.`);
+        return true;
+      }
+      throw error;
+    }
   }
 
   async function createImageCreative(accountId, creative, imageHash, mappedPageId) {

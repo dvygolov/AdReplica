@@ -51,8 +51,11 @@ function buildAppMarkSvg() {
     '    </linearGradient>',
     '  </defs>',
     '  <rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#adreplica-gold)" stroke-width="6"/>',
-    '  <path d="M21 67 34.8 29h12.4L61 67H50.2l-2.2-6.8H34.1L31.9 67Zm16.5-15.3h7l-3.5-10.8Z" fill="url(#adreplica-gold)"/>',
-    '  <path d="M50.5 67V29h16.1c8.9 0 14.1 4.6 14.1 12.1 0 5.2-2.6 8.9-7 10.7L82 67H71.1l-6.3-13.5h-1.7V45h2.9c3 0 4.8-1.4 4.8-4 0-2.6-1.8-4-4.8-4h-4.7V67Z" fill="#fff2bd" fill-opacity="0.97"/>',
+    '  <rect x="23" y="25" width="34" height="42" rx="6" fill="#222" stroke="#fff2bd" stroke-width="4"/>',
+    '  <rect x="39" y="29" width="34" height="42" rx="6" fill="#151515" stroke="url(#adreplica-gold)" stroke-width="5"/>',
+    '  <path d="M48 56 56 40l8 16" fill="none" stroke="url(#adreplica-gold)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>',
+    '  <path d="M52 51h8" fill="none" stroke="#fff2bd" stroke-width="4" stroke-linecap="round"/>',
+    '  <path d="M33 37h11M33 49h9M33 61h8" fill="none" stroke="#ffd000" stroke-width="4" stroke-linecap="round" opacity=".72"/>',
     '</svg>',
   ].join("\n");
 }
@@ -129,8 +132,8 @@ function buildManifestHtml({ appName, build, manifestBase64 }) {
   ].join("\n");
 }
 
-function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshotUrl, iconUrl }) {
-  const title = `${appName} Loader`;
+function buildLandingHtml({ appName, displayName = appName, build, bookmarklet, manifestUrl, screenshotUrl, iconUrl }) {
+  const title = `${displayName} Loader`;
   const inlineMark = buildAppMarkSvg();
   return [
     "<!doctype html>",
@@ -140,7 +143,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshot
     '  <meta name="viewport" content="width=device-width, initial-scale=1" />',
     `  <title>${escapeHtml(title)}</title>`,
     '  <meta name="robots" content="noindex,nofollow" />',
-    `  <meta name="description" content="${escapeHtml(appName)} bookmarklet loader for Facebook Ads Manager campaign export, import, and clone workflows." />`,
+    `  <meta name="description" content="${escapeHtml(displayName)} bookmarklet loader for Facebook Ads Manager campaign export, import, and clone workflows." />`,
     `  <link rel="icon" href="${escapeHtml(iconUrl)}" type="image/svg+xml" />`,
     "  <style>",
     "    :root {",
@@ -371,7 +374,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshot
     "  <main>",
     "    <nav class=\"nav\">",
     "      <div class=\"brand-wrap\">",
-    `        <div class="brand-line"><span class="brand-mark">${inlineMark}</span><div class="brand">${escapeHtml(appName)}</div></div>`,
+    `        <div class="brand-line"><span class="brand-mark">${inlineMark}</span><div class="brand">${escapeHtml(displayName)}</div></div>`,
     "        <div class=\"byline\">by <a href=\"https://yellowweb.top\" target=\"_blank\" rel=\"noopener\">Yellow Web</a></div>",
     "      </div>",
     "      <div class=\"nav-links\"><a href=\"#install\">Install</a><a href=\"#features\">Features</a><a href=\"#how\">How it works</a><a class=\"tg-link\" href=\"https://t.me/yellow_web\" target=\"_blank\" rel=\"noopener\" aria-label=\"Yellow Web Telegram\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M21.8 4.6 18.6 19.7c-.2 1.1-.9 1.4-1.8.9l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1 9.3-8.4c.4-.4-.1-.6-.6-.2L6 13.2 1.1 11.7c-1.1-.3-1.1-1.1.2-1.6L20.5 2.7c.9-.3 1.7.2 1.3 1.9Z\"/></svg></a></div>",
@@ -379,7 +382,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshot
     "    <section class=\"hero\" id=\"install\">",
     "      <div class=\"hero-grid\">",
     "        <div>",
-    `          <div class="eyebrow">${escapeHtml(appName)} build ${escapeHtml(build)}</div>`,
+    `          <div class="eyebrow">${escapeHtml(displayName)} build ${escapeHtml(build)}</div>`,
     "          <h1>Campaign cloning without leaving Ads Manager.</h1>",
     "          <p class=\"lead\">AdReplica is a browser-side tool for exporting, importing, and cloning Facebook Ads Manager campaigns, including drafts, media, pages, pixels, dynamic creatives, and catalog-aware flows.</p>",
     "          <div class=\"install\">",
@@ -443,6 +446,7 @@ function main() {
   const distRoot = path.dirname(outRoot);
   const baseUrl = readArg("base-url", "");
   const appName = readArg("app", "AdReplica");
+  const displayName = "Ad Replica";
   const chunkOgObjectIds = parseListArg("chunk-og-object-ids");
   const source = fs.readFileSync(sourcePath, "utf8");
   const build = readArg("build", detectBuild(source));
@@ -525,6 +529,7 @@ function main() {
   writeFile(path.join(distRoot, APP_MARK_FILE), `${buildAppMarkSvg()}\n`);
   writeFile(path.join(distRoot, "index.html"), buildLandingHtml({
     appName,
+    displayName,
     build,
     bookmarklet,
     manifestUrl: prettyPublicUrl("latest/manifest.html"),
