@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "190526b1",
+    VERSION: "200526b1",
     API_VERSION: "v23.0",
     API_URL: "https://adsmanager-graph.facebook.com/v23.0/",
     PAGE_API_URL: "https://graph.facebook.com/v23.0/",
@@ -385,28 +385,51 @@
     if (raw.name || fallbackName) {
       payload.name = raw.name || fallbackName;
     }
-    payload.actor_type = raw.actor_type || "PAGE";
-    payload.enable_direct_install = raw.enable_direct_install !== undefined
-      ? Boolean(raw.enable_direct_install)
-      : false;
-    payload.object_type = raw.object_type || "VIDEO";
+    for (const field of [
+      "degrees_of_freedom_spec",
+      "creative_sourcing_spec",
+      "contextual_multi_ads",
+      "actor_type",
+      "authorization_category",
+      "branded_content_sponsor_page_id",
+      "destination_spec",
+      "enable_direct_install",
+      "instagram_actor_id",
+      "product_set_id",
+      "template_url_spec",
+      "object_type",
+      "thumbnail_url",
+      "uca_draft_version",
+      "use_page_actor_override",
+    ]) {
+      if (raw[field] !== undefined) {
+        payload[field] = deepClone(raw[field]);
+      }
+    }
+    if (payload.actor_type === undefined) {
+      payload.actor_type = "PAGE";
+    }
+    if (payload.enable_direct_install === undefined) {
+      payload.enable_direct_install = false;
+    }
+    if (payload.object_type === undefined) {
+      payload.object_type = "VIDEO";
+    }
     if (raw.url_tags) {
       payload.url_tags = raw.url_tags;
     }
-    const objectStorySpec = {};
-    for (const field of ["page_id", "instagram_user_id", "instagram_actor_id"]) {
-      if (osp[field] !== undefined && osp[field] !== null && osp[field] !== "") {
-        objectStorySpec[field] = osp[field];
-      }
-    }
-    const normalizedVideoData = {};
-    for (const field of ["video_id", "title", "message", "image_hash", "image_url", "video_thumbnail_source", "call_to_action"]) {
-      if (videoData[field] !== undefined && videoData[field] !== null && videoData[field] !== "") {
-        normalizedVideoData[field] = deepClone(videoData[field]);
+    const objectStorySpec = deepClone(osp);
+    delete objectStorySpec.link_data;
+    const normalizedVideoData = deepClone(videoData);
+    for (const [field, value] of Object.entries(normalizedVideoData)) {
+      if (value === undefined || value === null || value === "") {
+        delete normalizedVideoData[field];
       }
     }
     if (Object.keys(normalizedVideoData).length) {
       objectStorySpec.video_data = normalizedVideoData;
+    } else {
+      delete objectStorySpec.video_data;
     }
     if (Object.keys(objectStorySpec).length) {
       payload.object_story_spec = objectStorySpec;
@@ -5126,10 +5149,11 @@
     linkData.image_hash = imageHash;
     osp.link_data = linkData;
     await applyInstagramIdentity(osp, mappedPageId, raw.name || creative.name, accountId);
-    const body = appendCreativeUrlTags({
-      name: raw.name || creative.name,
-      object_story_spec: osp,
-    }, raw);
+    raw.object_story_spec = osp;
+    synchronizeCreativeIdentityFields(raw, osp);
+    stripCreativePreviewIdentifiers(raw);
+    const body = buildImportedCreativePayload(raw);
+    body.name = raw.name || creative.name;
     return createAdCreativeWithRetries(accountId, raw.name || creative.name, body);
   }
 
@@ -5149,10 +5173,11 @@
     }
     osp.video_data = videoData;
     await applyInstagramIdentity(osp, mappedPageId, raw.name || creative.name, accountId);
-    const body = appendCreativeUrlTags({
-      name: raw.name || creative.name,
-      object_story_spec: osp,
-    }, raw);
+    raw.object_story_spec = osp;
+    synchronizeCreativeIdentityFields(raw, osp);
+    stripCreativePreviewIdentifiers(raw);
+    const body = buildImportedCreativePayload(raw);
+    body.name = raw.name || creative.name;
     return createAdCreativeWithRetries(accountId, raw.name || creative.name, body);
   }
 
