@@ -76,6 +76,10 @@ import { createServiceRegistry } from "./services/index.mjs";
     return hasPositiveBudget(campaign?.daily_budget) || hasPositiveBudget(campaign?.lifetime_budget);
   }
 
+  function shouldIncludeCampaignBidStrategy(campaign) {
+    return Boolean(campaign?.bid_strategy) && hasCampaignLevelBudget(campaign);
+  }
+
   function shouldIncludeAdsetSchedule(adset, options = {}) {
     return Boolean(adset?.adset_schedule) && !(options.hasCampaignBudget && hasAdsetDayParting(adset));
   }
@@ -503,6 +507,17 @@ import { createServiceRegistry } from "./services/index.mjs";
         delete creative.raw.object_story_spec.instagram_actor_id;
       }
     }
+    for (const adset of (next.adsets || [])) {
+      if (!adset?.promoted_object) {
+        continue;
+      }
+      for (const [sourcePageId, mappedPageId] of Object.entries(pageMappings)) {
+        if (!sourcePageId || !mappedPageId || sourcePageId === mappedPageId) {
+          continue;
+        }
+        replaceCreativePageReferences(adset.promoted_object, sourcePageId, mappedPageId);
+      }
+    }
     return next;
   }
 
@@ -628,7 +643,28 @@ import { createServiceRegistry } from "./services/index.mjs";
         sourceId: imageHash,
       });
     }
+    if (Array.isArray(osp.link_data?.child_attachments)) {
+      osp.link_data.child_attachments.forEach((attachment, index) => {
+        if (attachment?.image_hash) {
+          const imageHash = String(attachment.image_hash);
+          const originalName = `${imageHash}.jpg`;
+          slots.push({
+            key: `${creative.id}:child_attachment_image_${index}`,
+            creativeId: creative.id,
+            creativeName: creative.name,
+            type: "image",
+            expectedFileName: (fnMap && fnMap[originalName]) || originalName,
+            sourceId: imageHash,
+          });
+        }
+      });
+    }
     return slots;
+  }
+
+  function hasCarouselAttachmentMedia(raw) {
+    const attachments = raw?.object_story_spec?.link_data?.child_attachments;
+    return Array.isArray(attachments) && attachments.some((attachment) => attachment?.image_hash);
   }
 
   function isCatalogTemplateCreative(raw) {
@@ -2788,9 +2824,6 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (osp.template_data) {
       return true;
     }
-    if (osp.link_data?.multi_share_end_card || osp.link_data?.show_multiple_images) {
-      return true;
-    }
     return false;
   }
 
@@ -3534,6 +3567,39 @@ import { createServiceRegistry } from "./services/index.mjs";
             const imageUrl = image?.url || image?.permalink_url;
             if (imageUrl) {
               const friendly = makeFriendlyMediaFileName(adName, "image", 1, ".jpg");
+              sourceToFriendly.set(originalName, friendly);
+              fileNameMap[originalName] = friendly;
+              downloadQueue.push({
+                type: "image",
+                fileName: friendly,
+                sourceUrl: imageUrl,
+                sourceAccountId: accountId,
+                sourceId: imageHash,
+                sourceKind: "adimage",
+              });
+            }
+          }
+        }
+        if (Array.isArray(osp.link_data?.child_attachments)) {
+          for (const [attachmentIndex, attachment] of osp.link_data.child_attachments.entries()) {
+            if (!attachment?.image_hash) {
+              continue;
+            }
+            const imageHash = String(attachment.image_hash);
+            const originalName = `${imageHash}.jpg`;
+            if (sourceToFriendly.has(originalName)) {
+              continue;
+            }
+            const images = await graphFetch(`act_${accountId}/adimages`, {
+              query: {
+                hashes: [imageHash],
+                fields: "hash,url,permalink_url",
+              },
+            });
+            const image = images.data?.[0];
+            const imageUrl = image?.url || image?.permalink_url;
+            if (imageUrl) {
+              const friendly = makeFriendlyMediaFileName(adName, "carousel", attachmentIndex + 1, ".jpg");
               sourceToFriendly.set(originalName, friendly);
               fileNameMap[originalName] = friendly;
               downloadQueue.push({
@@ -4344,6 +4410,34 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
   }
 
+  async function replaceCarouselAttachmentMedia(accountId, creative, osp, mediaCache) {
+    const attachments = osp?.link_data?.child_attachments;
+    if (!Array.isArray(attachments) || !attachments.length) {
+      return true;
+    }
+    const fnMap = state.importPackage?.fileNameMap;
+    let replaced = 0;
+    for (const [index, attachment] of attachments.entries()) {
+      if (!attachment?.image_hash) {
+        continue;
+      }
+      const oldHash = String(attachment.image_hash);
+      const originalKey = `${oldHash}.jpg`;
+      const mediaFile = resolveImportedMediaFile(`${creative.id}:child_attachment_image_${index}`, originalKey, fnMap);
+      if (!mediaFile) {
+        log("warn", `Creative ${creative.name} skipped: carousel media file not found ${originalKey}.`);
+        return false;
+      }
+      const uploaded = await uploadImageAsset(accountId, mediaFile, mediaCache);
+      attachment.image_hash = uploaded.hash;
+      replaced += 1;
+    }
+    if (replaced) {
+      log("info", `Creative ${creative.name}: replaced ${replaced} carousel image${replaced === 1 ? "" : "s"}.`);
+    }
+    return true;
+  }
+
   async function createPixel(accountId, sourcePixelId, campaignName) {
     // If account already has pixels, use the first one
     if (state.importAccountPixels.length > 0) {
@@ -5049,6 +5143,22 @@ import { createServiceRegistry } from "./services/index.mjs";
       return createAdCreativeWithRetries(accountId, raw.name || creative.name, body);
     }
 
+    if (hasCarouselAttachmentMedia(creative.raw)) {
+      const raw = deepClone(creative.raw);
+      replaceCreativePageReferences(raw, sourcePageId, mappedPageId);
+      const osp = raw.object_story_spec || {};
+      await applyInstagramIdentity(osp, mappedPageId, raw.name || creative.name, accountId);
+      if (!await replaceCarouselAttachmentMedia(accountId, creative, osp, mediaCache)) {
+        return null;
+      }
+      raw.object_story_spec = osp;
+      synchronizeCreativeIdentityFields(raw, osp);
+      stripCreativePreviewIdentifiers(raw);
+      const body = buildImportedCreativePayload(raw);
+      body.name = raw.name || creative.name;
+      return createAdCreativeWithRetries(accountId, raw.name || creative.name, body);
+    }
+
     const slots = getCreativeMediaSlots(creative);
     if (!slots.length) {
       log("warn", `Creative ${creative.name} skipped: no supported media slot.`);
@@ -5162,6 +5272,23 @@ import { createServiceRegistry } from "./services/index.mjs";
       return payload;
     }
 
+    if (hasCarouselAttachmentMedia(raw)) {
+      const osp = raw.object_story_spec || {};
+      await applyInstagramIdentity(osp, mappedPageId, raw.name || creative.name, accountId);
+      if (!await replaceCarouselAttachmentMedia(accountId, creative, osp, mediaCache)) {
+        return null;
+      }
+      raw.object_story_spec = osp;
+      synchronizeCreativeIdentityFields(raw, osp);
+      stripCreativePreviewIdentifiers(raw);
+      const payload = buildImportedCreativePayload(raw);
+      payload.name = raw.name || creative.name;
+      if (!await validateDraftCreativePayload(accountId, raw.name || creative.name, payload)) {
+        return null;
+      }
+      return payload;
+    }
+
     const slots = getCreativeMediaSlots(creative);
     if (!slots.length) {
       log("warn", `Creative ${creative.name} skipped: no supported media slot.`);
@@ -5255,7 +5382,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (hasPositiveBudget(campaign.lifetime_budget)) {
       body.lifetime_budget = campaign.lifetime_budget;
     }
-    if (campaign.bid_strategy) {
+    if (shouldIncludeCampaignBidStrategy(campaign)) {
       body.bid_strategy = campaign.bid_strategy;
     }
     if (campaign.buying_type) {
@@ -5401,24 +5528,6 @@ import { createServiceRegistry } from "./services/index.mjs";
       body,
     });
     return String(json.id);
-  }
-
-  async function updateAdObjectStatus(objectId, status, label) {
-    await graphFetch(objectId, {
-      method: "POST",
-      body: { status },
-    });
-    log("info", `${label} set to ${status}.`);
-  }
-
-  async function activateCreatedCampaignTree(campaignId, adsetIds, adIds) {
-    for (const [index, adsetId] of adsetIds.entries()) {
-      await updateAdObjectStatus(adsetId, "ACTIVE", `Adset ${index + 1}`);
-    }
-    for (const [index, adId] of adIds.entries()) {
-      await updateAdObjectStatus(adId, "ACTIVE", `Ad ${index + 1}`);
-    }
-    await updateAdObjectStatus(campaignId, "ACTIVE", "Campaign");
   }
 
   async function discardCurrentDraft(accountId) {
@@ -5820,7 +5929,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (hasPositiveBudget(campaign.lifetime_budget)) {
       values.push(draftItem("lifetime_budget", campaign.lifetime_budget));
     }
-    if (campaign.bid_strategy) {
+    if (shouldIncludeCampaignBidStrategy(campaign)) {
       values.push(draftItem("bid_strategy", campaign.bid_strategy));
     }
     if (campaign.buying_type) {
@@ -7072,18 +7181,9 @@ import { createServiceRegistry } from "./services/index.mjs";
         await logDraftValidation(state.importAccountId, draftId);
         log("info", "Draft import complete. No publishing performed.");
       } else {
-        const shouldActivateAfterCreate = state.importStatus === "ACTIVE";
-        const creationStatus = shouldActivateAfterCreate ? "PAUSED" : state.importStatus;
-        if (shouldActivateAfterCreate) {
-          log("info", "Creating ACTIVE import as PAUSED first, then activating after adsets and ads exist.");
-        }
-        const newCampaignId = await createCampaign(state.importAccountId, state.importPackage.campaign, {
-          status: creationStatus,
-        });
+        const newCampaignId = await createCampaign(state.importAccountId, state.importPackage.campaign);
         log("info", `Campaign created: ${newCampaignId}`);
         const packageHasCampaignBudget = hasCampaignLevelBudget(state.importPackage.campaign);
-        const createdAdsetIds = [];
-        const createdAdIds = [];
 
         for (const adset of state.importPackage.adsets) {
           const newAdsetId = await createAdset(
@@ -7091,10 +7191,9 @@ import { createServiceRegistry } from "./services/index.mjs";
             newCampaignId,
             adset,
             pixelMap,
-            { hasCampaignBudget: packageHasCampaignBudget, status: creationStatus },
+            { hasCampaignBudget: packageHasCampaignBudget },
           );
           adsetMap.set(String(adset.id), newAdsetId);
-          createdAdsetIds.push(newAdsetId);
           log("info", `Adset created: ${adset.name}`);
         }
 
@@ -7118,16 +7217,10 @@ import { createServiceRegistry } from "./services/index.mjs";
             log("warn", `Ad ${ad.name} skipped: creative/adset not prepared.`);
             continue;
           }
-          const newAdId = await createAd(state.importAccountId, newAdsetId, ad, newCreativeId, {
-            status: creationStatus,
-          });
-          createdAdIds.push(newAdId);
+          await createAd(state.importAccountId, newAdsetId, ad, newCreativeId);
           log("info", `Ad created: ${ad.name}`);
         }
 
-        if (shouldActivateAfterCreate) {
-          await activateCreatedCampaignTree(newCampaignId, createdAdsetIds, createdAdIds);
-        }
         log("info", "Import complete.");
       }
       if (reloadOnSuccess) {
