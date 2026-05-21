@@ -3405,6 +3405,9 @@ import { createServiceRegistry } from "./services/index.mjs";
                 type: "image",
                 fileName: friendly,
                 sourceUrl: imageUrl,
+                sourceAccountId: accountId,
+                sourceId: imageHash,
+                sourceKind: "adimage",
               });
             }
           }
@@ -3429,6 +3432,9 @@ import { createServiceRegistry } from "./services/index.mjs";
                 type: "video",
                 fileName: friendly,
                 sourceUrl: video.source,
+                sourceAccountId: accountId,
+                sourceId: videoId,
+                sourceKind: "advideo",
               });
             }
             if (hasAssetFeedCustomVideoThumbnail(vid)) {
@@ -3454,6 +3460,9 @@ import { createServiceRegistry } from "./services/index.mjs";
                     type: "image",
                     fileName: friendly,
                     sourceUrl: previewUrl,
+                    sourceAccountId: accountId,
+                    sourceId: vid.thumbnail_hash ? String(vid.thumbnail_hash) : "",
+                    sourceKind: "thumbnail",
                   });
                 }
               }
@@ -3476,6 +3485,9 @@ import { createServiceRegistry } from "./services/index.mjs";
               type: "video",
               fileName: friendly,
               sourceUrl: video.source,
+              sourceAccountId: accountId,
+              sourceId: videoId,
+              sourceKind: "advideo",
             });
           }
           if (hasStandaloneCustomVideoThumbnail(osp.video_data)) {
@@ -3501,6 +3513,9 @@ import { createServiceRegistry } from "./services/index.mjs";
                   type: "image",
                   fileName: friendly,
                   sourceUrl: previewUrl,
+                  sourceAccountId: accountId,
+                  sourceId: osp.video_data.image_hash ? String(osp.video_data.image_hash) : "",
+                  sourceKind: "thumbnail",
                 });
               }
             }
@@ -3525,6 +3540,9 @@ import { createServiceRegistry } from "./services/index.mjs";
                 type: "image",
                 fileName: friendly,
                 sourceUrl: imageUrl,
+                sourceAccountId: accountId,
+                sourceId: imageHash,
+                sourceKind: "adimage",
               });
             }
           }
@@ -3606,6 +3624,28 @@ import { createServiceRegistry } from "./services/index.mjs";
     return new Blob([buffer], {
       type: response.headers.get("content-type") || "application/octet-stream",
     });
+  }
+
+  function getMediaFileName(file) {
+    return String(file?.name || file?.fileName || "");
+  }
+
+  function isRemoteMediaFile(file) {
+    return Boolean(file?.__adReplicaRemoteMedia);
+  }
+
+  function createRemoteMediaFile(file, error = null) {
+    return {
+      __adReplicaRemoteMedia: true,
+      name: file.fileName,
+      fileName: file.fileName,
+      type: file.type,
+      sourceUrl: file.sourceUrl || "",
+      sourceAccountId: String(file.sourceAccountId || "").replace(/^act_/, ""),
+      sourceId: String(file.sourceId || ""),
+      sourceKind: file.sourceKind || "",
+      downloadError: String(error?.message || error || ""),
+    };
   }
 
   async function downloadFile(sourceUrl, fileName) {
@@ -3754,11 +3794,8 @@ import { createServiceRegistry } from "./services/index.mjs";
   async function buildMediaFilesFromPackage(packageData) {
     const files = new Map();
     for (const file of packageData?._downloadQueue || []) {
-      log("info", `Copying media ${file.fileName} from source...`);
-      const blob = await downloadFile(file.sourceUrl, file.fileName);
-      files.set(file.fileName, new File([blob], file.fileName, {
-        type: blob.type || (file.type === "video" ? "video/mp4" : "image/jpeg"),
-      }));
+      log("info", `Preparing server-side media copy for ${file.fileName}...`);
+      files.set(file.fileName, createRemoteMediaFile(file));
     }
     return files;
   }
@@ -4472,21 +4509,220 @@ import { createServiceRegistry } from "./services/index.mjs";
     return next;
   }
 
+  function getAdImageHashFromResponse(json, fileName) {
+    if (json?.hash) {
+      return String(json.hash);
+    }
+    const images = json?.images || {};
+    const direct = fileName ? images[fileName] : null;
+    const first = direct || images[Object.keys(images)[0]];
+    if (first?.hash) {
+      return String(first.hash);
+    }
+    if (typeof first?.id === "string" && first.id.includes(":")) {
+      return first.id.split(":").pop();
+    }
+    return "";
+  }
+
+  function getFileExtension(fileName) {
+    const match = String(fileName || "").match(/(\.[a-z0-9]{1,8})$/i);
+    return match ? match[1].toLowerCase() : "";
+  }
+
+  function replaceFileExtension(fileName, extension) {
+    const safeExtension = String(extension || "").startsWith(".") ? String(extension) : `.${extension}`;
+    const name = String(fileName || "image");
+    return getFileExtension(name) ? name.replace(/(\.[a-z0-9]{1,8})$/i, safeExtension) : `${name}${safeExtension}`;
+  }
+
+  function shouldTranscodeImageForMeta(file) {
+    if (!file || isRemoteMediaFile(file)) {
+      return false;
+    }
+    const fileName = getMediaFileName(file);
+    return String(file.type || "").toLowerCase() === "image/webp" || getFileExtension(fileName) === ".webp";
+  }
+
+  function loadImageElementFromBlob(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Failed to decode image."));
+      };
+      image.src = url;
+    });
+  }
+
+  async function transcodeImageFileForMeta(file) {
+    if (!shouldTranscodeImageForMeta(file)) {
+      return file;
+    }
+    const image = await loadImageElementFromBlob(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+    if (!canvas.width || !canvas.height) {
+      throw new Error(`Cannot convert ${getMediaFileName(file)}: empty image dimensions.`);
+    }
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error(`Cannot convert ${getMediaFileName(file)}: canvas is unavailable.`);
+    }
+    context.drawImage(image, 0, 0);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+    if (!blob) {
+      throw new Error(`Cannot convert ${getMediaFileName(file)} to JPEG.`);
+    }
+    const nextName = replaceFileExtension(getMediaFileName(file), ".jpg");
+    log("info", `Converted ${getMediaFileName(file)} to ${nextName} for Meta image upload.`);
+    return new File([blob], nextName, {
+      type: "image/jpeg",
+      lastModified: file.lastModified || Date.now(),
+    });
+  }
+
+  async function tryUploadRemoteImageCopy(accountId, file) {
+    if (!file.sourceAccountId || !file.sourceId) {
+      return "";
+    }
+    const json = await graphFetch(`act_${accountId}/adimages`, {
+      method: "POST",
+      body: {
+        name: getMediaFileName(file),
+        copy_from: {
+          source_account_id: String(file.sourceAccountId).replace(/^act_/, ""),
+          hash: String(file.sourceId),
+        },
+      },
+    });
+    return getAdImageHashFromResponse(json, getMediaFileName(file));
+  }
+
+  async function tryUploadRemoteImageUrl(accountId, file) {
+    if (!file.sourceUrl) {
+      return "";
+    }
+    const json = await graphFetch(`act_${accountId}/adimages`, {
+      method: "POST",
+      body: {
+        name: getMediaFileName(file),
+        url: file.sourceUrl,
+      },
+    });
+    return getAdImageHashFromResponse(json, getMediaFileName(file));
+  }
+
+  async function downloadRemoteMediaAsFile(file) {
+    if (!file.sourceUrl) {
+      throw new Error("No source URL.");
+    }
+    const blob = await downloadFile(file.sourceUrl, getMediaFileName(file));
+    return new File([blob], getMediaFileName(file), {
+      type: blob.type || (file.type === "video" ? "video/mp4" : "image/jpeg"),
+    });
+  }
+
+  async function uploadRemoteImageViaBrowser(accountId, file) {
+    const downloaded = await downloadRemoteMediaAsFile(file);
+    return uploadImage(accountId, downloaded);
+  }
+
+  async function uploadRemoteImage(accountId, file) {
+    const failures = [];
+    try {
+      const hash = await tryUploadRemoteImageCopy(accountId, file);
+      if (hash) {
+        log("info", `Copied image ${getMediaFileName(file)} through Meta copy_from.`);
+        return hash;
+      }
+    } catch (error) {
+      failures.push(`copy_from: ${String(error?.message || error)}`);
+    }
+    try {
+      const hash = await tryUploadRemoteImageUrl(accountId, file);
+      if (hash) {
+        log("info", `Copied image ${getMediaFileName(file)} through Meta URL import.`);
+        return hash;
+      }
+    } catch (error) {
+      failures.push(`url: ${String(error?.message || error)}`);
+    }
+    try {
+      const hash = await uploadRemoteImageViaBrowser(accountId, file);
+      if (hash) {
+        log("info", `Copied image ${getMediaFileName(file)} through browser download fallback.`);
+        return hash;
+      }
+    } catch (error) {
+      failures.push(`browser_download: ${String(error?.message || error)}`);
+    }
+    throw new Error(`Remote image copy failed for ${getMediaFileName(file)}. ${failures.join(" | ")}`);
+  }
+
   async function uploadImage(accountId, file) {
+    if (isRemoteMediaFile(file)) {
+      return uploadRemoteImage(accountId, file);
+    }
+    const uploadFile = await transcodeImageFileForMeta(file);
     const formData = new FormData();
-    formData.append("image_name", file, file.name);
+    formData.append("image_name", uploadFile, uploadFile.name);
     const json = await graphFetch(`act_${accountId}/adimages`, {
       method: "POST",
       formData,
     });
-    const entry = json.images?.[file.name];
+    const entry = json.images?.[uploadFile.name];
     if (!entry?.hash) {
-      throw new Error(`Facebook did not return hash for ${file.name}.`);
+      throw new Error(`Facebook did not return hash for ${uploadFile.name}.`);
     }
     return String(entry.hash);
   }
 
+  async function uploadRemoteVideo(accountId, file) {
+    if (!file.sourceUrl) {
+      throw new Error(`Remote video copy failed for ${getMediaFileName(file)}: no source URL.`);
+    }
+    const failures = [];
+    try {
+      const json = await graphFetch(`act_${accountId}/advideos`, {
+        method: "POST",
+        query: { fields: "picture" },
+        body: {
+          title: getMediaFileName(file),
+          file_url: file.sourceUrl,
+        },
+      });
+      if (!json.id) {
+        throw new Error("Facebook did not return video id.");
+      }
+      const videoId = String(json.id);
+      await waitForUploadedVideoProcessing(videoId);
+      log("info", `Copied video ${getMediaFileName(file)} through Meta URL import.`);
+      return videoId;
+    } catch (error) {
+      failures.push(`file_url: ${String(error?.message || error)}`);
+    }
+    try {
+      const downloaded = await downloadRemoteMediaAsFile(file);
+      const videoId = await uploadVideo(accountId, downloaded);
+      log("info", `Copied video ${getMediaFileName(file)} through browser download fallback.`);
+      return videoId;
+    } catch (error) {
+      failures.push(`browser_download: ${String(error?.message || error)}`);
+    }
+    throw new Error(`Remote video copy failed for ${getMediaFileName(file)}. ${failures.join(" | ")}`);
+  }
+
   async function uploadVideo(accountId, file) {
+    if (isRemoteMediaFile(file)) {
+      return uploadRemoteVideo(accountId, file);
+    }
     const formData = new FormData();
     formData.append("source", file, file.name);
     const json = await graphFetch(`act_${accountId}/advideos`, {
@@ -4517,11 +4753,12 @@ import { createServiceRegistry } from "./services/index.mjs";
   }
 
   async function uploadImageAsset(accountId, file, mediaCache) {
-    let hash = mediaCache.images.get(file.name);
+    const fileName = getMediaFileName(file);
+    let hash = mediaCache.images.get(fileName);
     if (!hash) {
-      log("info", `Uploading image ${file.name}...`);
+      log("info", `Uploading image ${fileName}...`);
       hash = await uploadImage(accountId, file);
-      mediaCache.images.set(file.name, hash);
+      mediaCache.images.set(fileName, hash);
     }
     let url = mediaCache.imageUrls?.get(String(hash)) || "";
     if (!url) {
@@ -4999,11 +5236,11 @@ import { createServiceRegistry } from "./services/index.mjs";
     return raw;
   }
 
-  async function createCampaign(accountId, campaign) {
+  async function createCampaign(accountId, campaign, options = {}) {
     const body = {
       name: state.importCampaignName || campaign.name,
       objective: campaign.objective,
-      status: state.importStatus,
+      status: options.status || state.importStatus,
       special_ad_categories: campaign.special_ad_categories || [],
     };
     if (campaign.special_ad_category) {
@@ -5052,7 +5289,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     const body = {
       name: adset.name,
       campaign_id: campaignId,
-      status: state.importStatus,
+      status: options.status || state.importStatus,
       optimization_goal: adset.optimization_goal,
       billing_event: adset.billing_event,
       targeting: cleanTargeting(adset.targeting, adset.name),
@@ -5149,10 +5386,10 @@ import { createServiceRegistry } from "./services/index.mjs";
     return String(json.id);
   }
 
-  async function createAd(accountId, adsetId, ad, creativeId) {
+  async function createAd(accountId, adsetId, ad, creativeId, options = {}) {
     const body = {
       name: ad.name,
-      status: state.importStatus,
+      status: options.status || state.importStatus,
       adset_id: adsetId,
       creative: { creative_id: creativeId },
     };
@@ -5164,6 +5401,24 @@ import { createServiceRegistry } from "./services/index.mjs";
       body,
     });
     return String(json.id);
+  }
+
+  async function updateAdObjectStatus(objectId, status, label) {
+    await graphFetch(objectId, {
+      method: "POST",
+      body: { status },
+    });
+    log("info", `${label} set to ${status}.`);
+  }
+
+  async function activateCreatedCampaignTree(campaignId, adsetIds, adIds) {
+    for (const [index, adsetId] of adsetIds.entries()) {
+      await updateAdObjectStatus(adsetId, "ACTIVE", `Adset ${index + 1}`);
+    }
+    for (const [index, adId] of adIds.entries()) {
+      await updateAdObjectStatus(adId, "ACTIVE", `Ad ${index + 1}`);
+    }
+    await updateAdObjectStatus(campaignId, "ACTIVE", "Campaign");
   }
 
   async function discardCurrentDraft(accountId) {
@@ -6817,9 +7072,18 @@ import { createServiceRegistry } from "./services/index.mjs";
         await logDraftValidation(state.importAccountId, draftId);
         log("info", "Draft import complete. No publishing performed.");
       } else {
-        const newCampaignId = await createCampaign(state.importAccountId, state.importPackage.campaign);
+        const shouldActivateAfterCreate = state.importStatus === "ACTIVE";
+        const creationStatus = shouldActivateAfterCreate ? "PAUSED" : state.importStatus;
+        if (shouldActivateAfterCreate) {
+          log("info", "Creating ACTIVE import as PAUSED first, then activating after adsets and ads exist.");
+        }
+        const newCampaignId = await createCampaign(state.importAccountId, state.importPackage.campaign, {
+          status: creationStatus,
+        });
         log("info", `Campaign created: ${newCampaignId}`);
         const packageHasCampaignBudget = hasCampaignLevelBudget(state.importPackage.campaign);
+        const createdAdsetIds = [];
+        const createdAdIds = [];
 
         for (const adset of state.importPackage.adsets) {
           const newAdsetId = await createAdset(
@@ -6827,9 +7091,10 @@ import { createServiceRegistry } from "./services/index.mjs";
             newCampaignId,
             adset,
             pixelMap,
-            { hasCampaignBudget: packageHasCampaignBudget },
+            { hasCampaignBudget: packageHasCampaignBudget, status: creationStatus },
           );
           adsetMap.set(String(adset.id), newAdsetId);
+          createdAdsetIds.push(newAdsetId);
           log("info", `Adset created: ${adset.name}`);
         }
 
@@ -6853,10 +7118,16 @@ import { createServiceRegistry } from "./services/index.mjs";
             log("warn", `Ad ${ad.name} skipped: creative/adset not prepared.`);
             continue;
           }
-          await createAd(state.importAccountId, newAdsetId, ad, newCreativeId);
+          const newAdId = await createAd(state.importAccountId, newAdsetId, ad, newCreativeId, {
+            status: creationStatus,
+          });
+          createdAdIds.push(newAdId);
           log("info", `Ad created: ${ad.name}`);
         }
 
+        if (shouldActivateAfterCreate) {
+          await activateCreatedCampaignTree(newCampaignId, createdAdsetIds, createdAdIds);
+        }
         log("info", "Import complete.");
       }
       if (reloadOnSuccess) {
