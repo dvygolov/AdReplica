@@ -80,6 +80,52 @@ import { createServiceRegistry } from "./services/index.mjs";
     return Boolean(campaign?.bid_strategy) && hasCampaignLevelBudget(campaign);
   }
 
+  function getEffectiveAdsetBidStrategy(adset, options = {}) {
+    if (adset?.bid_strategy) {
+      return adset.bid_strategy;
+    }
+    if (!options.hasCampaignBudget && options.campaignBidStrategy) {
+      return options.campaignBidStrategy;
+    }
+    return "";
+  }
+
+  function hasBidConstraints(value) {
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    if (value && typeof value === "object") {
+      return Object.keys(value).length > 0;
+    }
+    return Boolean(value);
+  }
+
+  function applyBidFields(body, adset, options = {}) {
+    const bidStrategy = getEffectiveAdsetBidStrategy(adset, options);
+    if (bidStrategy) {
+      body.bid_strategy = bidStrategy;
+    }
+    if (adset?.bid_amount) {
+      body.bid_amount = adset.bid_amount;
+    }
+    if (hasBidConstraints(adset?.bid_constraints)) {
+      body.bid_constraints = adset.bid_constraints;
+    }
+  }
+
+  function pushDraftBidFields(values, adset, options = {}) {
+    const bidStrategy = getEffectiveAdsetBidStrategy(adset, options);
+    if (bidStrategy) {
+      values.push(draftItem("bid_strategy", bidStrategy));
+    }
+    if (adset?.bid_amount) {
+      values.push(draftItem("bid_amount", adset.bid_amount));
+    }
+    if (hasBidConstraints(adset?.bid_constraints)) {
+      values.push(draftJsonItem("bid_constraints", adset.bid_constraints));
+    }
+  }
+
   function shouldIncludeAdsetSchedule(adset, options = {}) {
     return Boolean(adset?.adset_schedule) && !(options.hasCampaignBudget && hasAdsetDayParting(adset));
   }
@@ -3283,6 +3329,7 @@ import { createServiceRegistry } from "./services/index.mjs";
         "targeting",
         "bid_strategy",
         "bid_amount",
+        "bid_constraints",
         "promoted_object",
         "attribution_spec",
         "asset_feed_id",
@@ -5477,12 +5524,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (hasPositiveBudget(adset.lifetime_budget)) {
       body.lifetime_budget = adset.lifetime_budget;
     }
-    if (adset.bid_strategy) {
-      body.bid_strategy = adset.bid_strategy;
-    }
-    if (adset.bid_amount) {
-      body.bid_amount = adset.bid_amount;
-    }
+    applyBidFields(body, adset, options);
     if (adset.attribution_spec) {
       body.attribution_spec = adset.attribution_spec;
     }
@@ -6072,14 +6114,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (hasPositiveBudget(adset.lifetime_budget)) {
       values.push(draftItem("lifetime_budget", adset.lifetime_budget));
     }
-    if (adset.bid_strategy) {
-      values.push(draftItem("bid_strategy", adset.bid_strategy));
-    }
-    if (adset.bid_amount) {
-      values.push(draftItem("bid_amount", adset.bid_amount));
-    } else {
-      values.push(draftJsonItem("bid_constraints", []));
-    }
+    pushDraftBidFields(values, adset, options);
     if (adset.attribution_spec) {
       values.push(draftJsonItem("attribution_spec", adset.attribution_spec));
     }
@@ -7125,7 +7160,10 @@ import { createServiceRegistry } from "./services/index.mjs";
             draftCampaignId,
             adset,
             pixelMap,
-            { hasCampaignBudget: packageHasCampaignBudget },
+            {
+              hasCampaignBudget: packageHasCampaignBudget,
+              campaignBidStrategy: state.importPackage.campaign?.bid_strategy,
+            },
           );
           adsetMap.set(String(adset.id), newAdsetId);
           log("info", `Draft adset created: ${adset.name}`);
@@ -7191,7 +7229,10 @@ import { createServiceRegistry } from "./services/index.mjs";
             newCampaignId,
             adset,
             pixelMap,
-            { hasCampaignBudget: packageHasCampaignBudget },
+            {
+              hasCampaignBudget: packageHasCampaignBudget,
+              campaignBidStrategy: state.importPackage.campaign?.bid_strategy,
+            },
           );
           adsetMap.set(String(adset.id), newAdsetId);
           log("info", `Adset created: ${adset.name}`);
