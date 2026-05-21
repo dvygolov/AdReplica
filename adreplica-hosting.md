@@ -21,10 +21,22 @@ Use Cloudflare Pages or a Cloudflare Worker-backed static route.
 
 ## Build and Publish
 
-Generate deployable files:
+Generate the payload from `src/`:
+
+```powershell
+npm run build:payload
+```
+
+Generate deployable files from the generated `adreplica.js` payload:
 
 ```powershell
 node D:\YandexDisk\Coding\Arbitrazh\AdReplica\adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica
+```
+
+The combined project build runs both steps:
+
+```powershell
+npm run build
 ```
 
 Deploy `D:\YandexDisk\Coding\Arbitrazh\AdReplica\dist` as the Cloudflare Pages root.

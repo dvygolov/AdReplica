@@ -3,7 +3,9 @@
 ## Architecture Rules
 
 - `adreplica-loader.js` is the only loader source of truth.
-- `adreplica.js` is the payload only. Do not embed a second copy of the loader inside it.
+- `src/` is the only editable payload source.
+- `adreplica.js` is the generated payload only. Do not edit it by hand; run `npm run build:payload` after payload source changes.
+- Do not embed a second copy of the loader inside the payload.
 - Loader and payload must remain separate scripts.
 - The landing page bookmarklet must be generated from `adreplica-loader.js`, not from inline loader code duplicated elsewhere.
 
@@ -16,5 +18,6 @@
 
 ## Hygiene
 
+- After payload behavior changes, run `npm run build:payload` and `npm run check`.
 - If loader behavior changes, verify there is only one implementation in the repo.
 - If payload behavior changes, do not touch bookmarklet generation unless loader behavior truly changed.

@@ -23,11 +23,28 @@ Then open Facebook Ads Manager and click the bookmark.
 
 ## Files
 
-- `adreplica.js` is the AdReplica payload.
+- `src/` is the editable AdReplica payload source.
+- `adreplica.js` is the generated AdReplica payload. Do not edit it by hand; run `npm run build:payload`.
 - `adreplica-loader.js` is the small bookmarklet loader.
 - `adreplica-og-packager.js` builds the landing page, OG manifest/chunks, and deployable `dist` folder.
 - `dist/` is the Cloudflare Pages static root.
 - `target-current.png` is used as the landing screenshot source.
+
+## Check
+
+```powershell
+npm run check
+```
+
+This verifies that generated `adreplica.js` is current with `src/` and runs Node syntax checks for the packager, payload, and loader.
+
+## Payload Build
+
+```powershell
+npm run build:payload
+```
+
+The payload build uses `esbuild` to bundle and minify `src/main.mjs` into a single browser IIFE at `adreplica.js`. The payload version is taken from `package.json`.
 
 ## Build
 
@@ -38,6 +55,7 @@ npm run build
 Equivalent direct command:
 
 ```powershell
+npm run build:payload
 node .\adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica
 ```
 
@@ -52,7 +70,7 @@ npx wrangler pages deploy .\dist --project-name=adreplica --branch=main --commit
 After deploying payload changes, refresh the Facebook OG scrape for:
 
 - `https://adreplica.pages.dev/adreplica/latest/manifest.html`
-- `https://adreplica.pages.dev/adreplica/latest/og/chunk-001.html`
+- every generated `https://adreplica.pages.dev/adreplica/latest/og/chunk-*.html`
 
 The current loader is configured with the stable latest manifest URL `https://adreplica.pages.dev/adreplica/latest/manifest.html`; it resolves the current Facebook OG object at runtime instead of pinning a manifest object ID into the bookmarklet. The client loader does not call `scrape=true`; the deploy/release flow is responsible for refreshing the latest manifest and chunk URLs in Facebook OG.
 

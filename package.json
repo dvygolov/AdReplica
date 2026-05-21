@@ -4,8 +4,10 @@
   "private": true,
   "description": "Browser-side Facebook Ads Manager export, import, clone, and bookmarklet loader tooling.",
   "scripts": {
-    "check": "node --check adreplica-og-packager.js && node --check adreplica.js && node --check adreplica-loader.js",
-    "build": "node adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica",
+    "build:payload": "node scripts/build-payload.cjs",
+    "check:payload": "node scripts/build-payload.cjs --check",
+    "check": "npm run check:payload && node --check adreplica-og-packager.js && node --check adreplica.js && node --check adreplica-loader.js",
+    "build": "npm run build:payload && node adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica",
     "deploy": "npx wrangler pages deploy ./dist --project-name=adreplica --branch=main --commit-dirty=true"
   },
   "keywords": [
@@ -16,5 +18,7 @@
   ],
   "author": "Yellow Web",
   "license": "UNLICENSED",
-  "devDependencies": {}
+  "devDependencies": {
+    "esbuild": "^0.25.5"
+  }
 }
