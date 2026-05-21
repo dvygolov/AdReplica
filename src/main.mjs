@@ -340,7 +340,6 @@ import { createServiceRegistry } from "./services/index.mjs";
       "authorization_category",
       "branded_content_sponsor_page_id",
       "destination_spec",
-      "enable_direct_install",
       "instagram_actor_id",
       "product_set_id",
       "template_url_spec",
@@ -355,9 +354,6 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
     if (payload.actor_type === undefined) {
       payload.actor_type = "PAGE";
-    }
-    if (payload.enable_direct_install === undefined) {
-      payload.enable_direct_install = false;
     }
     if (payload.object_type === undefined) {
       payload.object_type = "VIDEO";
@@ -397,7 +393,6 @@ import { createServiceRegistry } from "./services/index.mjs";
       "authorization_category",
       "branded_content_sponsor_page_id",
       "destination_spec",
-      "enable_direct_install",
       "instagram_actor_id",
       "product_set_id",
       "template_url_spec",
@@ -432,7 +427,6 @@ import { createServiceRegistry } from "./services/index.mjs";
       "authorization_category",
       "branded_content_sponsor_page_id",
       "destination_spec",
-      "enable_direct_install",
       "instagram_actor_id",
       "product_set_id",
       "template_url_spec",
@@ -3429,7 +3423,6 @@ import { createServiceRegistry } from "./services/index.mjs";
             "effective_instagram_media_id",
             "effective_instagram_story_id",
             "effective_object_story_id",
-            "enable_direct_install",
             "instagram_actor_id",
             "instagram_permalink_url",
             "thumbnail_url",
