@@ -27,6 +27,8 @@ Generate the payload from `src/`:
 npm run build:payload
 ```
 
+This rebuilds the current package version without changing it.
+
 Generate deployable files from the generated `adreplica.js` payload:
 
 ```powershell
@@ -38,6 +40,8 @@ The combined project build runs both steps:
 ```powershell
 npm run build
 ```
+
+`npm run build` is the release build and automatically advances the date-based build version (`ddmmyybN`) before generating the payload and OG package.
 
 Deploy `D:\YandexDisk\Coding\Arbitrazh\AdReplica\dist` as the Cloudflare Pages root.
 

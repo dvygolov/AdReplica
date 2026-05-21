@@ -19,5 +19,6 @@
 ## Hygiene
 
 - After payload behavior changes, run `npm run build:payload` and `npm run check`.
+- For release/package builds, run `npm run build`; it bumps the date-based build version before regenerating `adreplica.js` and `dist/`.
 - If loader behavior changes, verify there is only one implementation in the repo.
 - If payload behavior changes, do not touch bookmarklet generation unless loader behavior truly changed.

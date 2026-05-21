@@ -52,9 +52,12 @@ The payload build uses `esbuild` to bundle and minify `src/main.mjs` into a sing
 npm run build
 ```
 
+This is the release build. It automatically bumps `package.json` to the next date-based build version (`ddmmyybN`), rebuilds `adreplica.js`, and regenerates `dist/`.
+
 Equivalent direct command:
 
 ```powershell
+npm run bump:build
 npm run build:payload
 node .\adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica
 ```
