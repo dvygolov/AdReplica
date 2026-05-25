@@ -14,7 +14,7 @@
 - After each production deploy, run Facebook Sharing Debugger scrape for:
   - `https://adreplica.pages.dev/adreplica/latest/manifest`
   - every `https://adreplica.pages.dev/adreplica/latest/og/chunk-*`
-- Perform release scrape through Dolphin Anty profile `NRD Lazy 1`.
+- Perform release scrape through the currently logged-in Google Chrome profile.
 
 ## Hygiene
 
