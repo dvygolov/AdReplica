@@ -2,14 +2,12 @@
   "app": "AdReplica",
   "build": "210526b6",
   "version": "210526b6",
-  "generatedAt": "2026-05-25T11:39:38.897Z",
+  "generatedAt": "2026-05-25T12:13:10.011Z",
   "payload": {
     "encoding": "base64",
     "sha256": "28092d0d9d81bf0beee5c8025c0003dab5c0ab60cf489275d669afce8b4739a7",
     "byteLength": 151520
   },
-  "payloadUrl": "https://adreplica.pages.dev/adreplica/210526b6/payload.js",
-  "latestPayloadUrl": "https://adreplica.pages.dev/adreplica/latest/payload.js",
   "chunks": [
     {
       "index": 1,

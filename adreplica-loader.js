@@ -219,32 +219,7 @@
       sourceTag: "remote",
     };
   };
-  const fetchDirectPayload = async (manifest) => {
-    const payloadUrl = manifest.latestPayloadUrl || manifest.payloadUrl || "";
-    if (!payloadUrl) {
-      throw new Error("Manifest does not contain a Cloudflare payload URL.");
-    }
-    const response = await withTimeout(fetch(payloadUrl, { cache: "no-store", credentials: "omit" }), payloadUrl);
-    const source = await response.text();
-    if (!response.ok) {
-      throw new Error("Cloudflare payload " + response.status + ": " + source.slice(0, 180));
-    }
-    const actualSha256 = await sha256Hex(source);
-    return {
-      source,
-      actualSha256,
-      manifestSha256: manifest?.payload?.sha256 || "",
-      sourceTag: "cloudflare",
-    };
-  };
-  const fetchLatestPayload = async (manifest) => {
-    try {
-      return await fetchDirectPayload(manifest);
-    } catch (directError) {
-      console.warn("[" + loaderConfig.app + " loader] Cloudflare payload fetch failed, trying Facebook OG fallback.", directError);
-      return fetchOgPayload(manifest);
-    }
-  };
+  const fetchLatestPayload = (manifest) => fetchOgPayload(manifest);
   const loadPayload = async () => {
     const cached = readCache();
     let manifest = null;
