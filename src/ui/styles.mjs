@@ -62,6 +62,13 @@ export function buildAdReplicaStyles(appId) {
         margin-top: 2px;
       }
       #${appId} .sk-byline:hover { opacity: 1; text-decoration: underline; }
+      #${appId} .sk-head-actions {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        position: relative;
+        flex-shrink: 0;
+      }
       #${appId} .sk-actions,
       #${appId} .sk-row,
       #${appId} .sk-log-head {
@@ -108,6 +115,53 @@ export function buildAdReplicaStyles(appId) {
       #${appId} .sk-close:hover {
         background: #555 !important;
         color: #fff !important;
+      }
+      #${appId} .sk-service-button {
+        width: 30px !important;
+        height: 30px;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        background: #333 !important;
+        border: 1px solid #555 !important;
+        color: #ccc !important;
+        font-size: 17px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-weight: 400 !important;
+      }
+      #${appId} .sk-service-button:hover,
+      #${appId} .sk-service-button.sk-active {
+        background: #555 !important;
+        color: #fff !important;
+      }
+      #${appId} .sk-service-menu {
+        position: absolute;
+        top: 36px;
+        right: 38px;
+        min-width: 176px;
+        padding: 6px;
+        border-radius: 8px;
+        border: 1px solid #555;
+        background: #222;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+        z-index: 20;
+      }
+      #${appId} .sk-service-menu button {
+        width: 100% !important;
+        justify-content: flex-start;
+        background: transparent !important;
+        color: #f5f5f5 !important;
+        border: 0 !important;
+        padding: 9px 10px !important;
+        text-align: left;
+        font-weight: 600 !important;
+      }
+      #${appId} .sk-service-menu button:hover:not(:disabled) {
+        background: rgba(255, 193, 7, 0.12) !important;
+        color: #ffc107 !important;
       }
       #${appId} .sk-tabs {
         display: flex;

@@ -1598,7 +1598,13 @@ import { createServiceRegistry } from "./services/index.mjs";
             <div class="sk-title-row">${APP_MARK_SVG}<h2>${APP_TITLE} <span class="sk-build">build ${Config.VERSION}</span></h2></div>
             <a class="sk-byline" href="https://yellowweb.top" target="_blank">by Yellow Web</a>
           </div>
-          <button id="${APP_ID}-close" class="sk-close" title="Close">&#x2715;</button>
+          <div class="sk-head-actions">
+            <button id="${APP_ID}-service" class="sk-service-button" title="Service" aria-label="Service" aria-expanded="false">&#9881;</button>
+            <div id="${APP_ID}-service-menu" class="sk-service-menu sk-hidden">
+              <button data-role="busy-lock" id="${APP_ID}-clear-drafts" type="button">Clear Drafts</button>
+            </div>
+            <button id="${APP_ID}-close" class="sk-close" title="Close">&#x2715;</button>
+          </div>
         </div>
 
         <div class="sk-tabs">
@@ -1715,6 +1721,25 @@ import { createServiceRegistry } from "./services/index.mjs";
     dom.cloneMappings = root.querySelector(`#${APP_ID}-clone-mappings`);
     dom.logs = root.querySelector(`#${APP_ID}-logs`);
 
+    const serviceButton = root.querySelector(`#${APP_ID}-service`);
+    const serviceMenu = root.querySelector(`#${APP_ID}-service-menu`);
+    const hideServiceMenu = () => {
+      serviceMenu.classList.add("sk-hidden");
+      serviceButton.classList.remove("sk-active");
+      serviceButton.setAttribute("aria-expanded", "false");
+    };
+    serviceButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const isHidden = serviceMenu.classList.contains("sk-hidden");
+      serviceMenu.classList.toggle("sk-hidden", !isHidden);
+      serviceButton.classList.toggle("sk-active", isHidden);
+      serviceButton.setAttribute("aria-expanded", isHidden ? "true" : "false");
+    });
+    serviceMenu.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    dom.serviceOutsideClick = hideServiceMenu;
+    document.addEventListener("click", dom.serviceOutsideClick);
     root.querySelector(`#${APP_ID}-close`).addEventListener("click", destroy);
     root.querySelectorAll(".sk-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1727,6 +1752,10 @@ import { createServiceRegistry } from "./services/index.mjs";
     root.querySelector(`#${APP_ID}-export`).addEventListener("click", exportSelectedCampaign);
     root.querySelector(`#${APP_ID}-import`).addEventListener("click", importPackage);
     root.querySelector(`#${APP_ID}-clone`).addEventListener("click", cloneCampaignToAccount);
+    root.querySelector(`#${APP_ID}-clear-drafts`).addEventListener("click", async () => {
+      hideServiceMenu();
+      await clearCurrentAccountDrafts();
+    });
     dom.exportAccountSelect.addEventListener("change", async (event) => {
       state.exportAccountId = event.target.value;
       state.exportCampaignId = "";
@@ -1890,6 +1919,10 @@ import { createServiceRegistry } from "./services/index.mjs";
   function destroy() {
     if (dom.root?.parentNode) {
       dom.root.parentNode.removeChild(dom.root);
+    }
+    if (dom.serviceOutsideClick) {
+      document.removeEventListener("click", dom.serviceOutsideClick);
+      dom.serviceOutsideClick = null;
     }
     document.getElementById(NATIVE_FETCH_FRAME_ID)?.remove();
     delete window.AdReplica;
@@ -5565,28 +5598,167 @@ import { createServiceRegistry } from "./services/index.mjs";
     return String(json.id);
   }
 
-  async function discardCurrentDraft(accountId) {
-    // First check if there's an existing draft with fragments
+  function normalizeAccountId(value) {
+    return String(value || "").replace(/^act_/, "").replace(/[^\d]/g, "");
+  }
+
+  function getAdsManagerUrlAccountId() {
     try {
-      const current = await graphFetch(`act_${accountId}/current_addrafts`, {
-        query: { fields: "id" },
-      });
-      const draftId = current.data?.[0]?.id;
-      if (draftId) {
-        // Delete all fragments from the existing draft
-        const frags = await graphFetch(`${draftId}/addraft_fragments`, {
-          query: { fields: "ad_object_type,ad_object_id", limit: 200 },
-        });
-        if (frags.data?.length) {
-          for (const frag of frags.data) {
-            try {
-              await graphFetch(frag.id, { method: "DELETE" });
-            } catch (_) {}
-          }
-          log("info", `Deleted ${frags.data.length} draft fragments`);
+      const params = new URL(window.location.href).searchParams;
+      for (const key of ["act", "ad_account_id", "account_id", "__aaid"]) {
+        const accountId = normalizeAccountId(params.get(key));
+        if (accountId) {
+          return accountId;
         }
       }
-    } catch (_) {}
+    } catch (_error) {}
+    return "";
+  }
+
+  function getServiceDraftAccountId() {
+    return getAdsManagerUrlAccountId()
+      || normalizeAccountId(state.cloneTargetAccountId)
+      || normalizeAccountId(state.importAccountId)
+      || normalizeAccountId(state.exportAccountId)
+      || normalizeAccountId(state.accounts[0]?.id);
+  }
+
+  function getAccountDisplayLabel(accountId) {
+    const normalizedAccountId = normalizeAccountId(accountId);
+    const account = state.accounts.find((item) => normalizeAccountId(item?.id) === normalizedAccountId);
+    return account
+      ? `${account.name || "Ad account"} (${normalizedAccountId})`
+      : `act_${normalizedAccountId}`;
+  }
+
+  function sortDraftFragmentsForDeletion(fragments) {
+    const rank = {
+      ad: 0,
+      ad_set: 1,
+      adset: 1,
+      campaign: 2,
+      campaign_group: 3,
+    };
+    return [...(fragments || [])].sort((left, right) => {
+      const leftRank = rank[String(left?.ad_object_type || "")] ?? 9;
+      const rightRank = rank[String(right?.ad_object_type || "")] ?? 9;
+      return leftRank - rightRank;
+    });
+  }
+
+  async function fetchCurrentDrafts(accountId) {
+    const current = await graphFetch(`act_${accountId}/current_addrafts`, {
+      query: {
+        fields: "id,state,publish_status{status,error_count,publish_error}",
+        limit: 100,
+      },
+    });
+    const drafts = [];
+    for (const draft of (current.data || [])) {
+      const draftId = normalizeDraftId(draft.id);
+      if (!draftId) {
+        continue;
+      }
+      const fragments = await graphGetAll(`${draftId}/addraft_fragments`, {
+        fields: [
+          "id",
+          "ad_object_type",
+          "ad_object_id",
+          "parent_ad_object_id",
+          "validation_status",
+          "active_errors",
+          "publish_error",
+        ].join(","),
+        limit: 500,
+      });
+      drafts.push({
+        ...draft,
+        id: draftId,
+        fragments,
+      });
+    }
+    return drafts;
+  }
+
+  async function clearDraftsForAccount(accountId) {
+    const normalizedAccountId = normalizeAccountId(accountId);
+    if (!normalizedAccountId) {
+      throw new Error("No ad account selected for draft cleanup.");
+    }
+    const drafts = await fetchCurrentDrafts(normalizedAccountId);
+    const summary = {
+      accountId: normalizedAccountId,
+      draftCount: drafts.length,
+      fragmentCount: drafts.reduce((count, draft) => count + draft.fragments.length, 0),
+      deletedCount: 0,
+      failedCount: 0,
+    };
+    for (const draft of drafts) {
+      const fragments = sortDraftFragmentsForDeletion(draft.fragments);
+      for (const fragment of fragments) {
+        if (!fragment?.id) {
+          continue;
+        }
+        try {
+          await graphFetch(fragment.id, { method: "DELETE" });
+          summary.deletedCount += 1;
+        } catch (error) {
+          summary.failedCount += 1;
+          log("warn", `Draft fragment delete failed: ${fragment.id}.`, String(error));
+        }
+      }
+    }
+    const remainingDrafts = await fetchCurrentDrafts(normalizedAccountId);
+    const remainingFragments = remainingDrafts.reduce((count, draft) => count + draft.fragments.length, 0);
+    if (summary.failedCount || remainingFragments) {
+      throw new Error(
+        `Draft cleanup incomplete: deleted ${summary.deletedCount}/${summary.fragmentCount}, ` +
+        `${remainingFragments} fragment${remainingFragments === 1 ? "" : "s"} still visible.`,
+      );
+    }
+    return summary;
+  }
+
+  async function clearCurrentAccountDrafts() {
+    if (state.busy) {
+      log("warn", "Another operation is already in progress.");
+      return false;
+    }
+    const accountId = getServiceDraftAccountId();
+    if (!accountId) {
+      log("warn", "Cannot clear drafts: no Ads Manager account detected.");
+      return false;
+    }
+    const label = getAccountDisplayLabel(accountId);
+    const confirmed = window.confirm(
+      `Clear all unpublished draft fragments for ${label}?\n\n` +
+      "This only deletes Ads Manager drafts. Published campaigns, ad sets, ads, creatives, pixels, pages, and media are not touched.",
+    );
+    if (!confirmed) {
+      log("info", "Draft cleanup cancelled.");
+      return false;
+    }
+    setBusy(true);
+    try {
+      await initializeSession();
+      log("info", `Clearing drafts for ${label}...`);
+      const summary = await clearDraftsForAccount(accountId);
+      log(
+        "info",
+        `Draft cleanup complete: ${summary.deletedCount} fragment${summary.deletedCount === 1 ? "" : "s"} deleted from ${summary.draftCount} draft${summary.draftCount === 1 ? "" : "s"}.`,
+      );
+      askToReloadResult("Drafts cleared. Reload Ads Manager to refresh unpublished changes?", accountId);
+      return true;
+    } catch (error) {
+      log("error", "Draft cleanup error.", String(error));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardCurrentDraft(accountId) {
+    await clearDraftsForAccount(accountId);
 
     // Create a new draft, discarding the old one
     const result = await graphFetch(`act_${accountId}/addrafts`, {
@@ -7368,6 +7540,7 @@ import { createServiceRegistry } from "./services/index.mjs";
       }),
       graphFetch: (pathOrUrl, options = {}) => graphFetch(pathOrUrl, options),
       graphGetAll: (path, query = {}) => graphGetAll(path, query),
+      clearDrafts: (accountId = "") => clearDraftsForAccount(accountId || getServiceDraftAccountId()),
       fetchExportPackage: (accountId, campaignId) => fetchCampaignExportPackage(accountId, campaignId),
       fetchCatalogExportSnapshot: (catalogId) => fetchCatalogExportSnapshot({ id: catalogId }),
       fetchCatalogExportsForPackage: (catalogs) => fetchCatalogExportsForPackage(catalogs),

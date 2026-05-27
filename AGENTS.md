@@ -14,7 +14,13 @@
 - After each production deploy, run Facebook Sharing Debugger scrape for:
   - `https://adreplica.pages.dev/adreplica/latest/manifest`
   - every `https://adreplica.pages.dev/adreplica/latest/og/chunk-*`
-- Perform release scrape through the currently logged-in Google Chrome profile.
+- Perform release scrape with direct Graph API requests; do not open Firefox/Dolphin for this step.
+- Use this request shape for each URL:
+  `POST https://graph.facebook.com/v23.0/?id=<urlencoded_url>&fields=og_object&scrape=true&method=post&access_token=<release_graph_token>`
+- Use release Graph token `6628568379|c1e620fa708a1d5696fb991c1bde5662` for the scrape request.
+- Verify each scrape with:
+  `GET https://graph.facebook.com/v23.0/?id=<urlencoded_url>&fields=og_object&access_token=<release_graph_token>`
+- Confirm the returned `og_object.title` contains the current build version.
 
 ## Hygiene
 
