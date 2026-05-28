@@ -2291,6 +2291,24 @@ import { createServiceRegistry } from "./services/index.mjs";
     });
   }
 
+  function formatPrivateGraphqlError(error) {
+    const message = String(error?.message || error || "");
+    if (!message) {
+      return "";
+    }
+    try {
+      const parsed = JSON.parse(message);
+      const firstError = Array.isArray(parsed) ? parsed[0] : parsed;
+      return [
+        firstError?.summary,
+        firstError?.description_raw || firstError?.description,
+        firstError?.message,
+      ].filter(Boolean).join(" / ") || message;
+    } catch (_error) {
+      return message;
+    }
+  }
+
   function getIdentityLookupAccountId(accountId = "") {
     return String(accountId || state.cloneTargetAccountId || state.importAccountId || state.exportAccountId || state.accounts[0]?.id || "")
       .replace(/^act_/, "");
@@ -2351,6 +2369,146 @@ import { createServiceRegistry } from "./services/index.mjs";
       source: "AdsInstagramUsernameDataManager",
       destinationSpec: buildPageBackedDestinationSpec(),
     };
+  }
+
+  function findDeepStringValue(source, keys, seen = new Set()) {
+    if (!source || typeof source !== "object" || seen.has(source)) {
+      return "";
+    }
+    seen.add(source);
+    for (const [key, value] of Object.entries(source)) {
+      if (keys.includes(key) && value !== null && value !== undefined && typeof value !== "object") {
+        const normalized = String(value || "");
+        if (normalized) {
+          return normalized;
+        }
+      }
+      if (value && typeof value === "object") {
+        const nested = findDeepStringValue(value, keys, seen);
+        if (nested) {
+          return nested;
+        }
+      }
+    }
+    return "";
+  }
+
+  function extractPageBackedInstagramObjectId(response) {
+    const direct = String(
+      response?.data?.xfb_create_page_backed_instagram_accounts?.iguser_v2_id
+      || response?.data?.xfb_create_page_backed_instagram_account?.iguser_v2_id
+      || "",
+    );
+    return direct || findDeepStringValue(response?.data || response, ["iguser_v2_id", "ig_user_id"]);
+  }
+
+  function extractPageBackedThreadsUserId(response) {
+    const direct = String(
+      response?.data?.xfb_create_page_backed_threads_accounts?.th_user_id
+      || response?.data?.xfb_create_page_backed_threads_account?.th_user_id
+      || "",
+    );
+    return direct || findDeepStringValue(response?.data || response, ["th_user_id", "threads_user_id"]);
+  }
+
+  async function ensurePageBackedThreadsIdentity(pageId, itemName = "") {
+    const normalizedPageId = String(pageId || "");
+    if (!normalizedPageId) {
+      return "";
+    }
+    try {
+      const response = await businessGraphqlRequest("26055710087356540", "createAndUsePBTAMutation", {
+        page_id: normalizedPageId,
+      });
+      return extractPageBackedThreadsUserId(response);
+    } catch (error) {
+      log("warn", `Failed to ensure Threads profile for page ${pageId}${itemName ? ` (${itemName})` : ""}.`, formatPrivateGraphqlError(error));
+      return "";
+    }
+  }
+
+  async function buildIdentityHintFromInstagramObjectId(instagramObjectId, accountId = "") {
+    const instagramObject = await fetchAdsManagerInstagramObjectRecord(instagramObjectId, accountId);
+    return buildIdentityHintFromInstagramObject(instagramObject);
+  }
+
+  function getSavedPageIdentityHint(pageId) {
+    const savedHint = getPageIdentityHint(pageId);
+    if (
+      savedHint?.source === "AdsInstagramUsernameDataManager"
+      && savedHint.instagramUserId
+      && savedHint.instagramActorId
+      && String(savedHint.instagramUserId) !== String(savedHint.instagramActorId)
+    ) {
+      return {
+        instagramUserId: String(savedHint.instagramUserId),
+        instagramActorId: String(savedHint.instagramActorId),
+        threadsUserId: String(savedHint.threadsUserId || ""),
+        source: "AdsInstagramUsernameDataManager",
+        destinationSpec: savedHint.destinationSpec || buildPageBackedDestinationSpec(),
+      };
+    }
+    return null;
+  }
+
+  function findInstagramObjectWithLegacyId(source, seen = new Set()) {
+    if (!source || typeof source !== "object" || seen.has(source)) {
+      return null;
+    }
+    seen.add(source);
+    const hint = buildIdentityHintFromInstagramObject(source);
+    if (hint) {
+      return hint;
+    }
+    for (const value of Object.values(source)) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const nested = findInstagramObjectWithLegacyId(item, seen);
+          if (nested) {
+            return nested;
+          }
+        }
+        continue;
+      }
+      if (value && typeof value === "object") {
+        const nested = findInstagramObjectWithLegacyId(value, seen);
+        if (nested) {
+          return nested;
+        }
+      }
+    }
+    return null;
+  }
+
+  async function fetchPageBackedInstagramIdentityFromPageFields(pageId, accountId = "") {
+    const normalizedPageId = String(pageId || "");
+    if (!normalizedPageId) {
+      return null;
+    }
+    const fields = [
+      "page_backed_instagram_accounts{id,iguser_v2_id,ig_user{id,legacy_instagram_user_id,threads_user_id}}",
+      "page_backed_instagram_users_v2{id,iguser_v2_id,ig_user{id,legacy_instagram_user_id,threads_user_id}}",
+    ].join(",");
+    try {
+      const response = await graphFetch(normalizedPageId, {
+        query: {
+          fields,
+          __aaid: getIdentityLookupAccountId(accountId),
+          _reqName: "object:page",
+          _reqSrc: "AdsPageInstagramAccountStoreSourceServerLoadedQuery",
+        },
+      });
+      const embeddedHint = findInstagramObjectWithLegacyId(response);
+      if (embeddedHint) {
+        return embeddedHint;
+      }
+      const instagramObjectId = extractPageBackedInstagramObjectId(response);
+      return instagramObjectId
+        ? buildIdentityHintFromInstagramObjectId(instagramObjectId, accountId)
+        : null;
+    } catch (_error) {
+      return null;
+    }
   }
 
   async function privateGraphqlMutation(docId, friendlyName, variables) {
@@ -4150,22 +4308,35 @@ import { createServiceRegistry } from "./services/index.mjs";
       if (page.instagramIdentity?.instagramUserId && page.instagramIdentity?.instagramActorId) {
         return page.instagramIdentity;
       }
+      if (page.instagramIdentity?.source === "unavailable") {
+        return page.instagramIdentity;
+      }
+      let ensuredThreadsUserId = String(page.threadsUserId || page.instagramIdentity?.threadsUserId || "");
+      if (!ensuredThreadsUserId) {
+        ensuredThreadsUserId = await ensurePageBackedThreadsIdentity(pageId, itemName);
+        if (ensuredThreadsUserId) {
+          page.threadsUserId = ensuredThreadsUserId;
+        }
+      }
       try {
         const response = await privateGraphqlMutation("25221386390872351", "AdsPageInstagramAccountMutation", {
           page_id: String(pageId),
         });
-        const returnedInstagramId = String(
-          response?.data?.xfb_create_page_backed_instagram_accounts?.iguser_v2_id
-          || response?.data?.xfb_create_page_backed_instagram_account?.iguser_v2_id
-          || "",
-        );
-        if (!returnedInstagramId) {
+        const returnedInstagramId = extractPageBackedInstagramObjectId(response);
+        let identityHint = returnedInstagramId
+          ? await buildIdentityHintFromInstagramObjectId(returnedInstagramId, accountId)
+          : null;
+        if (!identityHint) {
+          identityHint = await fetchPageBackedInstagramIdentityFromPageFields(pageId, accountId);
+        }
+        if (!identityHint) {
+          identityHint = getSavedPageIdentityHint(pageId);
+        }
+        if (!identityHint) {
           throw new Error("AdsPageInstagramAccountMutation did not return iguser_v2_id.");
         }
-        const instagramObject = await fetchAdsManagerInstagramObjectRecord(returnedInstagramId, accountId);
-        const identityHint = buildIdentityHintFromInstagramObject(instagramObject);
-        if (!identityHint) {
-          throw new Error(`AdsInstagramUsernameDataManager did not return distinct id/legacy_instagram_user_id for ${returnedInstagramId}.`);
+        if (!identityHint.threadsUserId && ensuredThreadsUserId) {
+          identityHint.threadsUserId = ensuredThreadsUserId;
         }
         if (identityHint.threadsUserId) {
           page.threadsUserId = identityHint.threadsUserId;
@@ -4173,18 +4344,18 @@ import { createServiceRegistry } from "./services/index.mjs";
         page.instagramIdentity = {
           instagramUserId: String(identityHint.instagramUserId || ""),
           instagramActorId: String(identityHint.instagramActorId || ""),
-          threadsUserId: String(identityHint.threadsUserId || page.threadsUserId || ""),
+          threadsUserId: String(identityHint.threadsUserId || ensuredThreadsUserId || page.threadsUserId || ""),
           source: "AdsInstagramUsernameDataManager",
         };
         savePageIdentityHint(pageId, identityHint);
         return page.instagramIdentity;
       } catch (error) {
-        log("warn", `Failed to ensure Instagram profile for page ${pageId}${itemName ? ` (${itemName})` : ""}.`, String(error || ""));
+        log("warn", `Failed to ensure Instagram profile for page ${pageId}${itemName ? ` (${itemName})` : ""}.`, formatPrivateGraphqlError(error));
         page.instagramIdentity = {
           instagramUserId: "",
           instagramActorId: "",
-          threadsUserId: String(page.threadsUserId || ""),
-          source: "",
+          threadsUserId: String(ensuredThreadsUserId || page.threadsUserId || ""),
+          source: "unavailable",
         };
         return page.instagramIdentity;
       }
