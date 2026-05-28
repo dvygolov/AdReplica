@@ -1,6 +1,6 @@
 {
   "name": "adreplica",
-  "version": "280526b2",
+  "version": "280526b3",
   "private": true,
   "description": "Browser-side Facebook Ads Manager export, import, clone, and bookmarklet loader tooling.",
   "scripts": {
@@ -8,7 +8,8 @@
     "build:payload": "node scripts/build-payload.cjs",
     "check:payload": "node scripts/build-payload.cjs --check",
     "check": "npm run check:payload && node --check adreplica-og-packager.js && node --check adreplica.js && node --check adreplica-loader.js",
-    "build": "npm run bump:build && npm run build:payload && node adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica",
+    "prebuild": "npm run bump:build",
+    "build": "npm run build:payload && node adreplica-og-packager.js --base-url=https://adreplica.pages.dev/adreplica",
     "deploy": "npx wrangler pages deploy ./dist --project-name=adreplica --branch=main --commit-dirty=true"
   },
   "keywords": [

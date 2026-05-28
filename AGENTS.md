@@ -11,6 +11,9 @@
 
 ## Release Rules
 
+- Build versions use `DDMMYYbN`, based on the local build date.
+- `npm run build` runs `scripts/bump-build-version.cjs` before packaging. If the current version date is today, it increments only `bN`; otherwise it resets to today's date with `b1`.
+- Do not manually keep old build dates in `package.json`, `package-lock.json`, or root payload constants.
 - After each production deploy, run Facebook Sharing Debugger scrape for:
   - `https://adreplica.pages.dev/adreplica/latest/manifest`
   - every `https://adreplica.pages.dev/adreplica/latest/og/chunk-*`
