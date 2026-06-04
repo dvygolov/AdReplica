@@ -368,9 +368,22 @@ export function buildAdReplicaStyles(appId) {
         background: rgba(168, 85, 247, 0.25);
         color: #d8b4fe;
       }
+      #${appId} .sk-log-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        cursor: pointer;
+      }
+      #${appId} .sk-log-download {
+        flex-shrink: 0;
+        padding: 6px 10px;
+        font-size: 12px;
+      }
       #${appId} .sk-log-area {
         width: 100%;
         height: 150px;
+        margin-top: 10px;
         resize: vertical;
         background: #111;
         color: #ccc;

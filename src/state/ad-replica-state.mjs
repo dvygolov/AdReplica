@@ -6,6 +6,7 @@ export class AdReplicaState {
     this.loadingSession = false;
     this.busy = false;
     this.logs = [];
+    this.networkDiagnostics = [];
     this.accounts = [];
     this.pages = [];
     this.importAccountPixels = [];

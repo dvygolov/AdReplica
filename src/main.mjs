@@ -22,6 +22,7 @@ import { createServiceRegistry } from "./services/index.mjs";
   const state = new AdReplicaState();
 
   const dom = {};
+  const NETWORK_DIAGNOSTIC_LIMIT = 80;
 
   const logger = new Logger({ appTitle: APP_TITLE, state, onRender: () => renderLogs() });
 
@@ -33,6 +34,36 @@ import { createServiceRegistry } from "./services/index.mjs";
     state.busy = isBusy;
     renderStatus();
     renderButtons();
+  }
+
+  function redactUrlForDiagnostics(input) {
+    try {
+      const url = new URL(String(input || ""), window.location.href);
+      const parts = url.pathname.split("/").filter(Boolean).slice(0, 4);
+      const path = parts.length ? `/${parts.join("/")}` : "/";
+      return `${url.origin}${path}${url.search ? "?..." : ""}`;
+    } catch (_error) {
+      return String(input || "").slice(0, 120);
+    }
+  }
+
+  function recordNetworkDiagnostic(data = {}) {
+    const entry = {
+      createdAt: new Date().toISOString(),
+      kind: data.kind || "request",
+      phase: data.phase || "",
+      method: data.method || "GET",
+      url: redactUrlForDiagnostics(data.url || ""),
+      status: data.status ?? "",
+      attempt: data.attempt ?? "",
+      error: String(data.error?.message || data.error || "").slice(0, 500),
+      details: data.details || null,
+    };
+    state.networkDiagnostics.push(entry);
+    if (state.networkDiagnostics.length > NETWORK_DIAGNOSTIC_LIMIT) {
+      state.networkDiagnostics.splice(0, state.networkDiagnostics.length - NETWORK_DIAGNOSTIC_LIMIT);
+    }
+    return entry;
   }
 
 
@@ -1084,6 +1115,17 @@ import { createServiceRegistry } from "./services/index.mjs";
       || /video not ready for use in an ad|video is still being processed/i.test(haystack);
   }
 
+  function isGenericAdCreativeCreateFailure(error) {
+    const parsed = parseGraphError(error);
+    const code = Number(parsed?.code || parsed?.error?.code || 0);
+    const haystack = JSON.stringify(parsed || error || "");
+    return code === 100
+      && (
+        getGraphErrorSubcode(error) === 1487390
+        || /Adcreative Create Failed/i.test(haystack)
+      );
+  }
+
   function creativePayloadHasVideo(payload) {
     if (!payload || typeof payload !== "object") {
       return false;
@@ -1093,6 +1135,26 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
     return Array.isArray(payload.asset_feed_spec?.videos)
       && payload.asset_feed_spec.videos.some((item) => item?.video_id);
+  }
+
+  function summarizeCreativePayload(payload) {
+    if (!payload || typeof payload !== "object") {
+      return {};
+    }
+    const afs = payload.asset_feed_spec || {};
+    const osp = payload.object_story_spec || {};
+    return {
+      hasAssetFeedSpec: Boolean(payload.asset_feed_spec),
+      assetImages: Array.isArray(afs.images) ? afs.images.length : 0,
+      assetVideos: Array.isArray(afs.videos) ? afs.videos.length : 0,
+      assetBodies: Array.isArray(afs.bodies) ? afs.bodies.length : 0,
+      assetTitles: Array.isArray(afs.titles) ? afs.titles.length : 0,
+      assetLinkUrls: Array.isArray(afs.link_urls) ? afs.link_urls.length : 0,
+      hasObjectStorySpec: Boolean(payload.object_story_spec),
+      hasLinkData: Boolean(osp.link_data),
+      hasVideoData: Boolean(osp.video_data),
+      pageId: String(osp.page_id || ""),
+    };
   }
 
   function getAccountIdFromGraphPath(pathOrUrl) {
@@ -1385,22 +1447,68 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
   }
 
+  function formatLogEntry(entry) {
+    const time = entry.createdAt.slice(11, 19);
+    const lvl = entry.level.toUpperCase().padEnd(5);
+    let line = `[${time}] ${lvl} ${entry.message}`;
+    if (entry.details) {
+      const details = typeof entry.details === "string"
+        ? entry.details
+        : JSON.stringify(entry.details, null, 2);
+      line += `\n${details}`;
+    }
+    return line;
+  }
+
+  function buildLogText() {
+    const networkLines = state.networkDiagnostics.length
+      ? state.networkDiagnostics.map((entry) => {
+        const time = entry.createdAt.slice(11, 19);
+        const status = entry.status ? ` status=${entry.status}` : "";
+        const attempt = entry.attempt ? ` attempt=${entry.attempt}` : "";
+        const phase = entry.phase ? ` phase=${entry.phase}` : "";
+        const details = entry.details ? `\n${JSON.stringify(entry.details, null, 2)}` : "";
+        const error = entry.error ? `\n${entry.error}` : "";
+        return `[${time}] ${entry.kind} ${entry.method}${status}${attempt}${phase} ${entry.url}${error}${details}`;
+      })
+      : ["No failed API requests recorded."];
+    const context = [
+      `AdReplica log`,
+      `Build: ${Config.VERSION}`,
+      `Exported at: ${new Date().toISOString()}`,
+      `Page: ${window.location.origin}${window.location.pathname}`,
+      `Session ready: ${state.sessionReady}`,
+      `Busy: ${state.busy}`,
+      `Export account: ${state.exportAccountId || "-"}`,
+      `Export campaign: ${state.exportCampaignId || "-"}`,
+      `Import account: ${state.importAccountId || "-"}`,
+      `Clone source account: ${state.cloneSourceAccountId || "-"}`,
+      `Clone source campaign: ${state.cloneSourceCampaignId || "-"}`,
+      `Clone target account: ${state.cloneTargetAccountId || "-"}`,
+      `Clone mode: ${state.cloneAsDraft ? "DRAFT" : state.cloneStatus}`,
+      "",
+      "Network diagnostics:",
+      ...networkLines,
+      "",
+      "Logs:",
+    ];
+    const logLines = state.logs.length
+      ? state.logs.map(formatLogEntry)
+      : ["No log entries."];
+    return context.concat(logLines).join("\n");
+  }
+
   function renderLogs() {
     if (!dom.logs) return;
-    const text = state.logs.map((entry) => {
-      const time = entry.createdAt.slice(11, 19);
-      const lvl = entry.level.toUpperCase().padEnd(5);
-      let line = `[${time}] ${lvl} ${entry.message}`;
-      if (entry.details) {
-        const d = typeof entry.details === "string"
-          ? entry.details
-          : JSON.stringify(entry.details, null, 2);
-        line += `\n${d}`;
-      }
-      return line;
-    }).join("\n");
+    const text = state.logs.map(formatLogEntry).join("\n");
     dom.logs.value = text;
     dom.logs.scrollTop = dom.logs.scrollHeight;
+  }
+
+  function downloadLogs() {
+    const blob = new Blob([buildLogText()], { type: "text/plain;charset=utf-8" });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    triggerDownload(`adreplica-log-${Config.VERSION}-${stamp}.txt`, blob);
   }
 
   function renderAccountOptions(selectedId) {
@@ -1695,7 +1803,10 @@ import { createServiceRegistry } from "./services/index.mjs";
         </div>
 
         <details class="sk-logs">
-          <summary>Log</summary>
+          <summary class="sk-log-summary">
+            <span>Log</span>
+            <button type="button" class="sk-secondary sk-log-download" id="${APP_ID}-download-logs">Download log</button>
+          </summary>
           <textarea id="${APP_ID}-logs" class="sk-log-area" readonly></textarea>
         </details>
 
@@ -1720,6 +1831,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     dom.cloneModeSelect = root.querySelector(`#${APP_ID}-clone-mode`);
     dom.cloneMappings = root.querySelector(`#${APP_ID}-clone-mappings`);
     dom.logs = root.querySelector(`#${APP_ID}-logs`);
+    dom.downloadLogs = root.querySelector(`#${APP_ID}-download-logs`);
 
     const serviceButton = root.querySelector(`#${APP_ID}-service`);
     const serviceMenu = root.querySelector(`#${APP_ID}-service-menu`);
@@ -1752,6 +1864,11 @@ import { createServiceRegistry } from "./services/index.mjs";
     root.querySelector(`#${APP_ID}-export`).addEventListener("click", exportSelectedCampaign);
     root.querySelector(`#${APP_ID}-import`).addEventListener("click", importPackage);
     root.querySelector(`#${APP_ID}-clone`).addEventListener("click", cloneCampaignToAccount);
+    dom.downloadLogs.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      downloadLogs();
+    });
     root.querySelector(`#${APP_ID}-clear-drafts`).addEventListener("click", async () => {
       hideServiceMenu();
       await clearCurrentAccountDrafts();
@@ -2160,6 +2277,14 @@ import { createServiceRegistry } from "./services/index.mjs";
         const message = String(error?.message || error || "");
         const isTransientNetworkError = /failed to fetch|networkerror|load failed|network request failed|fetch failed|aborterror/i.test(message);
         if (!isTransientNetworkError || attempt === 3) {
+          recordNetworkDiagnostic({
+            kind: "graph_fetch",
+            phase: "fetch",
+            method,
+            url: url.toString(),
+            attempt,
+            error,
+          });
           throw error;
         }
         log("warn", `Transient fetch failure on attempt ${attempt} for ${url.pathname}. Retrying...`, message);
@@ -2167,6 +2292,13 @@ import { createServiceRegistry } from "./services/index.mjs";
       }
     }
     if (!response && lastFetchError) {
+      recordNetworkDiagnostic({
+        kind: "graph_fetch",
+        phase: "fetch",
+        method,
+        url: url.toString(),
+        error: lastFetchError,
+      });
       throw lastFetchError;
     }
     if (raw) {
@@ -2176,10 +2308,33 @@ import { createServiceRegistry } from "./services/index.mjs";
     let json;
     try {
       json = text ? JSON.parse(text) : {};
-    } catch (_error) {
+    } catch (error) {
+      recordNetworkDiagnostic({
+        kind: "graph_fetch",
+        phase: "parse",
+        method,
+        url: url.toString(),
+        status: response.status,
+        error,
+      });
       throw new Error(`Failed to parse JSON: ${text.slice(0, 300)}`);
     }
     if (!response.ok || json.error) {
+      const graphError = json.error || { status: response.status, text };
+      recordNetworkDiagnostic({
+        kind: "graph_fetch",
+        phase: "response",
+        method,
+        url: url.toString(),
+        status: response.status,
+        error: graphError?.message || JSON.stringify(graphError),
+        details: {
+          code: graphError?.code || "",
+          subcode: graphError?.error_subcode || "",
+          type: graphError?.type || "",
+          fbtrace_id: graphError?.fbtrace_id || "",
+        },
+      });
       throw new Error(JSON.stringify(json.error || { status: response.status, text }, null, 2));
     }
     return json;
@@ -2267,19 +2422,67 @@ import { createServiceRegistry } from "./services/index.mjs";
     body.set("doc_id", String(docId));
     body.set("variables", JSON.stringify(variables || {}));
 
-    const response = await adReplicaFetch(options.endpoint || "https://www.facebook.com/api/graphql/", {
-      method: "POST",
-      credentials: "include",
-      mode: "cors",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        accept: "*/*",
-      },
-      body,
-    });
+    const endpoint = options.endpoint || "https://www.facebook.com/api/graphql/";
+    let response;
+    try {
+      response = await adReplicaFetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        mode: "cors",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          accept: "*/*",
+        },
+        body,
+      });
+    } catch (error) {
+      recordNetworkDiagnostic({
+        kind: "private_graphql",
+        phase: "fetch",
+        method: "POST",
+        url: endpoint,
+        error,
+        details: {
+          friendlyName,
+          docId: String(docId),
+        },
+      });
+      throw error;
+    }
     const text = await response.text();
-    const json = parsePrivateGraphqlText(text);
+    let json;
+    try {
+      json = parsePrivateGraphqlText(text);
+    } catch (error) {
+      recordNetworkDiagnostic({
+        kind: "private_graphql",
+        phase: "parse",
+        method: "POST",
+        url: endpoint,
+        status: response.status,
+        error,
+        details: {
+          friendlyName,
+          docId: String(docId),
+        },
+      });
+      throw error;
+    }
     if (!response.ok || json.errors) {
+      const firstError = Array.isArray(json.errors) ? json.errors[0] : json.errors;
+      recordNetworkDiagnostic({
+        kind: "private_graphql",
+        phase: "response",
+        method: "POST",
+        url: endpoint,
+        status: response.status,
+        error: firstError?.message || firstError?.summary || JSON.stringify(firstError || { status: response.status }),
+        details: {
+          friendlyName,
+          docId: String(docId),
+          severity: firstError?.severity || "",
+        },
+      });
       throw new Error(JSON.stringify(json.errors || { status: response.status, text }, null, 2));
     }
     return json;
@@ -3945,16 +4148,106 @@ import { createServiceRegistry } from "./services/index.mjs";
     };
   }
 
-  async function downloadFile(sourceUrl, fileName) {
-    const isCdn = /fbcdn\.net|scontent/.test(sourceUrl);
-    const response = await adReplicaFetch(sourceUrl, {
-      credentials: isCdn ? "omit" : "include",
-      mode: "cors",
-    });
-    if (!response.ok) {
-      throw new Error(`Download error ${fileName}: ${response.status}`);
+  function getUrlDiagnosticLabel(sourceUrl) {
+    try {
+      const url = new URL(sourceUrl);
+      return `${url.hostname}${url.pathname ? url.pathname.split("/").slice(0, 3).join("/") : ""}`;
+    } catch (_error) {
+      return "unknown source";
     }
-    return responseToBlob(response);
+  }
+
+  async function downloadFile(sourceUrl, fileName, options = {}) {
+    const attempts = Math.max(1, Number(options.attempts || 3));
+    const isCdn = /fbcdn\.net|scontent/.test(sourceUrl);
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const response = await adReplicaFetch(sourceUrl, {
+          credentials: isCdn ? "omit" : "include",
+          mode: "cors",
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} ${response.statusText || ""}`.trim());
+        }
+        return responseToBlob(response);
+      } catch (error) {
+        lastError = error;
+        if (attempt >= attempts) {
+          break;
+        }
+        log(
+          "warn",
+          `Media download failed on attempt ${attempt}/${attempts}: ${fileName}. Retrying...`,
+          `${getUrlDiagnosticLabel(sourceUrl)} | ${String(error?.message || error)}`,
+        );
+        await sleep(800 * attempt);
+      }
+    }
+    throw new Error(`Download error ${fileName}: ${String(lastError?.message || lastError || "unknown error")}`);
+  }
+
+  function askMediaDownloadFailureDecision(file, error) {
+    const fileName = file?.fileName || file?.name || "media file";
+    const details = [
+      `File: ${fileName}`,
+      file?.type ? `Type: ${file.type}` : "",
+      file?.sourceKind ? `Source: ${file.sourceKind}` : "",
+      file?.sourceId ? `Source ID: ${file.sourceId}` : "",
+      `Error: ${String(error?.message || error || "unknown error")}`,
+    ].filter(Boolean);
+
+    if (!document.body) {
+      return Promise.resolve(window.confirm(`Can't download creative:\n${details.join("\n")}\n\nContinue?`) ? "yes" : "no");
+    }
+
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.style.cssText = [
+        "position:fixed",
+        "inset:0",
+        "z-index:2147483647",
+        "display:flex",
+        "align-items:center",
+        "justify-content:center",
+        "background:rgba(15,23,42,.54)",
+        "font-family:Arial,sans-serif",
+      ].join(";");
+      overlay.innerHTML = `
+        <div style="width:min(520px,calc(100vw - 32px));background:#111827;color:#f9fafb;border:1px solid rgba(255,255,255,.18);border-radius:8px;box-shadow:0 24px 70px rgba(0,0,0,.35);padding:18px;">
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Can't download creative</div>
+          <div style="font-size:13px;line-height:1.45;white-space:pre-wrap;color:#d1d5db;margin-bottom:14px;">${escapeHtml(details.join("\n"))}</div>
+          <div style="font-size:13px;color:#f9fafb;margin-bottom:14px;">Continue downloading the remaining files?</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" data-choice="yes" style="padding:7px 12px;border-radius:6px;border:1px solid #22c55e;background:#22c55e;color:#052e16;font-weight:700;cursor:pointer;">Yes</button>
+            <button type="button" data-choice="no" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.24);background:#1f2937;color:#f9fafb;font-weight:700;cursor:pointer;">No</button>
+            <button type="button" data-choice="cancel" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.24);background:transparent;color:#f9fafb;font-weight:700;cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      `;
+
+      const cleanup = (choice) => {
+        document.removeEventListener("keydown", onKeydown);
+        overlay.remove();
+        resolve(choice);
+      };
+      const onKeydown = (event) => {
+        if (event.key === "Escape") {
+          cleanup("cancel");
+        }
+      };
+      overlay.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const button = target?.closest("button[data-choice]");
+        if (!button) return;
+        cleanup(button.dataset.choice || "cancel");
+      });
+      document.addEventListener("keydown", onKeydown);
+      document.body.appendChild(overlay);
+      overlay.querySelector("button[data-choice='yes']")?.focus();
+    });
   }
 
   function triggerDownload(fileName, blob) {
@@ -3992,10 +4285,31 @@ import { createServiceRegistry } from "./services/index.mjs";
       triggerDownload(jsonFileName, jsonBlob);
       await sleep(150);
 
+      const failedDownloads = [];
+      let downloadedMediaCount = 0;
       for (const file of packageData._downloadQueue) {
         log("info", `Downloading ${file.fileName}...`);
-        const blob = await downloadFile(file.sourceUrl, file.fileName);
+        let blob;
+        try {
+          blob = await downloadFile(file.sourceUrl, file.fileName);
+        } catch (downloadError) {
+          const decision = await askMediaDownloadFailureDecision(file, downloadError);
+          failedDownloads.push({
+            fileName: file.fileName,
+            type: file.type || "",
+            sourceKind: file.sourceKind || "",
+            sourceId: file.sourceId || "",
+            error: String(downloadError?.message || downloadError),
+          });
+          if (decision === "yes") {
+            log("warn", `Skipped media download after user chose to continue: ${file.fileName}.`, String(downloadError?.message || downloadError));
+            continue;
+          }
+          const action = decision === "cancel" ? "cancelled" : "stopped";
+          throw new Error(`Export ${action} after failed media download: ${file.fileName}. ${String(downloadError?.message || downloadError)}`);
+        }
         triggerDownload(file.fileName, blob);
+        downloadedMediaCount += 1;
         await sleep(250);
       }
 
@@ -4009,7 +4323,14 @@ import { createServiceRegistry } from "./services/index.mjs";
           `Catalog settings embedded in JSON: ${packageData.catalogExports.map((item) => `${item.catalog?.name || item.catalog?.id} (${item.exportMode})`).join(", ")}.`,
         );
       }
-      log("info", `Export complete. Files: ${packageData.files.length + 1}`);
+      if (failedDownloads.length) {
+        log(
+          "warn",
+          `Export completed with ${failedDownloads.length} skipped media file(s).`,
+          failedDownloads,
+        );
+      }
+      log("info", `Export complete. Files downloaded: ${downloadedMediaCount + 1}/${packageData.files.length + 1}`);
     } catch (error) {
       log("error", "Campaign export error.", String(error));
     } finally {
@@ -4558,10 +4879,25 @@ import { createServiceRegistry } from "./services/index.mjs";
     delete objectStorySpec.video_data;
 
     log("info", `Creative ${creative.name}: rebuilt unsupported link_data draft into asset_feed_spec fallback.`);
-    return appendCreativeUrlTags({
+    const simpleFallbackObjectStorySpec = deepClone(raw.object_story_spec || {});
+    simpleFallbackObjectStorySpec.link_data = {
+      ...deepClone(linkData),
+      image_hash: uploadedHash,
+    };
+    delete simpleFallbackObjectStorySpec.video_data;
+
+    const payload = appendCreativeUrlTags({
       object_story_spec: objectStorySpec,
       asset_feed_spec: assetFeedSpec,
     }, raw);
+    Object.defineProperty(payload, "__adReplicaSimpleDraftFallback", {
+      value: appendCreativeUrlTags({
+        name: raw.name || creative.name,
+        object_story_spec: simpleFallbackObjectStorySpec,
+      }, raw),
+      enumerable: false,
+    });
+    return payload;
   }
 
   async function replaceAssetFeedMedia(accountId, creative, osp, afs, mediaCache) {
@@ -6505,21 +6841,35 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (ad.conversion_domain) {
       values.push(draftItem("conversion_domain", ad.conversion_domain));
     }
-    const json = await graphFetch(`${draftId}/addraft_fragments`, {
-      method: "POST",
-      body: {
-        action: "add",
-        ad_object_type: "ad",
-        account_id: accountId,
-        ad_draft_id: normalizedDraftId,
-        parent_ad_object_id: adsetDraftId,
-        values,
-        application_id: getDraftApplicationId(),
-        ownership_type: "USER",
-        use_active_draft_if_exists: true,
-      },
-    });
-    return String(json.ad_object_id);
+    try {
+      const json = await graphFetch(`${draftId}/addraft_fragments`, {
+        method: "POST",
+        body: {
+          action: "add",
+          ad_object_type: "ad",
+          account_id: accountId,
+          ad_draft_id: normalizedDraftId,
+          parent_ad_object_id: adsetDraftId,
+          values,
+          application_id: getDraftApplicationId(),
+          ownership_type: "USER",
+          use_active_draft_if_exists: true,
+        },
+      });
+      return String(json.ad_object_id);
+    } catch (error) {
+      const simpleFallback = creativeRaw?.__adReplicaSimpleDraftFallback;
+      if (simpleFallback && isGenericAdCreativeCreateFailure(error)) {
+        log(
+          "warn",
+          `Draft creative failed with Meta generic adcreative error; retrying simple link_data fallback for ${ad.name}.`,
+          summarizeCreativePayload(creativeRaw),
+        );
+        return createAdDraft(accountId, draftId, campaignDraftId, adsetDraftId, ad, simpleFallback);
+      }
+      log("error", `Draft ad creation failed for ${ad.name}.`, summarizeCreativePayload(creativeRaw));
+      throw error;
+    }
   }
 
   async function resolvePixelMap(accountId) {
