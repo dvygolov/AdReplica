@@ -4291,6 +4291,9 @@ import { createServiceRegistry } from "./services/index.mjs";
         log("info", `Downloading ${file.fileName}...`);
         let blob;
         try {
+          if (!file.sourceUrl) {
+            throw new Error("No source URL.");
+          }
           blob = await downloadFile(file.sourceUrl, file.fileName);
         } catch (downloadError) {
           const decision = await askMediaDownloadFailureDecision(file, downloadError);

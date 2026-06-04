@@ -375,6 +375,22 @@ export function buildAdReplicaStyles(appId) {
         gap: 12px;
         cursor: pointer;
       }
+      #${appId} .sk-log-summary::-webkit-details-marker {
+        display: none;
+      }
+      #${appId} .sk-log-summary::before {
+        content: "▸";
+        color: #ffc107;
+        font-size: 13px;
+        line-height: 1;
+        transition: transform 0.16s ease;
+      }
+      #${appId} .sk-logs[open] .sk-log-summary::before {
+        transform: rotate(90deg);
+      }
+      #${appId} .sk-log-summary span {
+        margin-right: auto;
+      }
       #${appId} .sk-log-download {
         flex-shrink: 0;
         padding: 6px 10px;
