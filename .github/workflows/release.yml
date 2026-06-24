@@ -41,7 +41,9 @@ jobs:
       - run: npm run check
       - run: npm run build
       - id: build
-        run: echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+        run: |
+          BUILD_VERSION=$(node -p 'require("./package.json").version')
+          echo "version=$BUILD_VERSION" >> "$GITHUB_OUTPUT"
       - name: Commit release artifacts
         env:
           BUILD_VERSION: ${{ steps.build.outputs.version }}
