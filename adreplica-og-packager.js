@@ -516,8 +516,23 @@ function main() {
     latestManifestUrl: prettyPublicUrl("latest/manifest.html"),
   };
   writeFile(path.join(buildDir, "package-info.json"), `${JSON.stringify(packageInfo, null, 2)}\n`);
+  writeFile(path.join(latestDir, "package-info.json"), `${JSON.stringify(packageInfo, null, 2)}\n`);
   const loaderSource = fs.readFileSync(LOADER_SOURCE, "utf8");
   const bookmarklet = `javascript:${encodeURIComponent(loaderSource)}`;
+  const toolMeta = {
+    app: appName,
+    title: displayName,
+    shortName: "Ad Replica",
+    description: "Campaign export, import, clone, media, identities, pixels, and catalogs for Ads Manager.",
+    build,
+    version: build,
+    landingUrl: "https://adreplica.pages.dev/",
+    sourceUrl: "https://github.com/dvygolov/AdReplica",
+    bookmarkletHref: bookmarklet,
+    latestManifestUrl: packageInfo.latestManifestUrl,
+    generatedAt,
+  };
+  writeFile(path.join(latestDir, "tool-meta.json"), `${JSON.stringify(toolMeta, null, 2)}\n`);
   const screenshotUrl = "assets/adreplica-ui.png";
   const iconUrl = APP_MARK_FILE;
   if (fs.existsSync(LANDING_SCREENSHOT)) {
