@@ -541,6 +541,51 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (!node) {
       return node;
     }
+    if (!parentKey) {
+      const labelNamesById = new Map();
+      const collectLabels = (current, currentParentKey = "") => {
+        if (!current) return;
+        if (Array.isArray(current)) {
+          current.forEach((item) => collectLabels(item, currentParentKey));
+          return;
+        }
+        if (typeof current !== "object") return;
+        if (
+          (
+            currentParentKey === "adlabels"
+            || /_label$/.test(currentParentKey)
+          )
+          && current.id
+          && current.name
+        ) {
+          labelNamesById.set(String(current.id), String(current.name));
+        }
+        for (const [key, value] of Object.entries(current)) {
+          collectLabels(value, key);
+        }
+      };
+      collectLabels(node);
+
+      const applyLabelNames = (current, currentParentKey = "") => {
+        if (!current) return;
+        if (Array.isArray(current)) {
+          current.forEach((item) => applyLabelNames(item, currentParentKey));
+          return;
+        }
+        if (typeof current !== "object") return;
+        const isLabel =
+          currentParentKey === "adlabels"
+          || /_label$/.test(currentParentKey);
+        if (isLabel && current.id && !current.name) {
+          current.name = labelNamesById.get(String(current.id))
+            || `adreplica_label_${String(current.id).replace(/[^a-z0-9]+/gi, "_")}`;
+        }
+        for (const [key, value] of Object.entries(current)) {
+          applyLabelNames(value, key);
+        }
+      };
+      applyLabelNames(node);
+    }
     if (Array.isArray(node)) {
       node.forEach((item) => stripAssetFeedLabelIdsForImport(item, parentKey));
       return node;
@@ -639,8 +684,12 @@ import { createServiceRegistry } from "./services/index.mjs";
               creativeId: creative.id,
               creativeName: creative.name,
               type: "image",
+              slotKind: "asset_feed_image",
+              slotLabel: `asset feed image #${index + 1}`,
+              slotIndex: index,
               expectedFileName: (fnMap && fnMap[originalName]) || originalName,
               sourceId: hash,
+              sourceImageHash: hash,
             });
           }
         });
@@ -655,8 +704,12 @@ import { createServiceRegistry } from "./services/index.mjs";
               creativeId: creative.id,
               creativeName: creative.name,
               type: "video",
+              slotKind: "asset_feed_video",
+              slotLabel: `asset feed video #${index + 1}`,
+              slotIndex: index,
               expectedFileName: (fnMap && fnMap[originalName]) || originalName,
               sourceId: videoId,
+              sourceVideoId: videoId,
             });
             if (hasAssetFeedCustomVideoThumbnail(vid)) {
               const ext = extractMediaExtensionFromUrl(vid.thumbnail_url, ".jpg");
@@ -666,8 +719,13 @@ import { createServiceRegistry } from "./services/index.mjs";
                 creativeId: creative.id,
                 creativeName: creative.name,
                 type: "image",
+                slotKind: "asset_feed_video_thumbnail",
+                slotLabel: `asset feed video thumbnail #${index + 1}`,
+                slotIndex: index,
                 expectedFileName: (fnMap && fnMap[thumbOriginalName]) || thumbOriginalName,
                 sourceId: `${videoId}:preview`,
+                sourceImageHash: vid.thumbnail_hash ? String(vid.thumbnail_hash) : "",
+                sourceVideoId: videoId,
               });
             }
           }
@@ -687,8 +745,12 @@ import { createServiceRegistry } from "./services/index.mjs";
         creativeId: creative.id,
         creativeName: creative.name,
         type: "video",
+        slotKind: "video",
+        slotLabel: "video",
+        slotIndex: 0,
         expectedFileName: (fnMap && fnMap[originalName]) || originalName,
         sourceId: videoId,
+        sourceVideoId: videoId,
       });
       if (hasStandaloneCustomVideoThumbnail(osp.video_data)) {
         const ext = extractMediaExtensionFromUrl(osp.video_data.image_url, ".jpg");
@@ -698,8 +760,13 @@ import { createServiceRegistry } from "./services/index.mjs";
           creativeId: creative.id,
           creativeName: creative.name,
           type: "image",
+          slotKind: "video_thumbnail",
+          slotLabel: "video thumbnail",
+          slotIndex: 0,
           expectedFileName: (fnMap && fnMap[thumbOriginalName]) || thumbOriginalName,
           sourceId: `${videoId}:preview`,
+          sourceImageHash: osp.video_data.image_hash ? String(osp.video_data.image_hash) : "",
+          sourceVideoId: videoId,
         });
       }
     } else if (osp.link_data?.image_hash) {
@@ -710,8 +777,12 @@ import { createServiceRegistry } from "./services/index.mjs";
         creativeId: creative.id,
         creativeName: creative.name,
         type: "image",
+        slotKind: "image",
+        slotLabel: "image",
+        slotIndex: 0,
         expectedFileName: (fnMap && fnMap[originalName]) || originalName,
         sourceId: imageHash,
+        sourceImageHash: imageHash,
       });
     }
     if (Array.isArray(osp.link_data?.child_attachments)) {
@@ -724,8 +795,12 @@ import { createServiceRegistry } from "./services/index.mjs";
             creativeId: creative.id,
             creativeName: creative.name,
             type: "image",
+            slotKind: "carousel_image",
+            slotLabel: `carousel image #${index + 1}`,
+            slotIndex: index,
             expectedFileName: (fnMap && fnMap[originalName]) || originalName,
             sourceId: imageHash,
+            sourceImageHash: imageHash,
           });
         }
       });
@@ -934,6 +1009,44 @@ import { createServiceRegistry } from "./services/index.mjs";
     return [...merged.values()];
   }
 
+  function filterDpaCatalogHintsToPackageReferences(packageData, dpaCatalogHints) {
+    const directRefs = getCatalogRefsFromPackage(packageData);
+    const referencedCatalogIds = new Set([...directRefs.catalogs.keys()].map(String));
+    const referencedProductSetIds = new Set([...directRefs.productSets.keys()].map(String));
+    const filteredProductSets = [];
+
+    for (const productSet of dpaCatalogHints?.productSets || []) {
+      const productSetId = String(productSet?.id || "");
+      const catalogId = String(productSet?.product_catalog?.id || productSet?.catalog_id || "");
+      if (
+        (productSetId && referencedProductSetIds.has(productSetId))
+        || (catalogId && referencedCatalogIds.has(catalogId))
+      ) {
+        filteredProductSets.push(productSet);
+        if (catalogId) {
+          referencedCatalogIds.add(catalogId);
+        }
+      }
+    }
+
+    const filteredCatalogs = (dpaCatalogHints?.catalogs || [])
+      .filter((catalog) => referencedCatalogIds.has(String(catalog?.id || "")));
+
+    const skippedCatalogs = (dpaCatalogHints?.catalogs || [])
+      .filter((catalog) => !referencedCatalogIds.has(String(catalog?.id || "")));
+    if (skippedCatalogs.length) {
+      log(
+        "warn",
+        `Ignored ${skippedCatalogs.length} unreferenced DPA eligible catalog hint(s): ${skippedCatalogs.map((item) => `${item.name || item.id} (${item.id})`).join(", ")}.`,
+      );
+    }
+
+    return {
+      catalogs: filteredCatalogs,
+      productSets: filteredProductSets,
+    };
+  }
+
   function replaceMappedCatalogReferences(node, catalogMappings, productSetMappings = {}) {
     if (
       !node
@@ -1113,6 +1226,17 @@ import { createServiceRegistry } from "./services/index.mjs";
     const haystack = JSON.stringify(parsed || error || "");
     return getGraphErrorSubcode(error) === 1885252
       || /video not ready for use in an ad|video is still being processed/i.test(haystack);
+  }
+
+  function isImageNotFoundError(error) {
+    const parsed = parseGraphError(error);
+    const code = Number(parsed?.code || parsed?.error?.code || 0);
+    const haystack = JSON.stringify(parsed || error || "");
+    return code === 100
+      && (
+        getGraphErrorSubcode(error) === 2446386
+        || /Image Not Found|image you selected is not available/i.test(haystack)
+      );
   }
 
   function isGenericAdCreativeCreateFailure(error) {
@@ -4065,20 +4189,24 @@ import { createServiceRegistry } from "./services/index.mjs";
         log("warn", `Catalog creative ${creative.name || creative.id} exported without product_set_id after DPA hint enrichment.`);
       }
     }
-    const provisionalPackage = {
+    const referencePackage = {
       campaign,
       adsets,
       ads,
       creatives,
-      catalogs: dpaCatalogHints.catalogs,
-      productSets: dpaCatalogHints.productSets,
+    };
+    const referencedDpaCatalogHints = filterDpaCatalogHintsToPackageReferences(referencePackage, dpaCatalogHints);
+    const provisionalPackage = {
+      ...referencePackage,
+      catalogs: referencedDpaCatalogHints.catalogs,
+      productSets: referencedDpaCatalogHints.productSets,
     };
     const sourceCatalogs = mergeEntityHintsById(
-      dpaCatalogHints.catalogs,
+      referencedDpaCatalogHints.catalogs,
       getSourceCatalogsFromPackage(provisionalPackage),
     );
     const sourceProductSets = mergeEntityHintsById(
-      dpaCatalogHints.productSets,
+      referencedDpaCatalogHints.productSets,
       getSourceProductSetsFromPackage(provisionalPackage),
     );
     const catalogExports = await fetchCatalogExportsForPackage(sourceCatalogs);
@@ -4466,6 +4594,318 @@ import { createServiceRegistry } from "./services/index.mjs";
       files.set(file.fileName, createRemoteMediaFile(file));
     }
     return files;
+  }
+
+  function getPackageSourceAccountId(packageData) {
+    return String(packageData?.source?.accountId || packageData?.sourceAccountId || "").replace(/^act_/, "");
+  }
+
+  function collectMediaPreflightSlots(packageData) {
+    const slots = [];
+    const creativeById = new Map((packageData?.creatives || []).map((creative) => [String(creative.id), creative]));
+    const previousPackage = state.importPackage;
+    state.importPackage = packageData;
+    try {
+      for (const ad of packageData?.ads || []) {
+        const creativeId = String(ad?.creative?.id || "");
+        const creative = creativeById.get(creativeId);
+        if (!creative) {
+          slots.push({
+            adId: String(ad?.id || ""),
+            adName: ad?.name || ad?.id || "",
+            creativeId,
+            creativeName: creativeId,
+            type: "creative",
+            slotLabel: "creative",
+            expectedFileName: "",
+            missingCreative: true,
+          });
+          continue;
+        }
+        for (const slot of getCreativeMediaSlots(creative)) {
+          slots.push({
+            ...slot,
+            adId: String(ad?.id || ""),
+            adName: ad?.name || ad?.id || "",
+            creativeId: String(creative.id || slot.creativeId || ""),
+            creativeName: creative.name || slot.creativeName || creative.id || "",
+          });
+        }
+      }
+    } finally {
+      state.importPackage = previousPackage;
+    }
+    return slots;
+  }
+
+  function buildMediaPreflightIssue(slot, reason, details = "") {
+    return {
+      adId: String(slot?.adId || ""),
+      adName: String(slot?.adName || ""),
+      creativeId: String(slot?.creativeId || ""),
+      creativeName: String(slot?.creativeName || ""),
+      slotLabel: String(slot?.slotLabel || slot?.slotKind || slot?.type || "media"),
+      mediaType: String(slot?.type || ""),
+      sourceId: String(slot?.sourceImageHash || slot?.sourceVideoId || slot?.sourceId || ""),
+      expectedFileName: String(slot?.expectedFileName || ""),
+      reason,
+      details: String(details || ""),
+    };
+  }
+
+  function formatMediaPreflightIssue(issue) {
+    const ad = issue.adName || issue.adId || "-";
+    const creative = issue.creativeName || issue.creativeId || "-";
+    const source = issue.sourceId ? ` source ${issue.sourceId}` : "";
+    const file = issue.expectedFileName ? ` file ${issue.expectedFileName}` : "";
+    return `Ad "${ad}", creative "${creative}", ${issue.slotLabel}:${source}${file} - ${issue.reason}`;
+  }
+
+  async function checkSourceImageAvailable(accountId, imageHash, cache) {
+    const key = `${accountId}:${imageHash}`;
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    let result = { ok: false, url: "", error: "" };
+    try {
+      const url = await getAdImageUrlByHash(accountId, imageHash);
+      result = { ok: Boolean(url), url, error: "" };
+    } catch (error) {
+      result = { ok: false, url: "", error: String(error?.message || error) };
+    }
+    cache.set(key, result);
+    return result;
+  }
+
+  async function checkSourceVideoAvailable(videoId, cache) {
+    if (cache.has(videoId)) {
+      return cache.get(videoId);
+    }
+    let result = { ok: false, source: "", error: "" };
+    try {
+      const video = await graphFetch(videoId, {
+        query: { fields: "id,source" },
+      });
+      result = { ok: Boolean(video?.source), source: video?.source || "", error: "" };
+    } catch (error) {
+      result = { ok: false, source: "", error: String(error?.message || error) };
+    }
+    cache.set(videoId, result);
+    return result;
+  }
+
+  async function preflightUploadMediaSlot(accountId, slot, mediaCache) {
+    const mediaFile = getDefaultMediaFile(slot);
+    if (!mediaFile) {
+      throw new Error(`media file not selected: ${slot.expectedFileName}`);
+    }
+    if (slot.type === "image") {
+      await uploadImageAsset(accountId, mediaFile, mediaCache);
+      return;
+    }
+    if (slot.type === "video") {
+      const fileName = getMediaFileName(mediaFile);
+      let videoId = mediaCache.videos.get(fileName);
+      if (!videoId) {
+        log("info", `Preflight uploading video ${fileName}...`);
+        videoId = await uploadVideo(accountId, mediaFile);
+        mediaCache.videos.set(fileName, videoId);
+      }
+    }
+  }
+
+  async function runMediaPreflight(packageData, targetAccountId, mediaCache) {
+    const slots = collectMediaPreflightSlots(packageData);
+    const issues = [];
+    const sourceAccountId = getPackageSourceAccountId(packageData);
+    const sourceImageCache = new Map();
+    const sourceVideoCache = new Map();
+    const targetChecked = new Set();
+
+    for (const slot of slots) {
+      if (slot.missingCreative) {
+        issues.push(buildMediaPreflightIssue(slot, "creative is missing from package"));
+        continue;
+      }
+
+      const mediaFile = getDefaultMediaFile(slot);
+      const hasLocalOrRemoteFile = Boolean(mediaFile);
+
+      if (!hasLocalOrRemoteFile) {
+        if (sourceAccountId && slot.type === "image" && slot.sourceImageHash) {
+          const source = await checkSourceImageAvailable(sourceAccountId, slot.sourceImageHash, sourceImageCache);
+          if (!source.ok) {
+            issues.push(buildMediaPreflightIssue(
+              slot,
+              "source image is unavailable or current account has no access",
+              source.error,
+            ));
+            continue;
+          }
+        }
+        if (slot.type === "video" && slot.sourceVideoId) {
+          const source = await checkSourceVideoAvailable(slot.sourceVideoId, sourceVideoCache);
+          if (!source.ok) {
+            issues.push(buildMediaPreflightIssue(
+              slot,
+              "source video is unavailable or current account has no access",
+              source.error,
+            ));
+            continue;
+          }
+        }
+        issues.push(buildMediaPreflightIssue(
+          slot,
+          "media file is unavailable or was not selected",
+        ));
+        continue;
+      }
+
+      if (sourceAccountId && isRemoteMediaFile(mediaFile)) {
+        if (slot.type === "image" && slot.sourceImageHash) {
+          const source = await checkSourceImageAvailable(sourceAccountId, slot.sourceImageHash, sourceImageCache);
+          if (!source.ok) {
+            issues.push(buildMediaPreflightIssue(
+              slot,
+              "source image is unavailable or current account has no access",
+              source.error,
+            ));
+            continue;
+          }
+        }
+        if (slot.type === "video" && slot.sourceVideoId) {
+          const source = await checkSourceVideoAvailable(slot.sourceVideoId, sourceVideoCache);
+          if (!source.ok) {
+            issues.push(buildMediaPreflightIssue(
+              slot,
+              "source video is unavailable or current account has no access",
+              source.error,
+            ));
+            continue;
+          }
+        }
+      }
+
+      const targetKey = `${slot.type}:${getMediaFileName(mediaFile)}`;
+      if (targetChecked.has(targetKey)) {
+        continue;
+      }
+      targetChecked.add(targetKey);
+      try {
+        await preflightUploadMediaSlot(targetAccountId, slot, mediaCache);
+      } catch (error) {
+        issues.push(buildMediaPreflightIssue(
+          slot,
+          "target media copy failed or image is not available for creative use",
+          String(error?.message || error),
+        ));
+      }
+    }
+
+    return {
+      adsChecked: (packageData?.ads || []).length,
+      mediaChecked: slots.filter((slot) => !slot.missingCreative).length,
+      issues,
+    };
+  }
+
+  function filterPackageAdsByMediaPreflightIssues(packageData, issues) {
+    if (!packageData || !issues?.length) {
+      return packageData;
+    }
+    const blockedAdIds = new Set(issues.map((issue) => String(issue.adId || "")).filter(Boolean));
+    const blockedAdNames = new Set(issues.map((issue) => String(issue.adName || "")).filter(Boolean));
+    const next = deepClone(packageData);
+    next.ads = (next.ads || []).filter((ad) => {
+      const id = String(ad?.id || "");
+      const name = String(ad?.name || "");
+      return !(id && blockedAdIds.has(id)) && !(name && blockedAdNames.has(name));
+    });
+    const usedCreativeIds = new Set((next.ads || []).map((ad) => String(ad?.creative?.id || "")).filter(Boolean));
+    next.creatives = (next.creatives || []).filter((creative) => usedCreativeIds.has(String(creative.id || "")));
+    return next;
+  }
+
+  function askMediaPreflightDecision(summary) {
+    const issues = summary?.issues || [];
+    if (!issues.length) {
+      return Promise.resolve("continue");
+    }
+    if (!document.body) {
+      return Promise.resolve(window.confirm("Media preflight found unavailable creative media. Try copying anyway?") ? "try_anyway" : "cancel");
+    }
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.72);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;";
+      const rows = issues.slice(0, 12).map((issue) => `
+        <li style="margin:0 0 8px 0;">
+          <div style="font-weight:700;">${escapeHtml(issue.adName || issue.adId || "Ad")}</div>
+          <div>${escapeHtml(issue.creativeName || issue.creativeId || "Creative")} / ${escapeHtml(issue.slotLabel)}</div>
+          <div style="color:#fca5a5;">${escapeHtml(issue.reason)}</div>
+          ${issue.sourceId ? `<div style="color:#cbd5e1;">Source: ${escapeHtml(issue.sourceId)}</div>` : ""}
+          ${issue.expectedFileName ? `<div style="color:#cbd5e1;">File: ${escapeHtml(issue.expectedFileName)}</div>` : ""}
+        </li>
+      `).join("");
+      const more = issues.length > 12 ? `<div style="color:#cbd5e1;margin-top:8px;">And ${escapeHtml(String(issues.length - 12))} more issue(s). See logs for the full list.</div>` : "";
+      overlay.innerHTML = `
+        <div style="background:#111827;color:#f9fafb;width:min(760px,100%);max-height:86vh;overflow:auto;border:1px solid #374151;border-radius:8px;padding:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);font-family:Arial,sans-serif;">
+          <div style="font-size:17px;font-weight:800;margin-bottom:8px;">Media preflight found unavailable creative media</div>
+          <div style="font-size:13px;color:#d1d5db;margin-bottom:12px;">
+            Checked ${escapeHtml(String(summary.adsChecked || 0))} ad(s) and ${escapeHtml(String(summary.mediaChecked || 0))} media item(s). ${escapeHtml(String(issues.length))} issue(s) need a decision before copying.
+          </div>
+          <ol style="font-size:12px;line-height:1.35;margin:0 0 14px 18px;padding:0;">${rows}</ol>
+          ${more}
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
+            <button type="button" data-choice="cancel" style="padding:7px 12px;border-radius:6px;border:1px solid #4b5563;background:#1f2937;color:#f9fafb;font-weight:700;cursor:pointer;">Cancel</button>
+            <button type="button" data-choice="valid_only" style="padding:7px 12px;border-radius:6px;border:1px solid #fbbf24;background:#fbbf24;color:#1f2937;font-weight:700;cursor:pointer;">Copy valid ads only</button>
+            <button type="button" data-choice="try_anyway" style="padding:7px 12px;border-radius:6px;border:1px solid #ef4444;background:#ef4444;color:#fff;font-weight:700;cursor:pointer;">Try anyway</button>
+          </div>
+        </div>
+      `;
+      const finish = (choice) => {
+        overlay.remove();
+        resolve(choice);
+      };
+      overlay.addEventListener("click", (event) => {
+        const button = event.target instanceof Element
+          ? event.target.closest("button[data-choice]")
+          : null;
+        if (button) {
+          finish(button.dataset.choice);
+        }
+      });
+      document.body.appendChild(overlay);
+    });
+  }
+
+  async function runMediaPreflightAndApplyDecision(packageData, targetAccountId, mediaCache, options = {}) {
+    const summary = await runMediaPreflight(packageData, targetAccountId, mediaCache);
+    log("info", `Media preflight checked ${summary.adsChecked} ad(s), ${summary.mediaChecked} media item(s), ${summary.issues.length} issue(s).`);
+    for (const issue of summary.issues) {
+      log("warn", `Media preflight issue: ${formatMediaPreflightIssue(issue)}`, issue.details || null);
+    }
+    if (!summary.issues.length) {
+      return { proceed: true, packageData };
+    }
+
+    const forcedDecision = ["cancel", "valid_only", "try_anyway"].includes(options.mediaPreflightDecision)
+      ? options.mediaPreflightDecision
+      : "";
+    const decision = forcedDecision || await askMediaPreflightDecision(summary);
+    if (decision === "try_anyway") {
+      log("warn", `Continuing import despite ${summary.issues.length} media preflight issue(s).`);
+      return { proceed: true, packageData };
+    }
+    if (decision === "valid_only") {
+      const filtered = filterPackageAdsByMediaPreflightIssues(packageData, summary.issues);
+      const skipped = (packageData.ads || []).length - (filtered.ads || []).length;
+      log("warn", `Continuing import with valid ads only; skipped ${skipped} ad(s) with media preflight issues.`);
+      return { proceed: true, packageData: filtered };
+    }
+    log("warn", "Import canceled after media preflight issues.");
+    return { proceed: false, packageData };
   }
 
   function withManualSourceCatalog(packageData) {
@@ -5343,6 +5783,31 @@ import { createServiceRegistry } from "./services/index.mjs";
     return getAdImageHashFromResponse(json, getMediaFileName(file));
   }
 
+  async function waitForAdImageUrlByHash(accountId, imageHash, options = {}) {
+    const attempts = Number(options.attempts || 12);
+    const delayMs = Number(options.delayMs || 5000);
+    const label = options.label || String(imageHash || "");
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const url = await getAdImageUrlByHash(accountId, imageHash);
+        if (url) {
+          return url;
+        }
+      } catch (error) {
+        lastError = error;
+      }
+      if (attempt < attempts) {
+        log("info", `Waiting for target image to become available: ${label} (${attempt}/${attempts}).`);
+        await sleep(delayMs);
+      }
+    }
+    if (lastError) {
+      log("warn", `Target image availability check failed for ${label}.`, String(lastError));
+    }
+    return "";
+  }
+
   async function downloadRemoteMediaAsFile(file) {
     if (!file.sourceUrl) {
       throw new Error("No source URL.");
@@ -5363,8 +5828,14 @@ import { createServiceRegistry } from "./services/index.mjs";
     try {
       const hash = await tryUploadRemoteImageCopy(accountId, file);
       if (hash) {
-        log("info", `Copied image ${getMediaFileName(file)} through Meta copy_from.`);
-        return hash;
+        const url = await waitForAdImageUrlByHash(accountId, hash, {
+          label: getMediaFileName(file),
+        });
+        if (url) {
+          log("info", `Copied image ${getMediaFileName(file)} through Meta copy_from.`);
+          return hash;
+        }
+        throw new Error(`copy_from returned image hash ${hash}, but target account did not expose it for creative use.`);
       }
     } catch (error) {
       failures.push(`copy_from: ${String(error?.message || error)}`);
@@ -5486,13 +5957,18 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
     let url = mediaCache.imageUrls?.get(String(hash)) || "";
     if (!url) {
-      url = await getAdImageUrlByHash(accountId, hash);
+      url = await waitForAdImageUrlByHash(accountId, hash, {
+        label: fileName,
+      });
       if (!mediaCache.imageUrls) {
         mediaCache.imageUrls = new Map();
       }
       if (url) {
         mediaCache.imageUrls.set(String(hash), url);
       }
+    }
+    if (!url) {
+      throw new Error(`Target image is not available for creative use: ${fileName} (${hash}).`);
     }
     return { hash, url };
   }
@@ -5586,7 +6062,7 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   async function validateObjectStorySpecCreative(accountId, creativeName, body, options = {}) {
     const retryVideoNotReady = Boolean(options.retryVideoNotReady);
-    for (let attempt = 1; attempt <= 12; attempt += 1) {
+    for (let attempt = 1; attempt <= 18; attempt += 1) {
       try {
         await graphFetch(`act_${accountId}/adcreatives`, {
           method: "POST",
@@ -5602,8 +6078,16 @@ import { createServiceRegistry } from "./services/index.mjs";
           log("warn", `Creative ${creativeName} skipped: target page cannot create this object_story_spec creative (1487194).`);
           return false;
         }
+        if (isImageNotFoundError(error)) {
+          if (attempt === 18) {
+            throw new Error(`Creative ${creativeName} image never became available for validate_only.`);
+          }
+          log("warn", `Creative ${creativeName} image is not available for validate_only yet, waiting 5s...`);
+          await sleep(5000);
+          continue;
+        }
         if (retryVideoNotReady && isVideoNotReadyError(error)) {
-          if (attempt === 12) {
+          if (attempt >= 12) {
             throw new Error(`Video creative ${creativeName} never became ready for validate_only.`);
           }
           log("warn", `Creative ${creativeName} not ready for validate_only yet, waiting 30s...`);
@@ -5624,7 +6108,7 @@ import { createServiceRegistry } from "./services/index.mjs";
       return null;
     }
 
-    for (let attempt = 1; attempt <= 12; attempt += 1) {
+    for (let attempt = 1; attempt <= 18; attempt += 1) {
       try {
         const json = await graphFetch(`act_${accountId}/adcreatives`, {
           method: "POST",
@@ -5632,10 +6116,18 @@ import { createServiceRegistry } from "./services/index.mjs";
         });
         return String(json.id);
       } catch (error) {
+        if (isImageNotFoundError(error)) {
+          if (attempt === 18) {
+            throw new Error(`Creative ${creativeName} image never became available for adcreative.`);
+          }
+          log("warn", `Creative ${creativeName} image is not available for adcreative yet, waiting 5s...`);
+          await sleep(5000);
+          continue;
+        }
         if (!retryVideoNotReady || !isVideoNotReadyError(error)) {
           throw error;
         }
-        if (attempt === 12) {
+        if (attempt >= 12) {
           throw new Error(`Video creative ${creativeName} never became ready for adcreative.`);
         }
         log("warn", `Creative ${creativeName} not ready for adcreative yet, waiting 30s...`);
@@ -5744,11 +6236,11 @@ import { createServiceRegistry } from "./services/index.mjs";
       } else {
         await replaceAssetFeedMedia(accountId, creative, osp, afs, mediaCache);
         stripAssetFeedLabelIdsForImport(afs);
-        const body = appendCreativeUrlTags({
-          name: raw.name || creative.name,
-          object_story_spec: osp,
-          asset_feed_spec: afs,
-        }, raw);
+        raw.object_story_spec = osp;
+        synchronizeCreativeIdentityFields(raw, osp);
+        stripCreativePreviewIdentifiers(raw);
+        const body = buildImportedCreativePayload(raw);
+        body.name = raw.name || creative.name;
         return createAdCreativeWithRetries(accountId, raw.name || creative.name, body);
       }
     }
@@ -7866,14 +8358,29 @@ import { createServiceRegistry } from "./services/index.mjs";
         }
       }
 
-      const pixelMap = await resolvePixelMap(state.importAccountId);
-      const adsetMap = new Map();
-      const creativeMap = new Map();
       const mediaCache = {
         images: new Map(),
         imageUrls: new Map(),
         videos: new Map(),
       };
+      const mediaPreflight = await runMediaPreflightAndApplyDecision(
+        state.importPackage,
+        state.importAccountId,
+        mediaCache,
+        importOptions,
+      );
+      if (!mediaPreflight.proceed) {
+        return false;
+      }
+      state.importPackage = mediaPreflight.packageData;
+      if (!(state.importPackage.ads || []).length) {
+        log("warn", "Import stopped: media preflight left no valid ads to copy.");
+        return false;
+      }
+
+      const pixelMap = await resolvePixelMap(state.importAccountId);
+      const adsetMap = new Map();
+      const creativeMap = new Map();
 
       if (state.importAsDraft) {
         await discardCurrentDraft(state.importAccountId);
