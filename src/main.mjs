@@ -1475,7 +1475,6 @@ import { createServiceRegistry } from "./services/index.mjs";
     const sourcePages = getSourcePagesFromPackage(packageData);
     const sourcePixels = getSourcePixelsFromPackage(packageData);
     const sourceCatalogs = getSourceCatalogsFromPackage(packageData);
-    const sourceProductSets = getSourceProductSetsFromPackage(packageData);
     const mediaSlots = getMediaSlotsFromPackage(packageData);
 
     const pageRows = sourcePages.map((page) => {
@@ -1532,24 +1531,25 @@ import { createServiceRegistry } from "./services/index.mjs";
       `;
     }).join("");
 
+    const anyCatalogCopyToBm = sourceCatalogs.some((catalog) => {
+      const current = catalogMappings[catalog.id]
+        || ((catalogs || []).some((item) => item.id === catalog.id) ? catalog.id : "");
+      return current === "__copy__";
+    });
     const catalogWarning = sourceCatalogs.length
       ? targetBusiness?.id
-        ? `<div class="sk-note sk-warning">
-            Catalog campaign detected for target BM ${escapeHtml(targetBusiness.name || targetBusiness.id)}.
-            Select the same visible catalog, copy into a visible target catalog, or choose "Copy to target BM" to create/copy catalog settings when Meta permissions allow it.
-            ${sourceProductSets.length ? `Product sets detected: ${escapeHtml(sourceProductSets.map((item) => item.id).join(", "))}.` : ""}
+        ? `<div class="sk-note">
+            Catalog campaign. Target BM: ${escapeHtml(targetBusiness.name || targetBusiness.id)}.
+            ${anyCatalogCopyToBm ? `A new catalog will be created in ${escapeHtml(targetBusiness.name || targetBusiness.id)}.` : ""}
           </div>`
         : (catalogs || []).length
           ? `<div class="sk-note sk-warning">
-              Catalog campaign detected. The target ad account has no visible Business Manager on its ad account object,
-              but Meta exposes ${escapeHtml(String((catalogs || []).length))} eligible target catalog(s) for this ad account.
-              You can map into one of those existing target catalogs, but "Copy to target BM" is unavailable without visible BM access.
-              ${sourceProductSets.length ? `Product sets detected: ${escapeHtml(sourceProductSets.map((item) => item.id).join(", "))}.` : ""}
+              Catalog campaign. No visible Business Manager on the target ad account;
+              you can map into an existing target catalog, but "Copy to target BM" is unavailable.
             </div>`
           : `<div class="sk-note sk-warning">
-              Catalog campaign detected, but the target ad account has no visible Business Manager on its ad account object
-              and Meta does not expose any eligible target catalogs for this ad account.
-              Catalog campaigns cannot be cloned/imported here until Meta exposes a reusable target catalog or you choose a BM-owned or BM-assigned target ad account.
+              Catalog campaign, but the target ad account has no visible Business Manager
+              and no eligible target catalogs. Catalog campaigns cannot be cloned/imported here.
             </div>`
       : "";
 
