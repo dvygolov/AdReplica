@@ -1158,6 +1158,53 @@ import { createServiceRegistry } from "./services/index.mjs";
       || null;
   }
 
+  const sourceImageRecoveryCache = new Map();
+  const sourceVideoRecoveryCache = new Map();
+
+  // When no local file was selected, falls back to a remote-copy descriptor
+  // if the source account media is still readable by the current token.
+  async function recoverSlotMediaFromSource(slot) {
+    if (!slot || slot.missingCreative) {
+      return null;
+    }
+    const sourceAccountId = getPackageSourceAccountId(state.importPackage);
+    if (!sourceAccountId) {
+      return null;
+    }
+    const expectedFileName = String(slot.expectedFileName || "");
+    if (slot.type === "image" && slot.sourceImageHash) {
+      const source = await checkSourceImageAvailable(sourceAccountId, String(slot.sourceImageHash), sourceImageRecoveryCache);
+      if (!source.ok) {
+        return null;
+      }
+      log("info", `Recovering image ${expectedFileName || slot.sourceImageHash} from source account ${sourceAccountId}...`);
+      return createRemoteMediaFile({
+        fileName: expectedFileName || `${slot.sourceImageHash}.jpg`,
+        type: "image/jpeg",
+        sourceUrl: source.url || "",
+        sourceAccountId,
+        sourceId: String(slot.sourceImageHash),
+        sourceKind: String(slot.slotKind || "image"),
+      });
+    }
+    if (slot.type === "video" && slot.sourceVideoId) {
+      const source = await checkSourceVideoAvailable(String(slot.sourceVideoId), sourceVideoRecoveryCache);
+      if (!source.ok) {
+        return null;
+      }
+      log("info", `Recovering video ${expectedFileName || slot.sourceVideoId} from source account ${sourceAccountId}...`);
+      return createRemoteMediaFile({
+        fileName: expectedFileName || `${slot.sourceVideoId}.mp4`,
+        type: "video/mp4",
+        sourceUrl: source.source || "",
+        sourceAccountId,
+        sourceId: String(slot.sourceVideoId),
+        sourceKind: String(slot.slotKind || "video"),
+      });
+    }
+    return null;
+  }
+
   function renderPackageSummary(packageData) {
     if (!packageData) {
       return "";
@@ -1199,8 +1246,31 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   function parseGraphError(error) {
     if (!error) return null;
-    if (typeof error === "object" && (error.error || error.message || error.code)) {
-      return error.error || error;
+    if (typeof error === "object") {
+      if (error.error) {
+        return error.error;
+      }
+      // graphFetch throws Error instances whose message is a JSON string;
+      // unwrap it so error classifiers can see code/subcode/message fields.
+      const message = typeof error.message === "string" ? error.message.trim() : "";
+      if (message.startsWith("{") || message.startsWith("[")) {
+        try {
+          const parsedMessage = JSON.parse(message);
+          if (parsedMessage && typeof parsedMessage === "object") {
+            return parsedMessage.error || parsedMessage;
+          }
+        } catch (_parseError) {
+          // Plain-text message; fall through to the normalized shape below.
+        }
+      }
+      if (message || error.code !== undefined || error.error_subcode !== undefined) {
+        return {
+          code: error.code,
+          error_subcode: error.error_subcode,
+          message,
+        };
+      }
+      return error;
     }
     try {
       return JSON.parse(String(error).replace(/^Error:\s*/, ""));
@@ -4734,25 +4804,29 @@ import { createServiceRegistry } from "./services/index.mjs";
       if (!hasLocalOrRemoteFile) {
         if (sourceAccountId && slot.type === "image" && slot.sourceImageHash) {
           const source = await checkSourceImageAvailable(sourceAccountId, slot.sourceImageHash, sourceImageCache);
-          if (!source.ok) {
-            issues.push(buildMediaPreflightIssue(
-              slot,
-              "source image is unavailable or current account has no access",
-              source.error,
-            ));
+          if (source.ok) {
+            // Import will auto-copy the image from the source account.
             continue;
           }
+          issues.push(buildMediaPreflightIssue(
+            slot,
+            "source image is unavailable or current account has no access",
+            source.error,
+          ));
+          continue;
         }
         if (slot.type === "video" && slot.sourceVideoId) {
           const source = await checkSourceVideoAvailable(slot.sourceVideoId, sourceVideoCache);
-          if (!source.ok) {
-            issues.push(buildMediaPreflightIssue(
-              slot,
-              "source video is unavailable or current account has no access",
-              source.error,
-            ));
+          if (source.ok) {
+            // Import will auto-copy the video from the source account.
             continue;
           }
+          issues.push(buildMediaPreflightIssue(
+            slot,
+            "source video is unavailable or current account has no access",
+            source.error,
+          ));
+          continue;
         }
         issues.push(buildMediaPreflightIssue(
           slot,
@@ -5275,7 +5349,14 @@ import { createServiceRegistry } from "./services/index.mjs";
 
     const template = getAssetFeedFallbackTemplate(creative.id, "image");
     const slot = getCreativeMediaSlots(creative).find((item) => item.type === "image");
-    const mediaFile = slot ? getDefaultMediaFile(slot) : null;
+    let mediaFile = slot ? getDefaultMediaFile(slot) : null;
+    if (!mediaFile) {
+      mediaFile = await recoverSlotMediaFromSource(slot);
+    }
+    if (!mediaFile) {
+      log("warn", `Creative ${creative.name} skipped: link_data image unavailable and unrecoverable (${String(linkData.image_hash)}).`);
+      return null;
+    }
     let uploadedHash = String(linkData.image_hash);
     if (mediaFile) {
       uploadedHash = mediaCache.images.get(mediaFile.name);
@@ -5392,16 +5473,31 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   async function replaceAssetFeedMedia(accountId, creative, osp, afs, mediaCache) {
     const fnMap = state.importPackage?.fileNameMap;
+    const slotsByKey = new Map(getCreativeMediaSlots(creative).map((slot) => [String(slot.key), slot]));
+    const unresolved = [];
+    const resolveWithRecovery = async (key, originalKey, label) => {
+      const direct = resolveImportedMediaFile(key, originalKey, fnMap);
+      if (direct) {
+        return direct;
+      }
+      const recovered = await recoverSlotMediaFromSource(slotsByKey.get(String(key)));
+      if (recovered) {
+        return recovered;
+      }
+      unresolved.push(label);
+      return null;
+    };
+
     if (Array.isArray(afs.images)) {
       for (const img of afs.images) {
         if (!img.hash) continue;
         const oldHash = String(img.hash);
         const originalKey = `${oldHash}.jpg`;
-        const mediaFile = resolveImportedMediaFile(`${creative.id}:afs_image_${afs.images.indexOf(img)}`, originalKey, fnMap);
-        if (mediaFile) {
-          const uploaded = await uploadImageAsset(accountId, mediaFile, mediaCache);
-          img.hash = uploaded.hash;
-        }
+        const imageIndex = afs.images.indexOf(img);
+        const mediaFile = await resolveWithRecovery(`${creative.id}:afs_image_${imageIndex}`, originalKey, `asset feed image #${imageIndex + 1} (${originalKey})`);
+        if (!mediaFile) continue;
+        const uploaded = await uploadImageAsset(accountId, mediaFile, mediaCache);
+        img.hash = uploaded.hash;
       }
     }
 
@@ -5411,29 +5507,31 @@ import { createServiceRegistry } from "./services/index.mjs";
         const oldVideoId = String(vid.video_id);
         const videoIndex = afs.videos.indexOf(vid);
         const originalKey = `${oldVideoId}.mp4`;
-        const mediaFile = resolveImportedMediaFile(`${creative.id}:afs_video_${videoIndex}`, originalKey, fnMap);
-        if (mediaFile) {
-          let newId = mediaCache.videos.get(mediaFile.name);
-          if (!newId) {
-            log("info", `Uploading video ${mediaFile.name}...`);
-            newId = await uploadVideo(accountId, mediaFile);
-            mediaCache.videos.set(mediaFile.name, newId);
+        const mediaFile = await resolveWithRecovery(`${creative.id}:afs_video_${videoIndex}`, originalKey, `asset feed video #${videoIndex + 1} (${originalKey})`);
+        if (!mediaFile) continue;
+        let newId = mediaCache.videos.get(mediaFile.name);
+        if (!newId) {
+          log("info", `Uploading video ${mediaFile.name}...`);
+          newId = await uploadVideo(accountId, mediaFile);
+          mediaCache.videos.set(mediaFile.name, newId);
+        }
+        vid.video_id = newId;
+        const previewOriginalKey = getVideoThumbnailOriginalName(oldVideoId, extractMediaExtensionFromUrl(vid.thumbnail_url, ".jpg"));
+        let previewFile = resolveImportedMediaFile(`${creative.id}:afs_video_thumb_${videoIndex}`, previewOriginalKey, fnMap);
+        if (!previewFile) {
+          previewFile = await recoverSlotMediaFromSource(slotsByKey.get(`${creative.id}:afs_video_thumb_${videoIndex}`));
+        }
+        if (previewFile) {
+          const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
+          if (uploadedPreview.url) {
+            vid.thumbnail_url = uploadedPreview.url;
           }
-          vid.video_id = newId;
-          const previewOriginalKey = getVideoThumbnailOriginalName(oldVideoId, extractMediaExtensionFromUrl(vid.thumbnail_url, ".jpg"));
-          const previewFile = resolveImportedMediaFile(`${creative.id}:afs_video_thumb_${videoIndex}`, previewOriginalKey, fnMap);
-          if (previewFile) {
-            const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
-            if (uploadedPreview.url) {
-              vid.thumbnail_url = uploadedPreview.url;
-            }
-            vid.thumbnail_hash = uploadedPreview.hash;
-            vid.thumbnail_source = "custom";
-          } else {
-            vid.thumbnail_url = await getPreferredVideoThumbnail(newId);
-            delete vid.thumbnail_hash;
-            vid.thumbnail_source = "generated_default";
-          }
+          vid.thumbnail_hash = uploadedPreview.hash;
+          vid.thumbnail_source = "custom";
+        } else {
+          vid.thumbnail_url = await getPreferredVideoThumbnail(newId);
+          delete vid.thumbnail_hash;
+          vid.thumbnail_source = "generated_default";
         }
       }
     }
@@ -5441,7 +5539,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (osp.video_data?.video_id) {
       const oldVideoId = String(osp.video_data.video_id);
       const originalKey = `${oldVideoId}.mp4`;
-      const mediaFile = resolveImportedMediaFile(`${creative.id}:video`, originalKey, fnMap);
+      const mediaFile = await resolveWithRecovery(`${creative.id}:video`, originalKey, `video (${originalKey})`);
       if (mediaFile) {
         let newId = mediaCache.videos.get(mediaFile.name);
         if (!newId) {
@@ -5454,7 +5552,10 @@ import { createServiceRegistry } from "./services/index.mjs";
         }
         osp.video_data.video_id = newId;
         const previewOriginalKey = getVideoThumbnailOriginalName(oldVideoId, extractMediaExtensionFromUrl(osp.video_data.image_url, ".jpg"));
-        const previewFile = resolveImportedMediaFile(`${creative.id}:video_preview`, previewOriginalKey, fnMap);
+        let previewFile = resolveImportedMediaFile(`${creative.id}:video_preview`, previewOriginalKey, fnMap);
+        if (!previewFile) {
+          previewFile = await recoverSlotMediaFromSource(slotsByKey.get(`${creative.id}:video_preview`));
+        }
         if (previewFile) {
           const uploadedPreview = await uploadImageAsset(accountId, previewFile, mediaCache);
           osp.video_data.image_hash = uploadedPreview.hash;
@@ -5469,7 +5570,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     } else if (osp.link_data?.image_hash) {
       const oldHash = String(osp.link_data.image_hash);
       const originalKey = `${oldHash}.jpg`;
-      const mediaFile = resolveImportedMediaFile(`${creative.id}:image`, originalKey, fnMap);
+      const mediaFile = await resolveWithRecovery(`${creative.id}:image`, originalKey, `image (${originalKey})`);
       if (mediaFile) {
         const uploaded = await uploadImageAsset(accountId, mediaFile, mediaCache);
         if (!osp.link_data) {
@@ -5478,6 +5579,12 @@ import { createServiceRegistry } from "./services/index.mjs";
         osp.link_data.image_hash = uploaded.hash;
       }
     }
+
+    if (unresolved.length) {
+      log("warn", `Creative ${creative.name}: media unavailable and unrecoverable: ${unresolved.join("; ")}.`);
+      return false;
+    }
+    return true;
   }
 
   async function replaceCarouselAttachmentMedia(accountId, creative, osp, mediaCache) {
@@ -5493,7 +5600,12 @@ import { createServiceRegistry } from "./services/index.mjs";
       }
       const oldHash = String(attachment.image_hash);
       const originalKey = `${oldHash}.jpg`;
-      const mediaFile = resolveImportedMediaFile(`${creative.id}:child_attachment_image_${index}`, originalKey, fnMap);
+      let mediaFile = resolveImportedMediaFile(`${creative.id}:child_attachment_image_${index}`, originalKey, fnMap);
+      if (!mediaFile) {
+        const attachmentSlot = getCreativeMediaSlots(creative)
+          .find((slot) => String(slot.key) === `${creative.id}:child_attachment_image_${index}`);
+        mediaFile = await recoverSlotMediaFromSource(attachmentSlot);
+      }
       if (!mediaFile) {
         log("warn", `Creative ${creative.name} skipped: carousel media file not found ${originalKey}.`);
         return false;
@@ -6234,7 +6346,9 @@ import { createServiceRegistry } from "./services/index.mjs";
           raw,
         };
       } else {
-        await replaceAssetFeedMedia(accountId, creative, osp, afs, mediaCache);
+        if (!await replaceAssetFeedMedia(accountId, creative, osp, afs, mediaCache)) {
+          return null;
+        }
         stripAssetFeedLabelIdsForImport(afs);
         raw.object_story_spec = osp;
         synchronizeCreativeIdentityFields(raw, osp);
@@ -6288,7 +6402,10 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
 
     const slot = slots[0];
-    const mediaFile = getDefaultMediaFile(slot);
+    let mediaFile = getDefaultMediaFile(slot);
+    if (!mediaFile) {
+      mediaFile = await recoverSlotMediaFromSource(slot);
+    }
     if (!mediaFile) {
       log("warn", `Creative ${creative.name} skipped: media file not found ${slot.expectedFileName}.`);
       return null;
@@ -6359,7 +6476,9 @@ import { createServiceRegistry } from "./services/index.mjs";
         raw.object_story_spec = osp;
         synchronizeCreativeIdentityFields(raw, osp);
         stripCreativePreviewIdentifiers(raw);
-        await replaceAssetFeedMedia(accountId, creative, osp, afs, mediaCache);
+        if (!await replaceAssetFeedMedia(accountId, creative, osp, afs, mediaCache)) {
+          return null;
+        }
         stripAssetFeedLabelIdsForImport(afs);
         const payload = buildImportedCreativePayload(raw);
         if (!await validateDraftCreativePayload(accountId, raw.name || creative.name, payload, {
@@ -6421,7 +6540,10 @@ import { createServiceRegistry } from "./services/index.mjs";
     await applyInstagramIdentity(osp, mappedPageId, raw.name || creative.name, accountId);
 
     const slot = slots[0];
-    const mediaFile = getDefaultMediaFile(slot);
+    let mediaFile = getDefaultMediaFile(slot);
+    if (!mediaFile) {
+      mediaFile = await recoverSlotMediaFromSource(slot);
+    }
     if (!mediaFile) {
       log("warn", `Creative ${creative.name} skipped: media file not found ${slot.expectedFileName}.`);
       return null;
