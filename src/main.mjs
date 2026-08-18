@@ -445,6 +445,24 @@ import { createServiceRegistry } from "./services/index.mjs";
     return appendCreativeUrlTags(payload, raw);
   }
 
+  function resolveMutuallyExclusiveStoryImageFields(payload) {
+    const linkData = payload?.object_story_spec?.link_data;
+    if (!linkData || typeof linkData !== "object") {
+      return payload;
+    }
+    if (linkData.image_hash && Object.prototype.hasOwnProperty.call(linkData, "picture")) {
+      delete linkData.picture;
+    }
+    if (Array.isArray(linkData.child_attachments)) {
+      for (const attachment of linkData.child_attachments) {
+        if (attachment?.image_hash && Object.prototype.hasOwnProperty.call(attachment, "picture")) {
+          delete attachment.picture;
+        }
+      }
+    }
+    return payload;
+  }
+
   function buildCreativeValidationPayload(payload, creativeName) {
     if (!payload || typeof payload !== "object") {
       return null;
@@ -485,7 +503,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (payload.name || creativeName) {
       body.name = payload.name || creativeName;
     }
-    return body;
+    return resolveMutuallyExclusiveStoryImageFields(body);
   }
 
   function stripCreativePreviewIdentifiers(raw) {
@@ -8558,6 +8576,7 @@ import { createServiceRegistry } from "./services/index.mjs";
             log("warn", `Ad ${ad.name} skipped: failed to build draft creative/adset.`);
             continue;
           }
+          resolveMutuallyExclusiveStoryImageFields(draftCreative);
           const sourcePageId = getSourcePageId(creative);
           const mappedPageId = state.importPageMappings[sourcePageId] || sourcePageId;
           const newDraftAdId = await createAdDraft(
