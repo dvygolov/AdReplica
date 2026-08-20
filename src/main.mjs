@@ -2406,6 +2406,11 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
   }
 
+  function isTransientNetworkFetchError(error) {
+    const message = String(error?.message || error || "");
+    return /failed to fetch|networkerror|load failed|network request failed|fetch failed|aborterror/i.test(message);
+  }
+
   async function graphFetch(pathOrUrl, options = {}) {
     if (!state.token) {
       throw new Error("No access_token.");
@@ -2419,6 +2424,8 @@ import { createServiceRegistry } from "./services/index.mjs";
       fullUrl = false,
       raw = false,
       apiBase = Config.API_URL,
+      networkRetryAttempts = 3,
+      networkRetryBaseDelayMs = 600,
     } = options;
 
     const url = fullUrl
@@ -2479,7 +2486,8 @@ import { createServiceRegistry } from "./services/index.mjs";
 
     let response;
     let lastFetchError = null;
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const maxNetworkAttempts = Math.max(1, Number(networkRetryAttempts || 1));
+    for (let attempt = 1; attempt <= maxNetworkAttempts; attempt += 1) {
       try {
         response = await adReplicaFetch(url.toString(), init);
         lastFetchError = null;
@@ -2487,8 +2495,7 @@ import { createServiceRegistry } from "./services/index.mjs";
       } catch (error) {
         lastFetchError = error;
         const message = String(error?.message || error || "");
-        const isTransientNetworkError = /failed to fetch|networkerror|load failed|network request failed|fetch failed|aborterror/i.test(message);
-        if (!isTransientNetworkError || attempt === 3) {
+        if (!isTransientNetworkFetchError(error) || attempt === maxNetworkAttempts) {
           recordNetworkDiagnostic({
             kind: "graph_fetch",
             phase: "fetch",
@@ -2500,7 +2507,7 @@ import { createServiceRegistry } from "./services/index.mjs";
           throw error;
         }
         log("warn", `Transient fetch failure on attempt ${attempt} for ${url.pathname}. Retrying...`, message);
-        await sleep(600 * attempt);
+        await sleep(Math.max(0, Number(networkRetryBaseDelayMs || 0)) * (2 ** (attempt - 1)));
       }
     }
     if (!response && lastFetchError) {
@@ -2817,113 +2824,9 @@ import { createServiceRegistry } from "./services/index.mjs";
     return direct || findDeepStringValue(response?.data || response, ["iguser_v2_id", "ig_user_id"]);
   }
 
-  function extractPageBackedThreadsUserId(response) {
-    const direct = String(
-      response?.data?.xfb_create_page_backed_threads_accounts?.th_user_id
-      || response?.data?.xfb_create_page_backed_threads_account?.th_user_id
-      || "",
-    );
-    return direct || findDeepStringValue(response?.data || response, ["th_user_id", "threads_user_id"]);
-  }
-
-  async function ensurePageBackedThreadsIdentity(pageId, itemName = "") {
-    const normalizedPageId = String(pageId || "");
-    if (!normalizedPageId) {
-      return "";
-    }
-    try {
-      const response = await businessGraphqlRequest("26055710087356540", "createAndUsePBTAMutation", {
-        page_id: normalizedPageId,
-      });
-      return extractPageBackedThreadsUserId(response);
-    } catch (error) {
-      log("warn", `Failed to ensure Threads profile for page ${pageId}${itemName ? ` (${itemName})` : ""}.`, formatPrivateGraphqlError(error));
-      return "";
-    }
-  }
-
   async function buildIdentityHintFromInstagramObjectId(instagramObjectId, accountId = "") {
     const instagramObject = await fetchAdsManagerInstagramObjectRecord(instagramObjectId, accountId);
     return buildIdentityHintFromInstagramObject(instagramObject);
-  }
-
-  function getSavedPageIdentityHint(pageId) {
-    const savedHint = getPageIdentityHint(pageId);
-    if (
-      savedHint?.source === "AdsInstagramUsernameDataManager"
-      && savedHint.instagramUserId
-      && savedHint.instagramActorId
-      && String(savedHint.instagramUserId) !== String(savedHint.instagramActorId)
-    ) {
-      return {
-        instagramUserId: String(savedHint.instagramUserId),
-        instagramActorId: String(savedHint.instagramActorId),
-        threadsUserId: String(savedHint.threadsUserId || ""),
-        source: "AdsInstagramUsernameDataManager",
-        destinationSpec: savedHint.destinationSpec || buildPageBackedDestinationSpec(),
-      };
-    }
-    return null;
-  }
-
-  function findInstagramObjectWithLegacyId(source, seen = new Set()) {
-    if (!source || typeof source !== "object" || seen.has(source)) {
-      return null;
-    }
-    seen.add(source);
-    const hint = buildIdentityHintFromInstagramObject(source);
-    if (hint) {
-      return hint;
-    }
-    for (const value of Object.values(source)) {
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          const nested = findInstagramObjectWithLegacyId(item, seen);
-          if (nested) {
-            return nested;
-          }
-        }
-        continue;
-      }
-      if (value && typeof value === "object") {
-        const nested = findInstagramObjectWithLegacyId(value, seen);
-        if (nested) {
-          return nested;
-        }
-      }
-    }
-    return null;
-  }
-
-  async function fetchPageBackedInstagramIdentityFromPageFields(pageId, accountId = "") {
-    const normalizedPageId = String(pageId || "");
-    if (!normalizedPageId) {
-      return null;
-    }
-    const fields = [
-      "page_backed_instagram_accounts{id,iguser_v2_id,ig_user{id,legacy_instagram_user_id,threads_user_id}}",
-      "page_backed_instagram_users_v2{id,iguser_v2_id,ig_user{id,legacy_instagram_user_id,threads_user_id}}",
-    ].join(",");
-    try {
-      const response = await graphFetch(normalizedPageId, {
-        query: {
-          fields,
-          __aaid: getIdentityLookupAccountId(accountId),
-          _reqName: "object:page",
-          _reqSrc: "AdsPageInstagramAccountStoreSourceServerLoadedQuery",
-        },
-      });
-      const embeddedHint = findInstagramObjectWithLegacyId(response);
-      if (embeddedHint) {
-        return embeddedHint;
-      }
-      const instagramObjectId = extractPageBackedInstagramObjectId(response);
-      return instagramObjectId
-        ? buildIdentityHintFromInstagramObjectId(instagramObjectId, accountId)
-        : null;
-    } catch (_error) {
-      return null;
-    }
   }
 
   async function privateGraphqlMutation(docId, friendlyName, variables) {
@@ -5202,44 +5105,45 @@ import { createServiceRegistry } from "./services/index.mjs";
     return page.instagramIdentity;
   }
 
+  function resetPageIdentityProvisionCache() {
+    state.pageIdentityProvisionCache = new Map();
+  }
+
   async function ensurePageIdentityProfiles(pageId, itemName, accountId = "") {
-    const page = getKnownPageRecord(pageId);
-    if (page.identityProvisionPromise) {
-      return page.identityProvisionPromise;
+    const normalizedPageId = String(pageId || "");
+    const normalizedAccountId = getIdentityLookupAccountId(accountId);
+    const page = getKnownPageRecord(normalizedPageId);
+    const cache = state.pageIdentityProvisionCache instanceof Map
+      ? state.pageIdentityProvisionCache
+      : new Map();
+    state.pageIdentityProvisionCache = cache;
+    const cacheKey = `${normalizedAccountId}:${normalizedPageId}`;
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey);
     }
-    page.identityProvisionPromise = (async () => {
-      if (page.instagramIdentity?.instagramUserId && page.instagramIdentity?.instagramActorId) {
-        return page.instagramIdentity;
-      }
-      if (page.instagramIdentity?.source === "unavailable") {
-        return page.instagramIdentity;
-      }
-      let ensuredThreadsUserId = String(page.threadsUserId || page.instagramIdentity?.threadsUserId || "");
-      if (!ensuredThreadsUserId) {
-        ensuredThreadsUserId = await ensurePageBackedThreadsIdentity(pageId, itemName);
-        if (ensuredThreadsUserId) {
-          page.threadsUserId = ensuredThreadsUserId;
-        }
-      }
+
+    const provisionPromise = (async () => {
       try {
         const response = await privateGraphqlMutation("25221386390872351", "AdsPageInstagramAccountMutation", {
-          page_id: String(pageId),
+          page_id: normalizedPageId,
         });
         const returnedInstagramId = extractPageBackedInstagramObjectId(response);
-        let identityHint = returnedInstagramId
-          ? await buildIdentityHintFromInstagramObjectId(returnedInstagramId, accountId)
-          : null;
-        if (!identityHint) {
-          identityHint = await fetchPageBackedInstagramIdentityFromPageFields(pageId, accountId);
+        if (!returnedInstagramId) {
+          throw new Error("PBIA mutation did not return iguser_v2_id.");
+        }
+
+        let identityHint;
+        try {
+          identityHint = await buildIdentityHintFromInstagramObjectId(returnedInstagramId, normalizedAccountId);
+        } catch (error) {
+          throw new Error(
+            `PBIA instagram_object lookup failed for ${returnedInstagramId}: ${formatPrivateGraphqlError(error)}`,
+          );
         }
         if (!identityHint) {
-          identityHint = getSavedPageIdentityHint(pageId);
-        }
-        if (!identityHint) {
-          throw new Error("AdsPageInstagramAccountMutation did not return iguser_v2_id.");
-        }
-        if (!identityHint.threadsUserId && ensuredThreadsUserId) {
-          identityHint.threadsUserId = ensuredThreadsUserId;
+          throw new Error(
+            `PBIA instagram_object ${returnedInstagramId} did not return distinct id and legacy_instagram_user_id.`,
+          );
         }
         if (identityHint.threadsUserId) {
           page.threadsUserId = identityHint.threadsUserId;
@@ -5247,25 +5151,28 @@ import { createServiceRegistry } from "./services/index.mjs";
         page.instagramIdentity = {
           instagramUserId: String(identityHint.instagramUserId || ""),
           instagramActorId: String(identityHint.instagramActorId || ""),
-          threadsUserId: String(identityHint.threadsUserId || ensuredThreadsUserId || page.threadsUserId || ""),
+          threadsUserId: String(identityHint.threadsUserId || page.threadsUserId || ""),
           source: "AdsInstagramUsernameDataManager",
         };
-        savePageIdentityHint(pageId, identityHint);
+        savePageIdentityHint(normalizedPageId, identityHint);
         return page.instagramIdentity;
       } catch (error) {
-        log("warn", `Failed to ensure Instagram profile for page ${pageId}${itemName ? ` (${itemName})` : ""}.`, formatPrivateGraphqlError(error));
+        log(
+          "warn",
+          `Failed to ensure Instagram profile for page ${normalizedPageId}${itemName ? ` (${itemName})` : ""}.`,
+          formatPrivateGraphqlError(error),
+        );
         page.instagramIdentity = {
           instagramUserId: "",
           instagramActorId: "",
-          threadsUserId: String(ensuredThreadsUserId || page.threadsUserId || ""),
-          source: "unavailable",
+          threadsUserId: String(page.threadsUserId || ""),
+          source: "pbia_unavailable",
         };
         return page.instagramIdentity;
       }
-    })().finally(() => {
-      page.identityProvisionPromise = null;
-    });
-    return page.identityProvisionPromise;
+    })();
+    cache.set(cacheKey, provisionPromise);
+    return provisionPromise;
   }
 
   async function resolveInstagramIdentityForPage(pageId, accountId = "") {
@@ -7043,6 +6950,91 @@ import { createServiceRegistry } from "./services/index.mjs";
     return parseDraftStoredValue(getDraftValueEntry(values, field)?.new_value);
   }
 
+  function normalizeDraftObjectType(value) {
+    const normalized = String(value || "").toLowerCase();
+    return normalized === "adset" ? "ad_set" : normalized;
+  }
+
+  async function findDraftFragmentByTempId(draftId, expected) {
+    const fragments = await graphGetAll(`${normalizeDraftId(draftId)}/addraft_fragments`, {
+      fields: "id,ad_object_type,ad_object_id,parent_ad_object_id,values",
+      limit: 500,
+    });
+    const expectedType = normalizeDraftObjectType(expected.adObjectType);
+    const expectedTempId = String(expected.tempId ?? "");
+    const expectedParentId = String(expected.parentAdObjectId || "");
+    const expectedAccountId = normalizeAccountId(expected.accountId);
+    return fragments.find((fragment) => {
+      if (normalizeDraftObjectType(fragment?.ad_object_type) !== expectedType) {
+        return false;
+      }
+      if (String(getDraftValue(fragment?.values, "tempID") ?? "") !== expectedTempId) {
+        return false;
+      }
+      const fragmentParentId = String(
+        fragment?.parent_ad_object_id
+        || getDraftValue(fragment?.values, "parentAdObjectID")
+        || "",
+      );
+      if (expectedParentId && fragmentParentId !== expectedParentId) {
+        return false;
+      }
+      const fragmentAccountId = normalizeAccountId(getDraftValue(fragment?.values, "account_id"));
+      return !expectedAccountId || !fragmentAccountId || fragmentAccountId === expectedAccountId;
+    }) || null;
+  }
+
+  async function recoverCreatedDraftFragment(draftId, expected) {
+    for (const delayMs of [1000, 2000, 4000]) {
+      await sleep(delayMs);
+      try {
+        const fragment = await findDraftFragmentByTempId(draftId, expected);
+        if (fragment?.ad_object_id) {
+          return fragment;
+        }
+      } catch (error) {
+        log(
+          "warn",
+          `Could not verify ${expected.label} draft fragment after an ambiguous network failure.`,
+          String(error),
+        );
+      }
+    }
+    return null;
+  }
+
+  async function createDraftFragmentWithRecovery(draftId, body, expected) {
+    let lastError = null;
+    for (let writeAttempt = 1; writeAttempt <= 3; writeAttempt += 1) {
+      try {
+        return await graphFetch(`${normalizeDraftId(draftId)}/addraft_fragments`, {
+          method: "POST",
+          body,
+          networkRetryAttempts: 1,
+        });
+      } catch (error) {
+        lastError = error;
+        if (!isTransientNetworkFetchError(error)) {
+          throw error;
+        }
+        log(
+          "warn",
+          `Network response was lost while creating ${expected.label} draft fragment; checking the draft before retrying (${writeAttempt}/3).`,
+          String(error?.message || error || ""),
+        );
+        const recovered = await recoverCreatedDraftFragment(draftId, expected);
+        if (recovered) {
+          log("info", `Recovered ${expected.label} draft fragment after the network failure: ${recovered.ad_object_id}.`);
+          return { ad_object_id: recovered.ad_object_id, recovered: true };
+        }
+        if (writeAttempt < 3) {
+          log("warn", `No matching ${expected.label} draft fragment appeared; retrying the POST with the same tempID.`);
+        }
+      }
+    }
+    throw lastError || new Error(`Failed to create ${expected.label} draft fragment.`);
+  }
+
   function setDraftValue(values, field, value) {
     const nextValues = Array.isArray(values) ? values.map((item) => deepClone(item)) : [];
     const existing = nextValues.find((item) => String(item?.field || "") === String(field || ""));
@@ -7304,6 +7296,7 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   async function createCampaignDraft(accountId, draftId, campaign, options = {}) {
     const normalizedDraftId = normalizeDraftId(draftId);
+    const campaignTempId = nextDraftTempId();
     const objective = String(campaign.objective || "CONVERSIONS").toUpperCase();
     const isOutcomeLeads = objective === "OUTCOME_LEADS";
     const hasCampaignBudget = hasCampaignLevelBudget(campaign);
@@ -7315,6 +7308,7 @@ import { createServiceRegistry } from "./services/index.mjs";
       draftJsonItem("special_ad_categories", campaign.special_ad_categories || []),
       draftItem("special_ad_category", campaign.special_ad_category || "NONE"),
       draftItem("account_id", accountId),
+      draftValueItem("tempID", campaignTempId),
     ];
     if (campaign.special_ad_category_country) {
       values.push(draftJsonItem("special_ad_category_country", campaign.special_ad_category_country));
@@ -7348,7 +7342,6 @@ import { createServiceRegistry } from "./services/index.mjs";
         draftValueItem("is_pca_unified", null),
         draftValueItem("mc_experience_config", null),
         draftValueItem("is_odax_campaign_group", true),
-        draftValueItem("tempID", nextDraftTempId()),
         draftValueItem("boosted_component_product", null),
         draftValueItem("incremental_conversion_optimization_config", null),
         draftValueItem("topline_id", null),
@@ -7378,18 +7371,22 @@ import { createServiceRegistry } from "./services/index.mjs";
         }
       }
     }
-    const json = await graphFetch(`${draftId}/addraft_fragments`, {
-      method: "POST",
-      body: {
-        action: "add",
-        ad_object_type: "campaign",
-        ad_draft_id: normalizedDraftId,
-        account_id: accountId,
-        values,
-        application_id: getDraftApplicationId(),
-        ownership_type: "USER",
-        use_active_draft_if_exists: true,
-      },
+    const body = {
+      action: "add",
+      ad_object_type: "campaign",
+      ad_draft_id: normalizedDraftId,
+      account_id: accountId,
+      values,
+      application_id: getDraftApplicationId(),
+      ownership_type: "USER",
+      use_active_draft_if_exists: true,
+    };
+    const json = await createDraftFragmentWithRecovery(draftId, body, {
+      accountId,
+      adObjectType: "campaign",
+      tempId: campaignTempId,
+      parentAdObjectId: "",
+      label: "campaign",
     });
     return String(json.ad_object_id);
   }
@@ -7487,19 +7484,23 @@ import { createServiceRegistry } from "./services/index.mjs";
       preservePast: state.importPreserveSchedule,
     });
     values.push(endTime ? draftItem("end_time", endTime) : draftValueItem("end_time", null));
-    const json = await graphFetch(`${draftId}/addraft_fragments`, {
-      method: "POST",
-      body: {
-        action: "add",
-        ad_object_type: "ad_set",
-        account_id: accountId,
-        ad_draft_id: normalizedDraftId,
-        parent_ad_object_id: campaignDraftId,
-        values,
-        application_id: getDraftApplicationId(),
-        ownership_type: "USER",
-        use_active_draft_if_exists: true,
-      },
+    const body = {
+      action: "add",
+      ad_object_type: "ad_set",
+      account_id: accountId,
+      ad_draft_id: normalizedDraftId,
+      parent_ad_object_id: campaignDraftId,
+      values,
+      application_id: getDraftApplicationId(),
+      ownership_type: "USER",
+      use_active_draft_if_exists: true,
+    };
+    const json = await createDraftFragmentWithRecovery(draftId, body, {
+      accountId,
+      adObjectType: "ad_set",
+      tempId: adsetTempId,
+      parentAdObjectId: campaignDraftId,
+      label: "ad set",
     });
     return String(json.ad_object_id);
   }
@@ -7524,19 +7525,23 @@ import { createServiceRegistry } from "./services/index.mjs";
       values.push(draftItem("conversion_domain", ad.conversion_domain));
     }
     try {
-      const json = await graphFetch(`${draftId}/addraft_fragments`, {
-        method: "POST",
-        body: {
-          action: "add",
-          ad_object_type: "ad",
-          account_id: accountId,
-          ad_draft_id: normalizedDraftId,
-          parent_ad_object_id: adsetDraftId,
-          values,
-          application_id: getDraftApplicationId(),
-          ownership_type: "USER",
-          use_active_draft_if_exists: true,
-        },
+      const body = {
+        action: "add",
+        ad_object_type: "ad",
+        account_id: accountId,
+        ad_draft_id: normalizedDraftId,
+        parent_ad_object_id: adsetDraftId,
+        values,
+        application_id: getDraftApplicationId(),
+        ownership_type: "USER",
+        use_active_draft_if_exists: true,
+      };
+      const json = await createDraftFragmentWithRecovery(draftId, body, {
+        accountId,
+        adObjectType: "ad",
+        tempId: adTempId,
+        parentAdObjectId: adsetDraftId,
+        label: `ad ${ad.name}`,
       });
       return String(json.ad_object_id);
     } catch (error) {
@@ -8446,6 +8451,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     try {
       await initializeSession();
       await refreshImportAccountContext();
+      resetPageIdentityProvisionCache();
       enforceImportModeConstraints();
       if (importOptions.pageMappings) {
         state.importPageMappings = {

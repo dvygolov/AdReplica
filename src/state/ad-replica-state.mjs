@@ -49,6 +49,7 @@ export class AdReplicaState {
     this.cloneAsDraft = true;
     this.cloneStatus = "PAUSED";
     this.pageIdentityHints = null;
+    this.pageIdentityProvisionCache = new Map();
     this.lastDraftIdentityRepair = null;
     this.graphTemplateAccountId = "";
     this.graphTemplateParams = null;
