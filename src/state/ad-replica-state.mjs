@@ -50,6 +50,7 @@ export class AdReplicaState {
     this.cloneStatus = "PAUSED";
     this.pageIdentityHints = null;
     this.pageIdentityProvisionCache = new Map();
+    this.pageBackedThreadsProvisionCache = new Map();
     this.lastDraftIdentityRepair = null;
     this.graphTemplateAccountId = "";
     this.graphTemplateParams = null;

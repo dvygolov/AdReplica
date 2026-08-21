@@ -23,6 +23,7 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   const dom = {};
   const NETWORK_DIAGNOSTIC_LIMIT = 80;
+  const PAGE_BACKED_THREADS_MUTATION_DOC_ID = "26055710087356540";
 
   const logger = new Logger({ appTitle: APP_TITLE, state, onRender: () => renderLogs() });
 
@@ -446,21 +447,43 @@ import { createServiceRegistry } from "./services/index.mjs";
   }
 
   function resolveMutuallyExclusiveStoryImageFields(payload) {
-    const linkData = payload?.object_story_spec?.link_data;
-    if (!linkData || typeof linkData !== "object") {
+    const objectStorySpec = payload?.object_story_spec;
+    if (!objectStorySpec || typeof objectStorySpec !== "object") {
       return payload;
     }
-    if (linkData.image_hash && Object.prototype.hasOwnProperty.call(linkData, "picture")) {
-      delete linkData.picture;
-    }
-    if (Array.isArray(linkData.child_attachments)) {
-      for (const attachment of linkData.child_attachments) {
-        if (attachment?.image_hash && Object.prototype.hasOwnProperty.call(attachment, "picture")) {
-          delete attachment.picture;
+
+    const seen = new Set();
+    const normalizeNode = (node) => {
+      if (!node || typeof node !== "object" || seen.has(node)) {
+        return;
+      }
+      seen.add(node);
+      if (!Array.isArray(node) && node.image_hash && Object.prototype.hasOwnProperty.call(node, "picture")) {
+        delete node.picture;
+      }
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          normalizeNode(item);
+        }
+        return;
+      }
+      for (const value of Object.values(node)) {
+        if (value && typeof value === "object") {
+          normalizeNode(value);
         }
       }
-    }
+    };
+    normalizeNode(objectStorySpec);
     return payload;
+  }
+
+  function setStoryImageHash(target, imageHash) {
+    if (!target || typeof target !== "object") {
+      return target;
+    }
+    target.image_hash = imageHash;
+    delete target.picture;
+    return target;
   }
 
   function buildCreativeValidationPayload(payload, creativeName) {
@@ -2824,6 +2847,56 @@ import { createServiceRegistry } from "./services/index.mjs";
     return direct || findDeepStringValue(response?.data || response, ["iguser_v2_id", "ig_user_id"]);
   }
 
+  function extractPageBackedThreadsUserId(response) {
+    const direct = String(
+      response?.data?.xfb_create_page_backed_threads_accounts?.th_user_id
+      || response?.data?.xfb_create_page_backed_threads_account?.th_user_id
+      || "",
+    );
+    return direct || findDeepStringValue(response?.data || response, ["th_user_id", "threads_user_id"]);
+  }
+
+  async function ensurePageBackedThreadsIdentity(pageId, itemName = "", accountId = "") {
+    const normalizedPageId = String(pageId || "");
+    const normalizedAccountId = getIdentityLookupAccountId(accountId);
+    if (!normalizedPageId) {
+      return "";
+    }
+    const cache = state.pageBackedThreadsProvisionCache instanceof Map
+      ? state.pageBackedThreadsProvisionCache
+      : new Map();
+    state.pageBackedThreadsProvisionCache = cache;
+    const cacheKey = `${normalizedAccountId}:${normalizedPageId}`;
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey);
+    }
+
+    const provisionPromise = (async () => {
+      try {
+        const response = await businessGraphqlRequest(
+          PAGE_BACKED_THREADS_MUTATION_DOC_ID,
+          "createAndUsePBTAMutation",
+          { page_id: normalizedPageId },
+        );
+        const threadsUserId = extractPageBackedThreadsUserId(response);
+        if (!threadsUserId) {
+          throw new Error("PBTA mutation did not return th_user_id.");
+        }
+        log("info", `Page-backed Threads identity ready for page ${normalizedPageId}${itemName ? ` (${itemName})` : ""}.`);
+        return threadsUserId;
+      } catch (error) {
+        log(
+          "warn",
+          `Failed to ensure Threads profile for page ${normalizedPageId}${itemName ? ` (${itemName})` : ""}.`,
+          formatPrivateGraphqlError(error),
+        );
+        return "";
+      }
+    })();
+    cache.set(cacheKey, provisionPromise);
+    return provisionPromise;
+  }
+
   async function buildIdentityHintFromInstagramObjectId(instagramObjectId, accountId = "") {
     const instagramObject = await fetchAdsManagerInstagramObjectRecord(instagramObjectId, accountId);
     return buildIdentityHintFromInstagramObject(instagramObject);
@@ -5107,6 +5180,7 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   function resetPageIdentityProvisionCache() {
     state.pageIdentityProvisionCache = new Map();
+    state.pageBackedThreadsProvisionCache = new Map();
   }
 
   async function ensurePageIdentityProfiles(pageId, itemName, accountId = "") {
@@ -5184,7 +5258,9 @@ import { createServiceRegistry } from "./services/index.mjs";
     osp.page_id = pageId;
     const existingInstagramUserId = String(osp.instagram_user_id || "");
     const existingInstagramActorId = String(osp.instagram_actor_id || "");
-    const existingThreadsUserId = String(osp.threads_user_id || osp.th_user_id || "");
+    const hasThreadsUserIdField = Object.prototype.hasOwnProperty.call(osp, "threads_user_id");
+    const hasThUserIdField = Object.prototype.hasOwnProperty.call(osp, "th_user_id");
+    const needsThreadsIdentity = Boolean(osp.threads_user_id || osp.th_user_id);
     const identity = await ensurePageIdentityProfiles(pageId, itemName, accountId);
     if (identity.instagramUserId) {
       osp.instagram_user_id = identity.instagramUserId;
@@ -5203,29 +5279,62 @@ import { createServiceRegistry } from "./services/index.mjs";
     if (osp.instagram_actor_id && String(osp.instagram_actor_id) === String(osp.instagram_user_id || "")) {
       delete osp.instagram_actor_id;
     }
-    if (Object.prototype.hasOwnProperty.call(osp, "threads_user_id")) {
-      if (identity.threadsUserId) {
-        osp.threads_user_id = identity.threadsUserId;
-      } else if (existingThreadsUserId) {
-        osp.threads_user_id = existingThreadsUserId;
-      } else {
-        delete osp.threads_user_id;
+
+    let targetThreadsUserId = "";
+    if (needsThreadsIdentity) {
+      const provisionedThreadsUserId = await ensurePageBackedThreadsIdentity(pageId, itemName, accountId);
+      targetThreadsUserId = String(provisionedThreadsUserId || identity.threadsUserId || "");
+      if (!targetThreadsUserId) {
+        throw new Error(
+          `Page ${pageId} requires a page-backed Threads identity for ${itemName || "this creative"}, but provisioning returned no target Threads ID.`,
+        );
       }
+      const page = getKnownPageRecord(pageId);
+      page.threadsUserId = targetThreadsUserId;
+      identity.threadsUserId = targetThreadsUserId;
+      page.instagramIdentity = identity;
+      savePageIdentityHint(pageId, {
+        ...identity,
+        threadsUserId: targetThreadsUserId,
+      });
     }
-    if (Object.prototype.hasOwnProperty.call(osp, "th_user_id")) {
-      if (identity.threadsUserId) {
-        osp.th_user_id = identity.threadsUserId;
-      } else if (existingThreadsUserId) {
-        osp.th_user_id = existingThreadsUserId;
-      } else {
-        delete osp.th_user_id;
-      }
+
+    delete osp.threads_user_id;
+    delete osp.th_user_id;
+    if (targetThreadsUserId && hasThreadsUserIdField) {
+      osp.threads_user_id = targetThreadsUserId;
+    }
+    if (targetThreadsUserId && hasThUserIdField) {
+      osp.th_user_id = targetThreadsUserId;
     }
     const hasUsableInstagramIdentity = Boolean(osp.instagram_user_id) && Boolean(osp.instagram_actor_id);
     if (!hasUsableInstagramIdentity && itemName) {
       log("warn", `Page ${pageId} has no accessible Instagram identity for ${itemName}.`);
     }
     return identity;
+  }
+
+  async function preflightImportCreativeIdentities(accountId, packageData) {
+    let checked = 0;
+    let threadsRequired = 0;
+    for (const creative of (packageData?.creatives || [])) {
+      const objectStorySpec = creative?.raw?.object_story_spec;
+      const pageId = getSourcePageId(creative);
+      if (!objectStorySpec || !pageId) {
+        continue;
+      }
+      if (objectStorySpec.threads_user_id || objectStorySpec.th_user_id) {
+        threadsRequired += 1;
+      }
+      await applyInstagramIdentity(
+        deepClone(objectStorySpec),
+        pageId,
+        creative?.raw?.name || creative?.name || creative?.id || "creative",
+        accountId,
+      );
+      checked += 1;
+    }
+    log("info", `Identity preflight checked ${checked} creative(s), ${threadsRequired} requiring page-backed Threads.`);
   }
 
   function stripUnsupportedInstagramEnhancements(raw, identity, itemName) {
@@ -5296,8 +5405,8 @@ import { createServiceRegistry } from "./services/index.mjs";
       const objectStorySpec = deepClone(raw.object_story_spec || {});
       objectStorySpec.link_data = {
         ...deepClone(linkData),
-        image_hash: uploadedHash,
       };
+      setStoryImageHash(objectStorySpec.link_data, uploadedHash);
       delete objectStorySpec.video_data;
       log("info", `Creative ${creative.name}: rebuilt unsupported audio-only draft into object_story_spec fallback.`);
       return appendCreativeUrlTags({
@@ -5378,8 +5487,8 @@ import { createServiceRegistry } from "./services/index.mjs";
     const simpleFallbackObjectStorySpec = deepClone(raw.object_story_spec || {});
     simpleFallbackObjectStorySpec.link_data = {
       ...deepClone(linkData),
-      image_hash: uploadedHash,
     };
+    setStoryImageHash(simpleFallbackObjectStorySpec.link_data, uploadedHash);
     delete simpleFallbackObjectStorySpec.video_data;
 
     const payload = appendCreativeUrlTags({
@@ -5501,7 +5610,7 @@ import { createServiceRegistry } from "./services/index.mjs";
         if (!osp.link_data) {
           osp.link_data = {};
         }
-        osp.link_data.image_hash = uploaded.hash;
+        setStoryImageHash(osp.link_data, uploaded.hash);
       }
     }
 
@@ -5536,7 +5645,7 @@ import { createServiceRegistry } from "./services/index.mjs";
         return false;
       }
       const uploaded = await uploadImageAsset(accountId, mediaFile, mediaCache);
-      attachment.image_hash = uploaded.hash;
+      setStoryImageHash(attachment, uploaded.hash);
       replaced += 1;
     }
     if (replaced) {
@@ -6138,6 +6247,7 @@ import { createServiceRegistry } from "./services/index.mjs";
   }
 
   async function createAdCreativeWithRetries(accountId, creativeName, body) {
+    resolveMutuallyExclusiveStoryImageFields(body);
     const retryVideoNotReady = creativePayloadHasVideo(body);
     if (!await validateObjectStorySpecCreative(accountId, creativeName, body, {
       retryVideoNotReady,
@@ -6209,7 +6319,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     const raw = deepClone(creative.raw);
     const osp = raw.object_story_spec || {};
     const linkData = osp.link_data || {};
-    linkData.image_hash = imageHash;
+    setStoryImageHash(linkData, imageHash);
     osp.link_data = linkData;
     await applyInstagramIdentity(osp, mappedPageId, raw.name || creative.name, accountId);
     raw.object_story_spec = osp;
@@ -6479,7 +6589,7 @@ import { createServiceRegistry } from "./services/index.mjs";
       if (!osp.link_data) {
         osp.link_data = {};
       }
-      osp.link_data.image_hash = uploadedImage.hash;
+      setStoryImageHash(osp.link_data, uploadedImage.hash);
     }
 
     if (slot.type === "video") {
@@ -7508,6 +7618,7 @@ import { createServiceRegistry } from "./services/index.mjs";
   async function createAdDraft(accountId, draftId, campaignDraftId, adsetDraftId, ad, creativeRaw) {
     const normalizedDraftId = normalizeDraftId(draftId);
     const adTempId = nextDraftTempId();
+    resolveMutuallyExclusiveStoryImageFields(creativeRaw);
     const values = [
       draftItem("name", ad.name),
       draftItem("parentAdObjectID", adsetDraftId),
@@ -8523,6 +8634,8 @@ import { createServiceRegistry } from "./services/index.mjs";
         log("warn", "Import stopped: media preflight left no valid ads to copy.");
         return false;
       }
+
+      await preflightImportCreativeIdentities(state.importAccountId, state.importPackage);
 
       const pixelMap = await resolvePixelMap(state.importAccountId);
       const adsetMap = new Map();
