@@ -61,11 +61,12 @@ function sleep(ms) {
 }
 
 async function verifyTarget(target) {
-  const maxAttempts = 8;
+  const maxAttempts = 12;
   const delayMs = 5000;
   let lastTitle = "";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    await requestJson(graphUrl(target, true), { method: "POST" });
     const verify = await requestJson(graphUrl(target, false));
     const title = String(verify?.og_object?.title || "");
     if (title.includes(build)) {
@@ -84,7 +85,6 @@ async function verifyTarget(target) {
 }
 
 for (const target of targets) {
-  await requestJson(graphUrl(target, true), { method: "POST" });
   const title = await verifyTarget(target);
   console.log(`${target} -> ${title}`);
 }
