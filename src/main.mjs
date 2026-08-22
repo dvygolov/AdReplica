@@ -166,13 +166,17 @@ import { createServiceRegistry } from "./services/index.mjs";
     return String(value ?? "").replace(/^addraft_/, "");
   }
 
-  function nextDraftTempId() {
+  function nextDraftTempId(draftTransaction = null) {
     if (!Number.isInteger(state.tempIdCursor)) {
       state.tempIdCursor = -Date.now();
     } else {
       state.tempIdCursor -= 1;
     }
-    return state.tempIdCursor;
+    const tempId = state.tempIdCursor;
+    if (draftTransaction?.tempIds instanceof Set) {
+      draftTransaction.tempIds.add(String(tempId));
+    }
+    return tempId;
   }
 
 
@@ -6963,30 +6967,14 @@ import { createServiceRegistry } from "./services/index.mjs";
     }
   }
 
-  async function discardCurrentDraft(accountId) {
-    await clearDraftsForAccount(accountId);
-
-    // Create a new draft, discarding the old one
-    const result = await graphFetch(`act_${accountId}/addrafts`, {
-      method: "POST",
-      body: {
-        name: "Clean draft",
-        application_id: getDraftApplicationId(),
-        ownership_type: "USER",
-        use_active_draft_if_exists: false,
-        discard_active_draft: true,
-      },
-    });
-    log("info", `Old draft discarded. New: ${result.id}`);
-    return result.id;
-  }
-
   async function getCurrentDraftId(accountId) {
     const current = await graphFetch(`act_${accountId}/current_addrafts`, {
       query: { fields: "api_version" },
     });
     if (current.data?.[0]?.id) {
-      return normalizeDraftId(current.data[0].id);
+      const draftId = normalizeDraftId(current.data[0].id);
+      log("info", `Reusing active draft ${draftId}.`);
+      return draftId;
     }
     const created = await graphFetch(`act_${accountId}/addrafts`, {
       method: "POST",
@@ -6997,7 +6985,9 @@ import { createServiceRegistry } from "./services/index.mjs";
         use_active_draft_if_exists: true,
       },
     });
-    return normalizeDraftId(created.id);
+    const draftId = normalizeDraftId(created.id);
+    log("info", `Created active draft ${draftId}.`);
+    return draftId;
   }
 
   function draftItem(field, value) {
@@ -7058,6 +7048,90 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   function getDraftValue(values, field) {
     return parseDraftStoredValue(getDraftValueEntry(values, field)?.new_value);
+  }
+
+  function createDraftImportTransaction(accountId, draftId) {
+    return {
+      accountId: normalizeAccountId(accountId),
+      draftId: normalizeDraftId(draftId),
+      tempIds: new Set(),
+    };
+  }
+
+  function filterDraftFragmentsForTransaction(fragments, draftTransaction = null) {
+    const list = Array.isArray(fragments) ? fragments : [];
+    if (!(draftTransaction?.tempIds instanceof Set)) {
+      return list;
+    }
+    return list.filter((fragment) =>
+      draftTransaction.tempIds.has(String(getDraftValue(fragment?.values, "tempID") ?? "")),
+    );
+  }
+
+  async function rollbackDraftImport(accountId, draftId, draftTransaction) {
+    const normalizedAccountId = normalizeAccountId(accountId);
+    const normalizedDraftId = normalizeDraftId(draftId);
+    const summary = {
+      draftId: normalizedDraftId,
+      ownedCount: 0,
+      deletedCount: 0,
+      failedFragmentIds: [],
+      remainingFragmentIds: [],
+    };
+    if (!(draftTransaction?.tempIds instanceof Set) || !draftTransaction.tempIds.size) {
+      return summary;
+    }
+    if (
+      draftTransaction.accountId !== normalizedAccountId
+      || draftTransaction.draftId !== normalizedDraftId
+    ) {
+      throw new Error("Draft import rollback target does not match the active transaction.");
+    }
+
+    const seenFragmentIds = new Set();
+    const deletedFragmentIds = new Set();
+    const failedFragmentIds = new Set();
+    for (const delayMs of [0, 1000, 2000]) {
+      if (delayMs) {
+        await sleep(delayMs);
+      }
+      const draft = await fetchCurrentDraftDetails(normalizedAccountId, normalizedDraftId);
+      const ownedFragments = filterDraftFragmentsForTransaction(
+        draft?.addraft_fragments?.data || [],
+        draftTransaction,
+      );
+      for (const fragment of sortDraftFragmentsForDeletion(ownedFragments)) {
+        const fragmentId = String(fragment?.id || "");
+        if (!fragmentId || deletedFragmentIds.has(fragmentId)) {
+          continue;
+        }
+        seenFragmentIds.add(fragmentId);
+        try {
+          await graphFetch(fragmentId, { method: "DELETE" });
+          deletedFragmentIds.add(fragmentId);
+          failedFragmentIds.delete(fragmentId);
+        } catch (error) {
+          failedFragmentIds.add(fragmentId);
+          log("warn", `Draft import rollback failed for fragment ${fragmentId}.`, String(error));
+        }
+      }
+    }
+
+    summary.ownedCount = seenFragmentIds.size;
+    summary.deletedCount = deletedFragmentIds.size;
+    summary.failedFragmentIds = [...failedFragmentIds];
+    const remainingDraft = await fetchCurrentDraftDetails(normalizedAccountId, normalizedDraftId);
+    summary.remainingFragmentIds = filterDraftFragmentsForTransaction(
+      remainingDraft?.addraft_fragments?.data || [],
+      draftTransaction,
+    ).map((fragment) => String(fragment.id || fragment.ad_object_id || "")).filter(Boolean);
+    if (summary.failedFragmentIds.length || summary.remainingFragmentIds.length) {
+      throw new Error(
+        `Draft import rollback incomplete: deleted ${summary.deletedCount}/${summary.ownedCount}; ` +
+        `${summary.remainingFragmentIds.length} operation fragment${summary.remainingFragmentIds.length === 1 ? "" : "s"} still visible.`,
+      );
+    }
+    return summary;
   }
 
   function normalizeDraftObjectType(value) {
@@ -7235,11 +7309,21 @@ import { createServiceRegistry } from "./services/index.mjs";
           "id",
           "state",
           "publish_status{status,error_count,publish_error}",
-          "addraft_fragments.limit(500){id,ad_object_type,ad_object_id,parent_ad_object_id,validation_status,active_errors,publish_error,values}",
         ].join(","),
       },
     });
-    return (current.data || []).find((item) => normalizeDraftId(item.id) === normalizedDraftId) || null;
+    const draft = (current.data || []).find((item) => normalizeDraftId(item.id) === normalizedDraftId) || null;
+    if (!draft) {
+      return null;
+    }
+    const fragments = await graphGetAll(`${normalizedDraftId}/addraft_fragments`, {
+      fields: "id,ad_object_type,ad_object_id,parent_ad_object_id,validation_status,active_errors,publish_error,values",
+      limit: 500,
+    });
+    return {
+      ...draft,
+      addraft_fragments: { data: fragments },
+    };
   }
 
   async function updateDraftIdentityFragment(accountId, draftId, fragment, values) {
@@ -7269,7 +7353,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     });
   }
 
-  async function ensureDraftInstagramIdentityParity(accountId, draftId, draftAdContext = null) {
+  async function ensureDraftInstagramIdentityParity(accountId, draftId, draftAdContext = null, draftTransaction = null) {
     const summary = {
       draftId: normalizeDraftId(draftId),
       initialAffectedCount: 0,
@@ -7282,7 +7366,10 @@ import { createServiceRegistry } from "./services/index.mjs";
       state.lastDraftIdentityRepair = summary;
       return summary;
     }
-    const collectAffected = (draft) => (draft?.addraft_fragments?.data || [])
+    const collectAffected = (draft) => filterDraftFragmentsForTransaction(
+      draft?.addraft_fragments?.data || [],
+      draftTransaction,
+    )
       .map((fragment) => getAffectedDraftIdentityFragment(fragment, draftAdContext))
       .filter(Boolean);
     let workingDraft = initialDraft;
@@ -7334,7 +7421,11 @@ import { createServiceRegistry } from "./services/index.mjs";
 
     let updatedCount = 0;
     let unresolvedCount = 0;
-    for (const fragment of (draft.addraft_fragments?.data || [])) {
+    const scopedFragments = filterDraftFragmentsForTransaction(
+      draft.addraft_fragments?.data || [],
+      draftTransaction,
+    );
+    for (const fragment of scopedFragments) {
       const affected = getAffectedDraftIdentityFragment(fragment, draftAdContext);
       if (!affected) {
         continue;
@@ -7371,7 +7462,7 @@ import { createServiceRegistry } from "./services/index.mjs";
     return summary;
   }
 
-  async function logDraftValidation(accountId, draftId) {
+  async function logDraftValidation(accountId, draftId, draftTransaction = null) {
     try {
       const normalizedDraftId = normalizeDraftId(draftId);
       const draft = await fetchCurrentDraftDetails(accountId, draftId);
@@ -7379,7 +7470,14 @@ import { createServiceRegistry } from "./services/index.mjs";
         log("warn", `Draft ${normalizedDraftId} not found in current_addrafts after import.`);
         return;
       }
-      const fragments = draft.addraft_fragments?.data || [];
+      const fragments = filterDraftFragmentsForTransaction(
+        draft.addraft_fragments?.data || [],
+        draftTransaction,
+      );
+      if (draftTransaction?.tempIds instanceof Set && draftTransaction.tempIds.size && !fragments.length) {
+        log("warn", `Draft ${normalizedDraftId} current import fragments were not visible during validation.`);
+        return;
+      }
       const invalid = fragments
         .filter((fragment) =>
           fragment.validation_status === "HAS_ERRORS"
@@ -7395,9 +7493,9 @@ import { createServiceRegistry } from "./services/index.mjs";
           publish_error: fragment.publish_error || null,
         }));
       if (invalid.length) {
-        log("warn", `Draft ${normalizedDraftId} has ${invalid.length} invalid fragments after creation.`, invalid);
+        log("warn", `Draft ${normalizedDraftId} current import has ${invalid.length} invalid fragments.`, invalid);
       } else {
-        log("info", `Draft ${normalizedDraftId} validated without fragment errors.`);
+        log("info", `Draft ${normalizedDraftId} current import validated without fragment errors (${fragments.length} fragments).`);
       }
     } catch (error) {
       log("warn", `Failed to inspect draft validation for ${draftId}.`, String(error));
@@ -7406,7 +7504,7 @@ import { createServiceRegistry } from "./services/index.mjs";
 
   async function createCampaignDraft(accountId, draftId, campaign, options = {}) {
     const normalizedDraftId = normalizeDraftId(draftId);
-    const campaignTempId = nextDraftTempId();
+    const campaignTempId = nextDraftTempId(options.draftTransaction);
     const objective = String(campaign.objective || "CONVERSIONS").toUpperCase();
     const isOutcomeLeads = objective === "OUTCOME_LEADS";
     const hasCampaignBudget = hasCampaignLevelBudget(campaign);
@@ -7504,7 +7602,7 @@ import { createServiceRegistry } from "./services/index.mjs";
   async function createAdsetDraft(accountId, draftId, campaignDraftId, adset, pixelMap, options = {}) {
     const normalizedDraftId = normalizeDraftId(draftId);
     const promotedObject = deepClone(adset.promoted_object || {});
-    const adsetTempId = nextDraftTempId();
+    const adsetTempId = nextDraftTempId(options.draftTransaction);
     if (promotedObject.pixel_id) {
       promotedObject.pixel_id = pixelMap[String(promotedObject.pixel_id)] || promotedObject.pixel_id;
     }
@@ -7615,9 +7713,9 @@ import { createServiceRegistry } from "./services/index.mjs";
     return String(json.ad_object_id);
   }
 
-  async function createAdDraft(accountId, draftId, campaignDraftId, adsetDraftId, ad, creativeRaw) {
+  async function createAdDraft(accountId, draftId, campaignDraftId, adsetDraftId, ad, creativeRaw, options = {}) {
     const normalizedDraftId = normalizeDraftId(draftId);
-    const adTempId = nextDraftTempId();
+    const adTempId = nextDraftTempId(options.draftTransaction);
     resolveMutuallyExclusiveStoryImageFields(creativeRaw);
     const values = [
       draftItem("name", ad.name),
@@ -7663,7 +7761,7 @@ import { createServiceRegistry } from "./services/index.mjs";
           `Draft creative failed with Meta generic adcreative error; retrying simple link_data fallback for ${ad.name}.`,
           summarizeCreativePayload(creativeRaw),
         );
-        return createAdDraft(accountId, draftId, campaignDraftId, adsetDraftId, ad, simpleFallback);
+        return createAdDraft(accountId, draftId, campaignDraftId, adsetDraftId, ad, simpleFallback, options);
       }
       log("error", `Draft ad creation failed for ${ad.name}.`, summarizeCreativePayload(creativeRaw));
       throw error;
@@ -8642,85 +8740,112 @@ import { createServiceRegistry } from "./services/index.mjs";
       const creativeMap = new Map();
 
       if (state.importAsDraft) {
-        await discardCurrentDraft(state.importAccountId);
         const draftId = await getCurrentDraftId(state.importAccountId);
-        log("info", `Using draft ${draftId}.`);
-        const packageHasCampaignBudget = hasCampaignLevelBudget(state.importPackage.campaign);
-        const effectiveHasDayParting = packageHasDayParting(state.importPackage) && !packageHasCampaignBudget;
-        const draftCampaignId = await createCampaignDraft(
-          state.importAccountId,
-          draftId,
-          state.importPackage.campaign,
-          { hasDayParting: effectiveHasDayParting },
-        );
-        const draftAdContext = new Map();
-
-        for (const adset of state.importPackage.adsets) {
-          const newAdsetId = await createAdsetDraft(
+        const draftTransaction = createDraftImportTransaction(state.importAccountId, draftId);
+        try {
+          const packageHasCampaignBudget = hasCampaignLevelBudget(state.importPackage.campaign);
+          const effectiveHasDayParting = packageHasDayParting(state.importPackage) && !packageHasCampaignBudget;
+          const draftCampaignId = await createCampaignDraft(
             state.importAccountId,
             draftId,
-            draftCampaignId,
-            adset,
-            pixelMap,
-            {
-              hasCampaignBudget: packageHasCampaignBudget,
-              campaignBidStrategy: state.importPackage.campaign?.bid_strategy,
-            },
+            state.importPackage.campaign,
+            { hasDayParting: effectiveHasDayParting, draftTransaction },
           );
-          adsetMap.set(String(adset.id), newAdsetId);
-          log("info", `Draft adset created: ${adset.name}`);
-        }
+          const draftAdContext = new Map();
 
-        for (const ad of state.importPackage.ads) {
-          const creative = state.importPackage.creatives.find((item) => String(item.id) === String(ad?.creative?.id));
-          if (!creative) {
-            log("warn", `Ad ${ad.name} skipped: creative ${ad?.creative?.id} not found in package.`);
-            continue;
-          }
-          if (!creativeMap.has(creative.id)) {
-            const creativePayload = await resolveCreativeDraftPayload(
+          for (const adset of state.importPackage.adsets) {
+            const newAdsetId = await createAdsetDraft(
               state.importAccountId,
-              creative,
-              mediaCache,
+              draftId,
+              draftCampaignId,
+              adset,
+              pixelMap,
+              {
+                hasCampaignBudget: packageHasCampaignBudget,
+                campaignBidStrategy: state.importPackage.campaign?.bid_strategy,
+                draftTransaction,
+              },
             );
-            if (!creativePayload) {
-              creativeMap.set(creative.id, null);
-            } else {
-              creativeMap.set(creative.id, creativePayload);
+            adsetMap.set(String(adset.id), newAdsetId);
+            log("info", `Draft adset created: ${adset.name}`);
+          }
+
+          for (const ad of state.importPackage.ads) {
+            const creative = state.importPackage.creatives.find((item) => String(item.id) === String(ad?.creative?.id));
+            if (!creative) {
+              log("warn", `Ad ${ad.name} skipped: creative ${ad?.creative?.id} not found in package.`);
+              continue;
             }
+            if (!creativeMap.has(creative.id)) {
+              const creativePayload = await resolveCreativeDraftPayload(
+                state.importAccountId,
+                creative,
+                mediaCache,
+              );
+              if (!creativePayload) {
+                creativeMap.set(creative.id, null);
+              } else {
+                creativeMap.set(creative.id, creativePayload);
+              }
+            }
+            const draftCreative = creativeMap.get(creative.id);
+            const adsetDraftId = adsetMap.get(String(ad?.adset?.id));
+            if (!draftCreative || !adsetDraftId) {
+              log("warn", `Ad ${ad.name} skipped: failed to build draft creative/adset.`);
+              continue;
+            }
+            resolveMutuallyExclusiveStoryImageFields(draftCreative);
+            const sourcePageId = getSourcePageId(creative);
+            const mappedPageId = state.importPageMappings[sourcePageId] || sourcePageId;
+            const newDraftAdId = await createAdDraft(
+              state.importAccountId,
+              draftId,
+              draftCampaignId,
+              adsetDraftId,
+              ad,
+              draftCreative,
+              { draftTransaction },
+            );
+            const context = {
+              adId: String(newDraftAdId),
+              adName: ad.name,
+              pageId: String(mappedPageId || ""),
+              creativeId: String(creative.id || ""),
+              tempId: "",
+            };
+            draftAdContext.set(`id:${context.adId}`, context);
+            draftAdContext.set(`name:${String(context.adName || "").trim().toLowerCase()}`, context);
+            log("info", `Draft ad created: ${ad.name}`);
           }
-          const draftCreative = creativeMap.get(creative.id);
-          const adsetDraftId = adsetMap.get(String(ad?.adset?.id));
-          if (!draftCreative || !adsetDraftId) {
-            log("warn", `Ad ${ad.name} skipped: failed to build draft creative/adset.`);
-            continue;
-          }
-          resolveMutuallyExclusiveStoryImageFields(draftCreative);
-          const sourcePageId = getSourcePageId(creative);
-          const mappedPageId = state.importPageMappings[sourcePageId] || sourcePageId;
-          const newDraftAdId = await createAdDraft(
+
+          await ensureDraftInstagramIdentityParity(
             state.importAccountId,
             draftId,
-            draftCampaignId,
-            adsetDraftId,
-            ad,
-            draftCreative,
+            draftAdContext,
+            draftTransaction,
           );
-          const context = {
-            adId: String(newDraftAdId),
-            adName: ad.name,
-            pageId: String(mappedPageId || ""),
-            creativeId: String(creative.id || ""),
-            tempId: "",
-          };
-          draftAdContext.set(`id:${context.adId}`, context);
-          draftAdContext.set(`name:${String(context.adName || "").trim().toLowerCase()}`, context);
-          log("info", `Draft ad created: ${ad.name}`);
+          await logDraftValidation(state.importAccountId, draftId, draftTransaction);
+          log("info", "Draft updated. Existing unpublished campaigns were preserved.");
+        } catch (error) {
+          try {
+            const rollback = await rollbackDraftImport(
+              state.importAccountId,
+              draftId,
+              draftTransaction,
+            );
+            log(
+              "info",
+              `Rolled back current draft import: ${rollback.deletedCount} fragment${rollback.deletedCount === 1 ? "" : "s"} deleted; existing draft content preserved.`,
+            );
+          } catch (rollbackError) {
+            log(
+              "error",
+              "Current draft import rollback was incomplete; existing draft fragments were not targeted.",
+              String(rollbackError),
+            );
+          }
+          throw error;
         }
-
-        await ensureDraftInstagramIdentityParity(state.importAccountId, draftId, draftAdContext);
-        await logDraftValidation(state.importAccountId, draftId);
-        log("info", "Draft import complete. No publishing performed.");
       } else {
         const newCampaignId = await createCampaign(state.importAccountId, state.importPackage.campaign);
         log("info", `Campaign created: ${newCampaignId}`);
@@ -8769,7 +8894,7 @@ import { createServiceRegistry } from "./services/index.mjs";
       }
       if (reloadOnSuccess) {
         askToReloadResult(state.importAsDraft
-          ? "Draft is ready. Reload Ads Manager to show the new draft?"
+          ? "Draft updated. Reload Ads Manager to show the unpublished changes?"
           : "Import is complete. Reload Ads Manager to show the new entities?",
         state.importAccountId);
       }
