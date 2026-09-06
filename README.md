@@ -53,7 +53,23 @@ Then open Facebook Ads Manager and click the bookmark.
 npm run check
 ```
 
-This verifies that generated `adreplica.js` is current with `src/` and runs Node syntax checks for the packager, payload, and loader.
+This runs ESLint, behavior and architecture tests, generated-payload parity, and Node syntax checks. Use Node.js 22 or newer. `npm test` runs the isolated regression suite without Facebook credentials.
+
+## Source architecture
+
+`src/main.mjs` only bootstraps the application. `src/app/create-services.mjs` explicitly composes service instances with their dependencies; the browser bundle remains one generated file.
+
+- `ui/` owns controls, dialogs, mapping views and the downloadable operation report.
+- `operations/` owns immutable selections, one-operation-at-a-time coordination, and the result journal.
+- `workflows/` coordinates export, import and clone using an isolated operation state.
+- `facebook/` owns browser transport, session discovery and Graph clients.
+- `writers/` creates paused entities or transaction-owned draft fragments; `drafts/` validates and recovers drafts.
+- `media/`, `creative/`, `identity/`, `catalog/`, `pixels/`, and `accounts/` contain their respective services.
+- `domain/` contains pure transformations for package references, budgets, schedules and payloads.
+
+An import freezes its account, mappings and package before asynchronous work. Non-idempotent writes are not automatically repeated after a lost response. ACTIVE imports create a paused hierarchy, verify every entity and activate the campaign last. Catalog selection reuses existing data; copying requires an explicit selection and confirmation, and never overwrites existing product-set filters. Reports distinguish complete, partial, cancelled, failed and uncertain outcomes.
+
+See [the verification report](docs/refactor-verification.md) for tested behavior and live integration limitations.
 
 ## Payload Build
 

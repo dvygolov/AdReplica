@@ -8,13 +8,17 @@ export function escapeHtml(value) {
 }
 
 export function stripFacebookPrelude(text) {
-  return typeof text === "string" && text.startsWith("for (;;);") ? text.slice(9) : text;
+  return typeof text === "string" && text.startsWith("for (;;);")
+    ? text.slice(9)
+    : text;
 }
 
 export function sanitizeFileName(value) {
-  return String(value || "adreplica")
-    .replace(/[\\/:*?"<>|]+/g, "_")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 160) || "adreplica";
+  return (
+    String(value || "adreplica")
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160) || "adreplica"
+  );
 }

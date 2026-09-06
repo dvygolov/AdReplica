@@ -11,7 +11,7 @@ node_modules/
 adreplica-last-*.json
 exports/
 downloads/
-media/
+/media/
 qa/
 
 # Local secret stores or accidental dumps.

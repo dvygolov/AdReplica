@@ -5,6 +5,11 @@ export class AdReplicaState {
     this.sessionReady = false;
     this.loadingSession = false;
     this.busy = false;
+    this.busyDepth = 0;
+    this.operationActive = false;
+    this.lastOperationReport = null;
+    this.operationReport = null;
+    this.operationCancelled = false;
     this.logs = [];
     this.networkDiagnostics = [];
     this.accounts = [];
