@@ -18,7 +18,7 @@ export class CatalogSetService {
     const { log } = this.dependencies.logging;
     const { graphFetch, graphGetAll } = this.dependencies.graphClient;
     const existingSets = await graphGetAll(`${targetCatalogId}/product_sets`, {
-      fields: "id,name,filter",
+      fields: "id,name,filter,original_creation_source",
       limit: 200,
     });
     const targetByName = new Map(
@@ -28,12 +28,18 @@ export class CatalogSetService {
     for (const set of sourceProductSets) {
       const setName = String(set.name || "");
       const filter = remapProductSetFilter(set.filter, productIdMap);
+      // Meta creates an unfiltered set with every catalog. Missing filter alone
+      // is not proof of equivalence: require the catalog-created origin too.
+      const isCatalogDefault = (item) =>
+        item.original_creation_source === "catalog_creation" &&
+        (item.filter == null || item.filter === "");
       const existing = existingSets.find(
         (item) =>
-          item.name === setName &&
-          canonicalProductSetFilter(filter) !== null &&
-          canonicalProductSetFilter(item.filter) ===
-            canonicalProductSetFilter(filter),
+          (isCatalogDefault(set) && isCatalogDefault(item)) ||
+          (item.name === setName &&
+            canonicalProductSetFilter(filter) !== null &&
+            canonicalProductSetFilter(item.filter) ===
+              canonicalProductSetFilter(filter)),
       );
       if (existing) {
         productSetIdMap[String(set.id)] = String(existing.id);

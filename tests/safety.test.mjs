@@ -397,6 +397,47 @@ test("same-name product set with different filter is never overwritten", async (
   assert.equal(calls.length, 1);
   assert.match(calls[0].body.name, /AdReplica/);
 });
+test("catalog copying reuses Meta's automatic default without treating unknown filters as equivalent", async () => {
+  const writes = [];
+  const service = new CatalogSetService({
+    logging,
+    graphClient: {
+      graphGetAll: async () => [
+        {
+          id: "default",
+          name: "All Products",
+          original_creation_source: "catalog_creation",
+        },
+      ],
+      graphFetch: async (path, options) => {
+        writes.push({ path, ...options });
+        return { id: "explicit" };
+      },
+    },
+  });
+  const result = await service.copyCatalogProductSets(
+    [
+      {
+        id: "source-default",
+        name: "Localized default",
+        original_creation_source: "catalog_creation",
+      },
+      { id: "source-unknown", name: "Unknown" },
+      {
+        id: "source-filtered",
+        name: "All Products",
+        filter: { brand: { eq: "new" } },
+      },
+    ],
+    "target",
+    {},
+  );
+  assert.equal(result["source-default"], "default");
+  assert.equal(result["source-unknown"], "explicit");
+  assert.equal(writes.length, 2);
+  assert.deepEqual(writes[1].body.filter, '{"brand":{"eq":"new"}}');
+});
+
 test("product set matching does not silently use all-products or a lone unrelated set", () => {
   assert.equal(
     pickFallbackTargetProductSet({ name: "Sale", filter: { x: 1 } }, [

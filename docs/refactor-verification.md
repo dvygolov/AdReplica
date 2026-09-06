@@ -1,6 +1,6 @@
 # AdReplica refactor verification
 
-Date: 2026-09-06. Local build: `060926b3`. Baseline: `12764a6a15ae1daf672fd42daaeece2aa3b8b4d9`, preserved on local branch `monolith`. Implementation remains on `main`; no production deployment or push is part of this verification.
+Date: 2026-09-06. Local build: `060926b4`. Baseline: `12764a6a15ae1daf672fd42daaeece2aa3b8b4d9`, preserved on local branch `monolith`. Implementation remains on `main`; no production deployment or push is part of this verification.
 
 ## Changes
 
@@ -15,13 +15,14 @@ Additional corrections: distinct files with identical names no longer share uplo
 
 ## Automated verification
 
-`npm run check` runs ESLint, 23 Node tests, generated-payload parity and syntax checks. Tests cover:
+`npm run check` runs ESLint, 24 Node tests, generated-payload parity and syntax checks. Tests cover:
 
 - Service composition, acyclic imports and source module size; browser panel mounting, setting locks and report rendering.
 - Immutable operation settings, concurrent-operation exclusion and the full paused import workflow.
 - Lost POST responses, lost bodies, malformed responses, missing IDs, read retry and draft recovery without duplicate writes.
 - Paused staging, activation ordering, incomplete-import rejection and pause after activation failure.
 - Catalog reuse without writes, all-mapping preflight, filter preservation and conservative product-set matching.
+- Reuse of Meta's automatic all-products set requires `original_creation_source: catalog_creation` and an absent filter on both sets; an unknown or filtered set cannot match by missing filter alone.
 - Transaction-owned rollback in child-before-parent order, preserving unrelated fragments.
 - Pending/invalid draft validation, typed draft values and fallback temporary-ID accounting.
 - Same-name file separation, same-name ad preservation, picture/hash normalization and result classification.
@@ -53,10 +54,24 @@ Profile: NRD Lazy 3. All Facebook requests ran inside the profile's Ads Manager 
 
 All test campaign/ad set/ad objects and the direct-import creative were deleted. Both uploaded QA videos remain in the media library (`1059940250168069`, `1934128420897795`): Meta refused deletion with code 10/subcode 1363055. The newly created target pixel `1621554896153020` also remains because Meta does not allow its deletion with this session (code 100/subcode 33). A copied image may remain in the target library; it was not deleted because hash-based reuse does not establish exclusive test ownership. None of these resources has an active test campaign attached.
 
-The final build adds an additional uncertainty guard for HTTP 5xx private mutations; its regression test and package checks pass. Successful live video and editor checks were performed on 060926b2 before that guard; the final build was then smoke-tested for initialization. Detailed local evidence is in ignored `.runtime/live-verification.json` and is not included in the repository.
+Build 060926b3 added an uncertainty guard for HTTP 5xx private mutations. Successful live video and editor checks were performed on 060926b2 before that guard; build 060926b3 was then smoke-tested for initialization. Detailed local evidence is in ignored `.runtime/live-verification.json` and is not included in the repository.
+
+### Additional cross-catalog verification
+
+The live source catalog had four products and two sets. The first copy exposed a real integration failure: Meta automatically creates an unfiltered `All Products` set, but importing its exported counterpart tried to create another one and received error 10803/subcode 1798073. The operation correctly reported a partial result with the new catalog and four products; it had not created campaign fragments. Build 060926b4 fixes this using verified catalog-created origin metadata, with a regression test.
+
+On 060926b4, retrying into that disposable catalog completed with three VALIDATED draft fragments. All four product names, retailer IDs, prices and currencies matched the source. A fresh Ads Manager editor loaded the copied product set and displayed four product-card previews.
+
+A second exported-package fixture kept the source set name but changed its filter to one retailer ID. Copying into the disposable catalog created a separate suffixed set, preserved both pre-existing sets and all four products, and completed with three VALIDATED fragments. Reading the new set returned exactly the intended product. The saved ad and ad set both referenced the new set ID. The source catalog remained unchanged.
+
+Cancelling the real browser confirmation dialog produced `cancelled`, zero created objects, no catalog or campaign-hierarchy writes, and identical before/after target snapshots. Session/account/identity preflight requests still occurred before the confirmation.
+
+A final fresh-catalog run on 060926b4 created a second new catalog, four products, the expected product sets and three VALIDATED campaign/ad-set/ad fragments without errors. Before cleanup, all twelve test fragments across four completed imports remained VALIDATED; the earlier imports had been preserved. Local evidence is in ignored `.runtime/catalog-live-verification.json` and `.runtime/catalog-editor-evidence.json`.
+
+Cleanup removed all twelve owned test fragments. The account again has zero draft fragments and only its four original PAUSED campaigns; the source catalog comparison is unchanged. Two QA catalogs remain: `2076372593007587` and `2337808043635608`, with four products each. Meta refused both DELETE requests with code 10 (Permission Denied). Commerce Manager did not load a usable deletion form and the business-assets settings page returned content unavailable. No test campaigns are attached to the remaining catalogs. Browser test instrumentation was removed and the local 060926b4 panel restored.
 
 ## Limits
 
-ACTIVE activation ordering and failure recovery are tested with isolated transport fixtures; real delivery/spending was not enabled. Explicit cross-catalog copying and collision handling are covered by isolated tests; live catalog testing reused an accessible catalog. The target account's missing payment method prevents a fully validated cross-account result on that account. Meta showed placement-eligibility warnings in previews, including for the short landscape QA video; these are separate from successful import and editor loading.
+ACTIVE activation ordering and failure recovery are tested with isolated transport fixtures; real delivery/spending was not enabled. Cross-catalog copying was tested in the source account's Business Manager with manually populated catalogs; cross-business permissions and feed-backed copying were not exercised live. The target account's missing payment method prevents a fully validated cross-account result on that account. Meta showed placement-eligibility warnings in previews, including for the short landscape QA video; these are separate from successful import and editor loading.
 
 The loader's previously reviewed relaxed checksum policy and unsupported video-carousel cases are outside the four prioritized corrections. The loader source was unchanged. Meta's private API, permissions, account configuration and media processing remain external integration constraints.
