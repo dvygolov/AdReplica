@@ -13,3 +13,9 @@ Rollback checks the saved script's SHA-256 before executing it locally. It does 
 - Clicking the actual Service action replaced b6 with b5 through Blob script execution. There was exactly one panel; the latest cache remained b6 and previous remained b5.
 - Running the loader again restored b6 without rotating or losing the previous copy. The temporary transport fixture was then removed.
 - Local screenshots: `D:/Downloads/AdReplica-local-versions-070926/`.
+
+## Production verification
+
+Release workflow 34058857724 published build 070926b7. Direct Graph scrape and readback confirmed the current version in the manifest and every chunk; the site, payload checksum and shared hub also matched b7. The public bookmarklet matched the loader source (ignoring checkout line endings).
+
+In a fresh Dolphin tab without the test transport, the published loader downloaded b7 and preserved b6. Clicking Service loaded b6 locally; the latest cache remained b7 and only one panel existed. The public loader then returned to b7 successfully. The browser retains b7 and its local previous version b6.
