@@ -10,7 +10,7 @@ Use Cloudflare Pages or a Cloudflare Worker-backed static route.
 
 ## Runtime Flow
 
-1. The root `https://adreplica.pages.dev/` page serves a branded install landing with a one-click bookmarklet copy button.
+1. The root `https://adreplica.pages.dev/` page serves a branded install landing with a draggable bookmarklet, a code-copy button, and instructions beneath them.
 2. The bookmarklet stays small and only contains the loader.
 3. The loader runs only on `*.facebook.com`.
 4. The loader reads an OG-backed manifest through `adsmanager-graph.facebook.com`, using the current Ads Manager runtime token.
