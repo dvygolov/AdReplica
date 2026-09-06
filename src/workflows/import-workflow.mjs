@@ -67,6 +67,13 @@ export class ImportWorkflow {
       log("warn", "Select an account for import first.");
       return false;
     }
+    if (!state.importPackage.ads?.length) {
+      const message =
+        "This package contains no ads. Export a campaign with ads before importing.";
+      report.issue(message, { stage: "preflight" });
+      log("warn", message);
+      return false;
+    }
     setBusy(true);
     try {
       await initializeSession();

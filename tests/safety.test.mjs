@@ -271,6 +271,39 @@ test("lost response body and invalid JSON leave a write uncertain", async () => 
     assert.equal(calls, 1);
   }
 });
+test("Meta click events with cyclic flowlet metadata never enter the operation snapshot", async () => {
+  const state = stateForImport();
+  const event = { preventDefault() {}, __ext_triggerFlowlet: {} };
+  event.__ext_triggerFlowlet.parent = event.__ext_triggerFlowlet;
+  let observed;
+  const coordinator = new OperationCoordinator({
+    state,
+    initializeSession: async () => {},
+    onChange() {},
+    onReport() {},
+    createRuntime: (context) => ({
+      importWorkflow: {
+        async importPackage() {
+          observed = context.options;
+          return false;
+        },
+      },
+      cloneWorkflow: {
+        async cloneCampaignToAccount() {
+          observed = context.options;
+          return false;
+        },
+      },
+    }),
+  });
+  for (const kind of ["import", "clone"]) {
+    await coordinator.run(kind, event);
+    assert.deepEqual(observed, {});
+    assert.equal(state.busy, false);
+    assert.equal(state.lastOperationReport.kind, kind);
+  }
+});
+
 test("operation snapshots selections and excludes a concurrent operation", async () => {
   const state = stateForImport();
   let release;
@@ -594,6 +627,29 @@ test("full import orchestration creates a complete paused result with an immutab
   assert.equal(calls.length, 3);
   assert.ok(calls.every((x) => x.body.status === "PAUSED"));
 });
+test("empty imported packages fail visibly before session requests or writes", async () => {
+  const state = stateForImport();
+  state.importPackage.ads = [];
+  state.importPackage.creatives = [];
+  let sessionCalls = 0;
+  const services = createServices({
+    state,
+    dom: {},
+    logger: logging,
+    overrides: {
+      sessionService: {
+        initializeSession: async () => {
+          sessionCalls++;
+        },
+      },
+    },
+  });
+  assert.equal(await services.importWorkflow.importPackage(), false);
+  assert.equal(sessionCalls, 0);
+  assert.equal(state.operationReport.created.length, 0);
+  assert.match(state.operationReport.issues[0].message, /contains no ads/);
+});
+
 test("cancelled media preflight creates no catalog or campaign", async () => {
   const state = stateForImport();
   let writes = 0;

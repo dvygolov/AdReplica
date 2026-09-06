@@ -1,4 +1,5 @@
 import { Logging } from "../core/logging.mjs";
+import { LocalVersions } from "./local-versions.mjs";
 import { PanelView } from "../ui/panel-view.mjs";
 import { NetworkDiagnostics } from "../core/diagnostics.mjs";
 import { BrowserTransport } from "../facebook/browser-transport.mjs";
@@ -63,6 +64,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
     new PanelView({
       state,
       dom,
+      get localVersions() {
+        return services.localVersions;
+      },
       get logView() {
         return services.logView;
       },
@@ -170,6 +174,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
     new PanelController({
       state,
       dom,
+      get localVersions() {
+        return services.localVersions;
+      },
       get logging() {
         return services.logging;
       },
@@ -801,6 +808,17 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       },
       get dialogs() {
         return services.dialogs;
+      },
+    });
+  services.localVersions =
+    overrides.localVersions ||
+    new LocalVersions({
+      state,
+      get logging() {
+        return services.logging;
+      },
+      get panelView() {
+        return services.panelView;
       },
     });
   return services;

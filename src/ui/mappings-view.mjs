@@ -325,7 +325,9 @@ export class MappingsView {
       catalogAction: "catalog-map",
       mediaAction: "media-override",
       mediaSubtitle: "Creatives — Media Files",
-      mediaEmptyText: "No creatives with media files.",
+      mediaEmptyText: !state.importPackage?.ads?.length
+        ? "No media files: the selected package contains no ads."
+        : "No separate media files in this package. Catalog and existing-post creatives may use media stored in Meta.",
     });
   }
 

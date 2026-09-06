@@ -18,6 +18,10 @@
     console.warn(`[${loaderConfig.app}] Loader is already running.`);
     return;
   }
+  if (window.AdReplica?.state?.busy || window.AdReplica?.state?.operationActive || window.AdReplica?.state?.versionLoading) {
+    console.warn(`[${loaderConfig.app}] Wait for the current operation before updating.`);
+    return;
+  }
   window[guardKey] = { loading: true, build: "latest", startedAt: Date.now(), source: "" };
 
   const log = (message) => console.log(`[${loaderConfig.app} loader] ${message}`);
@@ -121,7 +125,7 @@
   };
   const writeCache = (manifest, source, actualSha256 = "") => {
     try {
-      localStorage.setItem(loaderConfig.cacheKey, JSON.stringify({
+      const next = {
         app: loaderConfig.app,
         version: manifest.version,
         sha256: actualSha256 || manifest?.payload?.sha256 || "",
@@ -129,7 +133,17 @@
         byteLength: manifest.payload.byteLength,
         source,
         savedAt: new Date().toISOString(),
-      }));
+      };
+      const previous = readCache();
+      // Preserve the version being replaced, including upgrades from old loaders.
+      if (previous && previous.version !== next.version) {
+        try {
+          localStorage.setItem("adreplica.loader.history.v1", JSON.stringify({ current: next, previous }));
+        } catch (error) {
+          console.warn(`[${loaderConfig.app} loader] Could not save the previous version locally.`, error);
+        }
+      }
+      localStorage.setItem(loaderConfig.cacheKey, JSON.stringify(next));
     } catch (error) {
       console.warn(`[${loaderConfig.app} loader] Payload loaded, but cache write failed.`, error);
     }
@@ -292,6 +306,9 @@
   (async () => {
     try {
       const payload = await loadPayload();
+      if (window.AdReplica?.state?.busy || window.AdReplica?.state?.operationActive || window.AdReplica?.state?.versionLoading) {
+        throw new Error("An operation started while the update was loading. Run the bookmarklet again when it finishes.");
+      }
       await executePayload(payload.source, payload.build);
       window[guardKey].build = payload.build;
       log(`loaded ${payload.build} payload from ${window[guardKey].source}`);

@@ -44,9 +44,25 @@ export class PanelView {
         state.busy ||
         state.loadingSession ||
         state.operationActive ||
+        state.versionLoading ||
         (element === dom.importModeSelect && importRequiresDraftOnly()) ||
         (element === dom.cloneModeSelect && cloneRequiresDraftOnly());
     });
+    if (dom.previousVersion) {
+      const { localVersions } = this.dependencies;
+      const previous = localVersions.previous();
+      dom.previousVersion.disabled ||= !previous;
+      dom.previousVersion.textContent = previous
+        ? `Load previous version (${previous.version})`
+        : "Load previous version";
+      dom.versionNote.textContent =
+        localVersions.warning ||
+        (state.versionLoading
+          ? "Loading saved version..."
+          : previous
+            ? "Saved in this browser. The bookmarklet opens the latest version again."
+            : "No previous version saved yet. It will appear after the next update.");
+    }
     if (dom.initButton) {
       dom.initButton.disabled = state.busy || state.loadingSession;
     }

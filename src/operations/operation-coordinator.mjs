@@ -1,4 +1,5 @@
 import { OperationContext } from "./operation-context.mjs";
+import { normalizeImportOptions } from "../domain/options.mjs";
 
 /** One user operation at a time; UI selection state never becomes execution state. */
 export class OperationCoordinator {
@@ -14,8 +15,16 @@ export class OperationCoordinator {
   }
 
   async run(kind, options = {}) {
-    if (this.active || this.state.busy || this.state.loadingSession)
+    if (
+      this.active ||
+      this.state.busy ||
+      this.state.loadingSession ||
+      this.state.versionLoading
+    )
       return false;
+    // Facebook decorates native click events with cyclic flowlet metadata.
+    // Discard UI events before snapshotting, not later inside the workflow.
+    options = normalizeImportOptions(options);
     const context = new OperationContext(kind, this.state, options);
     this.active = context;
     this.state.operationActive = true;

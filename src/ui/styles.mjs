@@ -163,6 +163,13 @@ export function buildAdReplicaStyles(appId) {
         background: rgba(255, 193, 7, 0.12) !important;
         color: #ffc107 !important;
       }
+      #${appId} .sk-version-note {
+        max-width: 280px;
+        padding: 6px 10px 9px;
+        color: #bbb;
+        font-size: 12px;
+        line-height: 1.4;
+      }
       #${appId} .sk-tabs {
         display: flex;
         margin-bottom: 0;
@@ -190,6 +197,20 @@ export function buildAdReplicaStyles(appId) {
       }
       #${appId} .sk-tab-panel { margin-top: 14px; }
       #${appId} .sk-hidden { display: none !important; }
+      #${appId} .sk-card > .sk-actions {
+        margin-top: 18px;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+      #${appId} .sk-operation-report,
+      #${appId} .sk-logs { margin-top: 14px; }
+      #${appId} .sk-operation-report h3 {
+        color: #ffc107;
+        font-size: 16px;
+        margin: 0 0 10px;
+      }
+      #${appId} .sk-operation-report p { margin: 12px 0; }
+      #${appId} .sk-operation-report summary { cursor: pointer; }
       #${appId} .sk-card,
       #${appId} .sk-logs {
         background: #222;
@@ -294,6 +315,7 @@ export function buildAdReplicaStyles(appId) {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
       }
+      #${appId} .sk-summary-grid > div:first-child { grid-column: 1 / -1; }
       #${appId} .sk-summary-grid div {
         background: #2a2a2a;
         border-radius: 8px;

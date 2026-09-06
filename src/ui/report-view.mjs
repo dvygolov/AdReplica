@@ -22,8 +22,11 @@ export class ReportView {
     const node = document.createElement("section");
     node.className = "sk-card sk-operation-report";
     node.setAttribute("role", "status");
-    node.innerHTML = `<h3>${escapeHtml(LABELS[data.status] || data.status)}</h3>
-      <div>${escapeHtml(data.campaignName)} — account ${escapeHtml(data.accountId)} (${escapeHtml(data.mode)})</div>
+    const operation =
+      { export: "Export", import: "Import", clone: "Clone" }[data.kind] ||
+      "Operation";
+    node.innerHTML = `<h3>${operation}: ${escapeHtml(LABELS[data.status] || data.status)}</h3>
+      <div>${escapeHtml(data.campaignName)} — account ${escapeHtml(data.accountId)}${data.kind === "export" ? "" : ` (${escapeHtml(data.mode)})`}</div>
       <p>${["campaign", "adset", "ad"].map((type) => `${type}: ${data.counts[type]}/${data.expected[type]}`).join(" · ")}</p>
       <details><summary>Details and remaining objects</summary><pre></pre></details>
       <div class="sk-actions"><button data-action="text">Download report</button><button data-action="json">JSON</button>

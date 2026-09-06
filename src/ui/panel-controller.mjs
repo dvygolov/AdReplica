@@ -43,6 +43,8 @@ export class PanelController {
     const { handleImportJsonSelected } = this.dependencies.importController;
     const { clearCurrentAccountDrafts } = this.dependencies.draftController;
     const { importPackage } = this.dependencies.importWorkflow;
+    const { localVersions } = this.dependencies;
+    localVersions.captureCurrent();
     injectStyles();
 
     const root = document.createElement("div");
@@ -61,6 +63,8 @@ export class PanelController {
             <button id="${APP_ID}-service" class="sk-service-button" title="Service" aria-label="Service" aria-expanded="false">&#9881;</button>
             <div id="${APP_ID}-service-menu" class="sk-service-menu sk-hidden">
               <button data-role="busy-lock" id="${APP_ID}-clear-drafts" type="button">Clear Drafts</button>
+              <button id="${APP_ID}-previous-version" type="button">Load previous version</button>
+              <div id="${APP_ID}-version-note" class="sk-version-note" role="status"></div>
             </div>
             <button id="${APP_ID}-close" class="sk-close" title="Close">&#x2715;</button>
           </div>
@@ -198,6 +202,8 @@ export class PanelController {
 
     const serviceButton = root.querySelector(`#${APP_ID}-service`);
     const serviceMenu = root.querySelector(`#${APP_ID}-service-menu`);
+    dom.previousVersion = root.querySelector(`#${APP_ID}-previous-version`);
+    dom.versionNote = root.querySelector(`#${APP_ID}-version-note`);
     const hideServiceMenu = () => {
       serviceMenu.classList.add("sk-hidden");
       serviceButton.classList.remove("sk-active");
@@ -205,6 +211,7 @@ export class PanelController {
     };
     serviceButton.addEventListener("click", (event) => {
       event.stopPropagation();
+      renderButtons();
       const isHidden = serviceMenu.classList.contains("sk-hidden");
       serviceMenu.classList.toggle("sk-hidden", !isHidden);
       serviceButton.classList.toggle("sk-active", isHidden);
@@ -212,6 +219,9 @@ export class PanelController {
     });
     serviceMenu.addEventListener("click", (event) => {
       event.stopPropagation();
+    });
+    dom.previousVersion.addEventListener("click", async () => {
+      await localVersions.loadPrevious();
     });
     dom.serviceOutsideClick = hideServiceMenu;
     document.addEventListener("click", dom.serviceOutsideClick);
@@ -235,10 +245,10 @@ export class PanelController {
       .addEventListener("click", exportSelectedCampaign);
     root
       .querySelector(`#${APP_ID}-import`)
-      .addEventListener("click", importPackage);
+      .addEventListener("click", () => importPackage());
     root
       .querySelector(`#${APP_ID}-clone`)
-      .addEventListener("click", cloneCampaignToAccount);
+      .addEventListener("click", () => cloneCampaignToAccount());
     dom.downloadLogs.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -449,10 +459,11 @@ export class PanelController {
   }
 
   injectStyles() {
-    if (document.getElementById(`${APP_ID}-styles`)) return;
-    const style = document.createElement("style");
+    const style =
+      document.getElementById(`${APP_ID}-styles`) ||
+      document.createElement("style");
     style.id = `${APP_ID}-styles`;
     style.textContent = buildAdReplicaStyles(APP_ID);
-    document.head.appendChild(style);
+    if (!style.isConnected) document.head.appendChild(style);
   }
 }
