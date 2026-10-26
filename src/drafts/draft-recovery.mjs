@@ -11,6 +11,11 @@ import { UncertainWriteError } from "../facebook/request-errors.mjs";
 export class DraftRecovery {
   constructor(dependencies) {
     this.dependencies = dependencies;
+    // Delays are injectable so tests do not spend real seconds waiting.
+    this.readRetryDelays = dependencies.readRetryDelays || [0, 1000, 2000];
+    this.networkRetryDelays = dependencies.networkRetryDelays || [
+      1000, 2000, 4000,
+    ];
     this.rollbackDraftImport = this.rollbackDraftImport.bind(this);
     this.normalizeDraftObjectType = this.normalizeDraftObjectType.bind(this);
     this.findDraftFragmentByTempId = this.findDraftFragmentByTempId.bind(this);
@@ -52,7 +57,7 @@ export class DraftRecovery {
     const seenFragmentIds = new Set();
     const deletedFragmentIds = new Set();
     const failedFragmentIds = new Set();
-    for (const delayMs of [0, 1000, 2000]) {
+    for (const delayMs of this.readRetryDelays) {
       if (delayMs) {
         await sleep(delayMs);
       }
@@ -171,7 +176,7 @@ export class DraftRecovery {
     const { log } = this.dependencies.logging;
     const { findDraftFragmentByTempId } = this;
     let confirmedAbsent = true;
-    for (const delayMs of [1000, 2000, 4000]) {
+    for (const delayMs of this.networkRetryDelays) {
       await sleep(delayMs);
       try {
         const fragment = await findDraftFragmentByTempId(draftId, expected);

@@ -94,11 +94,13 @@ test("draft write recovery", { concurrency: true }, async (t) => {
       posts: 1,
     },
   ]) {
-    t.test(scenario.name, async () => {
+    await t.test(scenario.name, async () => {
       let posts = 0;
       let reads = 0;
       const recovery = new DraftRecovery({
         logging: { log() {} },
+        readRetryDelays: [0, 0, 0],
+        networkRetryDelays: [0, 0, 0],
         graphClient: {
           async graphFetch(_path, options) {
             assert.equal(
