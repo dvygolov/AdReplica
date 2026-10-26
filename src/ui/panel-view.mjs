@@ -44,6 +44,7 @@ export class PanelView {
         state.busy ||
         state.loadingSession ||
         state.operationActive ||
+        state.massRunning ||
         state.versionLoading ||
         (element === dom.importModeSelect && importRequiresDraftOnly()) ||
         (element === dom.cloneModeSelect && cloneRequiresDraftOnly());
@@ -65,6 +66,9 @@ export class PanelView {
     }
     if (dom.initButton) {
       dom.initButton.disabled = state.busy || state.loadingSession;
+    }
+    if (dom.massStopButton) {
+      dom.massStopButton.disabled = !state.massRunning;
     }
   }
 
@@ -143,6 +147,7 @@ export class PanelView {
     renderLogs();
     renderImportMappings();
     renderCloneMappings();
+    this.dependencies.massCloneView.render();
     renderButtons();
   }
 }

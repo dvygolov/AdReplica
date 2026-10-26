@@ -120,6 +120,36 @@ export class DraftRepository {
     return summary;
   }
 
+  /** Deletes the fragments of one draft. Used to roll back a failed mass-clone target. */
+  async clearDraftById(accountId, draftId) {
+    const { log } = this.dependencies.logging;
+    const { graphFetch } = this.dependencies.graphClient;
+    const { sortDraftFragmentsForDeletion, fetchCurrentDrafts } = this;
+    const normalizedAccountId = normalizeAccountId(accountId);
+    const wanted = String(draftId || "").trim();
+    const summary = { deletedCount: 0, failedCount: 0, draftFound: false };
+    if (!normalizedAccountId || !wanted) return summary;
+    const drafts = await fetchCurrentDrafts(normalizedAccountId);
+    const draft = drafts.find((item) => String(item.id) === wanted);
+    if (!draft) return summary;
+    summary.draftFound = true;
+    for (const fragment of sortDraftFragmentsForDeletion(draft.fragments)) {
+      if (!fragment?.id) continue;
+      try {
+        await graphFetch(fragment.id, { method: "DELETE" });
+        summary.deletedCount += 1;
+      } catch (error) {
+        summary.failedCount += 1;
+        log(
+          "warn",
+          `Draft fragment delete failed: ${fragment.id}.`,
+          String(error),
+        );
+      }
+    }
+    return summary;
+  }
+
   async getCurrentDraftId(accountId) {
     const { log } = this.dependencies.logging;
     const { getDraftApplicationId } = this.dependencies.sessionService;

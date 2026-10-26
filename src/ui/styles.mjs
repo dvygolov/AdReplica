@@ -197,6 +197,66 @@ export function buildAdReplicaStyles(appId) {
       }
       #${appId} .sk-tab-panel { margin-top: 14px; }
       #${appId} .sk-hidden { display: none !important; }
+      #${appId} .sk-mass-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 320px;
+        overflow: auto;
+        margin-top: 12px;
+        padding-right: 4px;
+      }
+      #${appId} .sk-mass-row {
+        display: grid;
+        grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        background: #1d1d1d;
+        border: 1px solid #3a3a3a;
+        border-radius: 6px;
+        padding: 6px 9px;
+      }
+      #${appId} .sk-mass-row.sk-mass-off { opacity: 0.55; }
+      #${appId} .sk-mass-pick {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      #${appId} .sk-mass-pick input { width: auto; }
+      #${appId} .sk-mass-id {
+        display: block;
+        color: #777;
+        font-size: 11px;
+      }
+      #${appId} .sk-mass-row select { padding: 6px 8px; font-size: 12px; }
+      #${appId} .sk-mass-progress {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-top: 12px;
+      }
+      #${appId} .sk-mass-result {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) auto;
+        gap: 4px 10px;
+        border-left: 3px solid #555;
+        background: #1d1d1d;
+        border-radius: 4px;
+        padding: 6px 9px;
+        font-size: 12px;
+      }
+      #${appId} .sk-mass-result em {
+        grid-column: 1 / -1;
+        color: #d0a0a0;
+        font-style: normal;
+        font-size: 11px;
+      }
+      #${appId} .sk-mass-success { border-left-color: #4caf50; }
+      #${appId} .sk-mass-failed { border-left-color: #e57373; }
+      #${appId} .sk-mass-skipped { border-left-color: #ffb74d; }
+      #${appId} .sk-mass-running { border-left-color: #64b5f6; }
+      #${appId} .sk-badge-warn { color: #ffb74d; border-color: #ffb74d; }
       #${appId} .sk-card > .sk-actions {
         margin-top: 18px;
         justify-content: flex-start;

@@ -1,5 +1,6 @@
 import { buildDefaultCloneCampaignName } from "../domain/names.mjs";
 import { getSourceCatalogsFromPackage } from "../domain/package.mjs";
+import { withConvertedBudgets } from "../domain/currency.mjs";
 import { normalizeImportOptions } from "../domain/options.mjs";
 
 /** CloneWorkflow. Dependencies are supplied by the application composition root. */
@@ -155,6 +156,10 @@ export class CloneWorkflow {
       const packageData = withManualSourceCatalog(
         await ensureClonePackageLoaded(),
       );
+      const packageForImport = withConvertedBudgets(
+        packageData,
+        state.cloneCurrencyRate,
+      );
       state.cloneCampaignName = requestedName || state.cloneCampaignName;
       if (state.operationReport) {
         state.operationReport.expected = {
@@ -166,7 +171,7 @@ export class CloneWorkflow {
       }
       const mediaFiles = await buildMediaFilesFromPackage(packageData);
       state.importAccountId = state.cloneTargetAccountId;
-      applyPackageToImportState(packageData, {
+      applyPackageToImportState(packageForImport, {
         campaignName:
           state.cloneCampaignName ||
           packageData.campaign?.name ||

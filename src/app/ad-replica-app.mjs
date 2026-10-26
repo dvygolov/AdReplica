@@ -39,6 +39,12 @@ export class AdReplicaApp {
       this.coordinator.run("clone", options);
     this.services.exportWorkflow.exportSelectedCampaign = () =>
       this.coordinator.run("export");
+    // Each target of a mass clone is a full clone operation, so it runs through
+    // the coordinator and gets its own operation report.
+    this.services.massCloneWorkflow.dependencies.runOperation = (
+      kind,
+      options,
+    ) => this.coordinator.run(kind, options);
     this.debug = createDebugApi(this.services, this.state);
     this.debug.lastReport = () => this.state.lastOperationReport;
   }

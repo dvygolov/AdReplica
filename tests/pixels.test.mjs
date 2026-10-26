@@ -75,9 +75,17 @@ test("account that already has a pixel reuses it without a failing create call",
   assert.ok(
     logs.some(
       (entry) =>
-        entry.level === "warn" && entry.message.includes(EXISTING_PIXEL_ID),
+        entry.level === "info" && entry.message.includes(EXISTING_PIXEL_ID),
     ),
+    "the reuse is logged as informational, not as a failure",
   );
+  assert.ok(
+    state.operationReport.notices.some((notice) =>
+      notice.message.includes(EXISTING_PIXEL_ID),
+    ),
+    "the reuse is recorded as a notice so the run is not downgraded",
+  );
+  assert.equal(state.operationReport.issues.length, 0);
   const pixels = state.operationReport.created.filter(
     (x) => x.type === "pixel",
   );
@@ -85,7 +93,7 @@ test("account that already has a pixel reuses it without a failing create call",
   assert.equal(pixels[0].id, EXISTING_PIXEL_ID);
   assert.equal(pixels[0].reused, true);
   assert.match(
-    state.operationReport.issues[0].message,
+    state.operationReport.notices[0].message,
     /Reused existing pixel/,
   );
 });

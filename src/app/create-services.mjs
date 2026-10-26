@@ -46,6 +46,11 @@ import { CatalogProductService } from "../catalog/catalog-product-service.mjs";
 import { CatalogSetService } from "../catalog/catalog-set-service.mjs";
 import { EditorInspector } from "../ui/editor-inspector.mjs";
 import { ImportWorkflow } from "../workflows/import-workflow.mjs";
+import { MassCloneWorkflow } from "../workflows/mass-clone-workflow.mjs";
+import { MassCloneView } from "../ui/mass-clone-view.mjs";
+import { MassCloneController } from "../ui/mass-clone-controller.mjs";
+import { CurrencyRateService } from "../accounts/currency-rate-service.mjs";
+import { APP_ID } from "./constants.mjs";
 
 /** Construct one runtime. Each service receives only its declared collaborators.
  * Lazy getters resolve UI/workflow callbacks without circular module imports.
@@ -75,6 +80,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       },
       get mappingController() {
         return services.mappingController;
+      },
+      get massCloneView() {
+        return services.massCloneView;
       },
     });
   services.networkDiagnostics =
@@ -215,6 +223,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       },
       get importWorkflow() {
         return services.importWorkflow;
+      },
+      get massCloneController() {
+        return services.massCloneController;
       },
     });
   services.sessionService =
@@ -808,6 +819,61 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       },
       get dialogs() {
         return services.dialogs;
+      },
+    });
+  services.currencyRateService =
+    overrides.currencyRateService || new CurrencyRateService({});
+  services.massCloneView =
+    overrides.massCloneView ||
+    new MassCloneView({
+      state,
+      dom,
+    });
+  services.massCloneWorkflow =
+    overrides.massCloneWorkflow ||
+    new MassCloneWorkflow({
+      state,
+      get logging() {
+        return services.logging;
+      },
+      get graphClient() {
+        return services.graphClient;
+      },
+      get cloneWorkflow() {
+        return services.cloneWorkflow;
+      },
+      get massCloneView() {
+        return services.massCloneView;
+      },
+      get draftRepository() {
+        return services.draftRepository;
+      },
+      get currencyRateService() {
+        return services.currencyRateService;
+      },
+      get initializeSession() {
+        return services.sessionService.initializeSession;
+      },
+      renderMassClone: () => services.massCloneView.render(),
+      runOperation: () => false,
+    });
+  services.massCloneController =
+    overrides.massCloneController ||
+    new MassCloneController({
+      state,
+      dom,
+      appId: APP_ID,
+      get logging() {
+        return services.logging;
+      },
+      get graphClient() {
+        return services.graphClient;
+      },
+      get massCloneView() {
+        return services.massCloneView;
+      },
+      get massCloneWorkflow() {
+        return services.massCloneWorkflow;
       },
     });
   services.localVersions =

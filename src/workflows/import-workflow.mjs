@@ -12,6 +12,12 @@ import { materializeCatalogMappedPackage } from "../domain/package.mjs";
 import { createDraftImportTransaction } from "../domain/draft-values.mjs";
 import { normalizeImportOptions } from "../domain/options.mjs";
 import { OperationReport } from "../operations/operation-report.mjs";
+import {
+  assessAccountHealth,
+  explainDraftFragmentErrors,
+  isTransientFragmentFailure,
+} from "../accounts/account-health.mjs";
+import { sleep } from "../utils/object.mjs";
 
 /** ImportWorkflow. Dependencies are supplied by the application composition root. */
 export class ImportWorkflow {
@@ -72,6 +78,12 @@ export class ImportWorkflow {
         "This package contains no ads. Export a campaign with ads before importing.";
       report.issue(message, { stage: "preflight" });
       log("warn", message);
+      return false;
+    }
+    const health = assessAccountHealth(state.accounts, state.importAccountId);
+    if (!health.ok) {
+      report.issue(health.message, { stage: "preflight" });
+      log("warn", health.message);
       return false;
     }
     setBusy(true);
@@ -313,11 +325,38 @@ export class ImportWorkflow {
               `${identityValidation.unresolvedCount} draft identities remain unresolved.`,
               { stage: "identity" },
             );
-          report.validation = await logDraftValidation(
+          let validation = await logDraftValidation(
             state.importAccountId,
             draftId,
             draftTransaction,
           );
+          if (
+            validation?.invalid &&
+            isTransientFragmentFailure(validation.errors)
+          ) {
+            log(
+              "info",
+              "Draft validation reported a publishing error that may be transient; re-checking once.",
+            );
+            await sleep(8000);
+            validation = await logDraftValidation(
+              state.importAccountId,
+              draftId,
+              draftTransaction,
+            );
+          }
+          report.validation = validation;
+          if (report.validation?.invalid) {
+            const explanation = explainDraftFragmentErrors(
+              report.validation.errors,
+            );
+            report.issue(
+              explanation.length
+                ? explanation.join(" ")
+                : `${report.validation.invalid} draft fragments are invalid.`,
+              { stage: "validation" },
+            );
+          }
           if (
             !report.isComplete() ||
             report.validation?.invalid ||

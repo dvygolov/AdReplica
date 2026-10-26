@@ -39,6 +39,7 @@ export class OperationReport {
     this.created = [];
     this.skipped = [];
     this.issues = [];
+    this.notices = [];
     this.validation = null;
     this.activation = "not_requested";
     this.resources = [];
@@ -65,6 +66,15 @@ export class OperationReport {
   }
   issue(message, { uncertain = false, stage = "operation" } = {}) {
     this.issues.push({ message: String(message), uncertain, stage });
+  }
+  /**
+   * Informational note: worth showing to the operator, but it never downgrades
+   * the run status. Reusing an existing pixel is the canonical case — it is the
+   * expected behaviour on accounts that already hit Meta's one-pixel-per-account
+   * limit, so treating it as an issue would turn every such clone into "partial".
+   */
+  notice(message, { stage = "operation" } = {}) {
+    this.notices.push({ message: String(message), stage });
   }
   markRemoved(ids) {
     const removed = new Set(ids.map(String));
@@ -135,6 +145,7 @@ export class OperationReport {
           `${x.removed ? "REMOVED" : "CREATED"} ${x.type} ${x.id} ${x.name}`,
       ),
       ...data.skipped.map((x) => `SKIPPED ${x.name || x.id}: ${x.reason}`),
+      ...(data.notices || []).map((x) => `NOTE ${x.stage}: ${x.message}`),
       ...data.issues.map(
         (x) =>
           `${x.uncertain ? "UNCONFIRMED" : "ISSUE"} ${x.stage}: ${x.message}`,

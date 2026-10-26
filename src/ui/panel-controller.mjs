@@ -38,6 +38,7 @@ export class PanelController {
       loadExportCampaigns,
     } = this.dependencies.campaignController;
     const { exportSelectedCampaign } = this.dependencies.exportWorkflow;
+    const { massCloneController } = this.dependencies;
     const { ensureClonePackageLoaded, cloneCampaignToAccount } =
       this.dependencies.cloneWorkflow;
     const { handleImportJsonSelected } = this.dependencies.importController;
@@ -74,6 +75,7 @@ export class PanelController {
           <button class="sk-tab sk-tab-active" data-tab="export">Export</button>
           <button class="sk-tab" data-tab="import">Import</button>
           <button class="sk-tab" data-tab="clone">Clone</button>
+          <button class="sk-tab" data-tab="mass">Mass clone</button>
         </div>
 
         <div class="sk-tab-panel" id="${APP_ID}-panel-export">
@@ -157,6 +159,36 @@ export class PanelController {
           </section>
         </div>
 
+        <div class="sk-tab-panel sk-hidden" id="${APP_ID}-panel-mass">
+          <section class="sk-card">
+            <p class="sk-note">Uses the source account and campaign of the Clone tab. Targets are cloned one by one; a failed target is rolled back automatically.</p>
+            <label class="sk-field">
+              <span>Mode</span>
+              <select id="${APP_ID}-mass-mode">
+                <option value="DRAFT" selected>DRAFT</option>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="PAUSED">PAUSED</option>
+              </select>
+            </label>
+            <label class="sk-field">
+              <span>Campaign name template</span>
+              <input type="text" id="${APP_ID}-mass-name" placeholder="{source} — {account}" />
+            </label>
+            <label class="sk-field">
+              <span>FX rate for budgets (blank = automatic ECB rate)</span>
+              <input type="text" id="${APP_ID}-mass-rate" placeholder="1.0" />
+            </label>
+            <p class="sk-note sk-mass-currency" id="${APP_ID}-mass-currency"></p>
+            <div class="sk-mass-list" id="${APP_ID}-mass-list"></div>
+            <div class="sk-actions">
+              <button data-role="busy-lock" id="${APP_ID}-mass-run">Clone to selected accounts</button>
+              <button id="${APP_ID}-mass-retry" disabled>Retry failed</button>
+              <button id="${APP_ID}-mass-stop" disabled>Stop</button>
+            </div>
+            <div class="sk-mass-progress" id="${APP_ID}-mass-progress"></div>
+          </section>
+        </div>
+
         <details class="sk-logs">
           <summary class="sk-log-summary">
             <span>Log</span>
@@ -197,6 +229,10 @@ export class PanelController {
     );
     dom.cloneModeSelect = root.querySelector(`#${APP_ID}-clone-mode`);
     dom.cloneMappings = root.querySelector(`#${APP_ID}-clone-mappings`);
+    dom.massCloneList = root.querySelector(`#${APP_ID}-mass-list`);
+    dom.massCloneProgress = root.querySelector(`#${APP_ID}-mass-progress`);
+    dom.massRateInput = root.querySelector(`#${APP_ID}-mass-rate`);
+    dom.massCurrencyNote = root.querySelector(`#${APP_ID}-mass-currency`);
     dom.logs = root.querySelector(`#${APP_ID}-logs`);
     dom.downloadLogs = root.querySelector(`#${APP_ID}-download-logs`);
 
@@ -238,8 +274,14 @@ export class PanelController {
         root
           .querySelector(`#${APP_ID}-panel-${btn.dataset.tab}`)
           .classList.remove("sk-hidden");
+        if (btn.dataset.tab === "mass") {
+          massCloneController.ensureTargetsLoaded();
+        }
       });
     });
+    // Bind the mass tab up front: the panel is remounted on session changes and
+    // the tab-specific wiring must exist before the first click.
+    massCloneController.bind(root);
     root
       .querySelector(`#${APP_ID}-export`)
       .addEventListener("click", exportSelectedCampaign);

@@ -65,13 +65,13 @@ export class PixelService {
     const reuse = (pixels, reason) => {
       const pixel = pixels[0];
       const available = pixels.map((item) => item.id).join(", ");
-      state.operationReport?.issue(
+      state.operationReport?.notice(
         `Reused existing pixel ${pixel.id} on act_${account} instead of creating a new one (${reason}). Available pixels: ${available}.`,
         { stage: "pixel" },
       );
       invalidateAccountContextCache(account);
       log(
-        "warn",
+        "info",
         `Pixel creation is not available on act_${account} (${reason}); reusing existing pixel ${pixel.id}.`,
       );
       state.operationReport?.record("pixel", pixel.id, pixel.name, {
