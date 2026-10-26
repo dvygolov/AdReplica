@@ -5,6 +5,7 @@ import {
 } from "../domain/draft-values.mjs";
 import { sleep } from "../utils/object.mjs";
 import { isTransientNetworkFetchError } from "../domain/graph-errors.mjs";
+import { UncertainWriteError } from "../facebook/request-errors.mjs";
 
 /** DraftRecovery. Dependencies are supplied by the application composition root. */
 export class DraftRecovery {
@@ -128,50 +129,58 @@ export class DraftRecovery {
     const expectedTempId = String(expected.tempId ?? "");
     const expectedParentId = String(expected.parentAdObjectId || "");
     const expectedAccountId = normalizeAccountId(expected.accountId);
-    return (
-      fragments.find((fragment) => {
-        if (
-          normalizeDraftObjectType(fragment?.ad_object_type) !== expectedType
-        ) {
-          return false;
-        }
-        if (
-          String(getDraftValue(fragment?.values, "tempID") ?? "") !==
-          expectedTempId
-        ) {
-          return false;
-        }
-        const fragmentParentId = String(
-          fragment?.parent_ad_object_id ||
-            getDraftValue(fragment?.values, "parentAdObjectID") ||
-            "",
-        );
-        if (expectedParentId && fragmentParentId !== expectedParentId) {
-          return false;
-        }
-        const fragmentAccountId = normalizeAccountId(
-          getDraftValue(fragment?.values, "account_id"),
-        );
-        return (
-          !expectedAccountId ||
-          !fragmentAccountId ||
-          fragmentAccountId === expectedAccountId
-        );
-      }) || null
-    );
+    const matches = fragments.filter((fragment) => {
+      if (normalizeDraftObjectType(fragment?.ad_object_type) !== expectedType) {
+        return false;
+      }
+      if (
+        String(getDraftValue(fragment?.values, "tempID") ?? "") !==
+        expectedTempId
+      ) {
+        return false;
+      }
+      const fragmentParentId = String(
+        fragment?.parent_ad_object_id ||
+          getDraftValue(fragment?.values, "parentAdObjectID") ||
+          "",
+      );
+      if (expectedParentId && fragmentParentId !== expectedParentId) {
+        return false;
+      }
+      const fragmentAccountId = normalizeAccountId(
+        getDraftValue(fragment?.values, "account_id"),
+      );
+      return (
+        !expectedAccountId ||
+        !fragmentAccountId ||
+        fragmentAccountId === expectedAccountId
+      );
+    });
+    if (matches.length > 1) {
+      throw new UncertainWriteError(
+        `${normalizeDraftId(draftId)}/addraft_fragments`,
+        new Error(
+          `Multiple draft fragments found for ${expected.label} tempID ${expectedTempId}.`,
+        ),
+      );
+    }
+    return matches[0] || null;
   }
 
   async recoverCreatedDraftFragment(draftId, expected) {
     const { log } = this.dependencies.logging;
     const { findDraftFragmentByTempId } = this;
+    let confirmedAbsent = true;
     for (const delayMs of [1000, 2000, 4000]) {
       await sleep(delayMs);
       try {
         const fragment = await findDraftFragmentByTempId(draftId, expected);
         if (fragment?.ad_object_id) {
-          return fragment;
+          return { fragment, confirmedAbsent: false };
         }
+        if (fragment) confirmedAbsent = false;
       } catch (error) {
+        confirmedAbsent = false;
         log(
           "warn",
           `Could not verify ${expected.label} draft fragment after an ambiguous network failure.`,
@@ -179,33 +188,54 @@ export class DraftRecovery {
         );
       }
     }
-    return null;
+    return { fragment: null, confirmedAbsent };
   }
 
   async createDraftFragmentWithRecovery(draftId, body, expected) {
     const { log } = this.dependencies.logging;
     const { graphFetch } = this.dependencies.graphClient;
     const { recoverCreatedDraftFragment } = this;
-    try {
-      return await graphFetch(
-        `${normalizeDraftId(draftId)}/addraft_fragments`,
-        {
-          method: "POST",
-          body,
-          networkRetryAttempts: 1,
-        },
-      );
-    } catch (error) {
-      if (!error?.uncertain && !isTransientNetworkFetchError(error)) {
-        throw error;
+    const path = `${normalizeDraftId(draftId)}/addraft_fragments`;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      let response;
+      let writeError;
+      try {
+        response = await graphFetch(
+          `${normalizeDraftId(draftId)}/addraft_fragments`,
+          {
+            method: "POST",
+            body,
+            networkRetryAttempts: 1,
+          },
+        );
+        if (attempt === 1) return response;
+      } catch (error) {
+        if (!error?.uncertain && !isTransientNetworkFetchError(error)) {
+          throw error;
+        }
+        writeError = error;
+        log(
+          "warn",
+          `Network response was lost while creating ${expected.label} draft fragment; checking the draft without repeating the write.`,
+          String(error?.message || error || ""),
+        );
       }
-      log(
-        "warn",
-        `Network response was lost while creating ${expected.label} draft fragment; checking the draft without repeating the write.`,
-        String(error?.message || error || ""),
-      );
-      const recovered = await recoverCreatedDraftFragment(draftId, expected);
+      const recovery = await recoverCreatedDraftFragment(draftId, expected);
+      const isWrapped = Boolean(recovery && "fragment" in recovery);
+      const recovered = isWrapped ? recovery.fragment : recovery || null;
+      const confirmedAbsent = isWrapped && recovery.confirmedAbsent === true;
       if (recovered) {
+        if (
+          response &&
+          String(response.ad_object_id) !== String(recovered.ad_object_id)
+        ) {
+          throw new UncertainWriteError(
+            path,
+            new Error(
+              `Retry returned a different object for ${expected.label}.`,
+            ),
+          );
+        }
         log(
           "info",
           `Recovered ${expected.label} draft fragment after the network failure: ${recovered.ad_object_id}.`,
@@ -216,7 +246,22 @@ export class DraftRecovery {
           recovered: true,
         };
       }
-      throw error;
+      if (attempt === 1 && confirmedAbsent) {
+        log(
+          "warn",
+          `Three successful checks found no ${expected.label} draft fragment; retrying creation once with the same tempID.`,
+        );
+        continue;
+      }
+      throw (
+        writeError ||
+        new UncertainWriteError(
+          path,
+          new Error(
+            `Could not verify ${expected.label} after retrying creation.`,
+          ),
+        )
+      );
     }
   }
 }
