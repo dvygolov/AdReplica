@@ -30,16 +30,78 @@
   const USD_PHP = 58.5;
 
   const ACCOUNTS = [
-    { id: "974116454358643", name: "L3A3", kind: "personal", currency: "USD", pixels: ["1621554896153020"] },
-    { id: "796194912465909", name: "L3A9", kind: "personal", currency: "USD", pixels: ["1693276409004593", "1184530629974612"] },
-    { id: "3712757899043650", name: "L3A4", kind: "personal", currency: "USD", pixels: null },
-    { id: "1306348530321309", name: "L3A8", kind: "personal", currency: "USD", pixels: null },
-    { id: "1779940055831443", name: "L3A6", kind: "personal", currency: "USD", pixels: null },
-    { id: "1635614067189984", name: "L3A7", kind: "personal", currency: "USD", pixels: null, pageRevoked: true },
-    { id: "2313829705488751", name: "L3A5", kind: "personal", currency: "USD", pixels: null },
-    { id: "426472413446384", name: "Juan Miguel S. Bernardo", kind: "personal", currency: "PHP", pixels: null },
-    { id: "343643318385126", name: "L3A2", kind: "personal", currency: "USD", pixels: null },
-    { id: "3950356461902900", name: "JMS1", kind: "bm", biz: "Juan Miguel S.", currency: "USD", pixels: ["2457052461465059", "1524646825519080"] },
+    {
+      id: "974116454358643",
+      name: "L3A3",
+      kind: "personal",
+      currency: "USD",
+      pixels: ["1621554896153020"],
+    },
+    {
+      id: "796194912465909",
+      name: "L3A9",
+      kind: "personal",
+      currency: "USD",
+      pixels: ["1693276409004593", "1184530629974612"],
+    },
+    {
+      id: "3712757899043650",
+      name: "L3A4",
+      kind: "personal",
+      currency: "USD",
+      pixels: null,
+    },
+    {
+      id: "1306348530321309",
+      name: "L3A8",
+      kind: "personal",
+      currency: "USD",
+      pixels: null,
+    },
+    {
+      id: "1779940055831443",
+      name: "L3A6",
+      kind: "personal",
+      currency: "USD",
+      pixels: null,
+    },
+    {
+      id: "1635614067189984",
+      name: "L3A7",
+      kind: "personal",
+      currency: "USD",
+      pixels: null,
+      pageRevoked: true,
+    },
+    {
+      id: "2313829705488751",
+      name: "L3A5",
+      kind: "personal",
+      currency: "USD",
+      pixels: null,
+    },
+    {
+      id: "426472413446384",
+      name: "Juan Miguel S. Bernardo",
+      kind: "personal",
+      currency: "PHP",
+      pixels: null,
+    },
+    {
+      id: "343643318385126",
+      name: "L3A2",
+      kind: "personal",
+      currency: "USD",
+      pixels: null,
+    },
+    {
+      id: "3950356461902900",
+      name: "JMS1",
+      kind: "bm",
+      biz: "Juan Miguel S.",
+      currency: "USD",
+      pixels: ["2457052461465059", "1524646825519080"],
+    },
   ];
 
   const SOURCE = {
@@ -66,7 +128,7 @@
 
   const I18N = {
     en: {
-      "ver": "261026b1 · full interface prototype",
+      ver: "261026b1 · full interface prototype",
       "badge.prototype": "prototype",
       "btn.gear": "Service",
       "btn.close": "Close",
@@ -80,22 +142,30 @@
       "layout.docked": "docked 900",
       "layout.c580": "centred 580 (shipped)",
       "layout.c760": "centred 760",
-      "layout.title": "Panel width: shipped 580 · compromise 760 · prototype 900",
+      "layout.title":
+        "Panel width: shipped 580 · compromise 760 · prototype 900",
       "lang.ru": "Russian",
       "lang.en": "English",
       "log.started": "AdReplica 261026b1 · interface prototype",
-      "log.saved": "log saved to a file (the shipped AdReplica downloads a txt)",
+      "log.saved":
+        "log saved to a file (the shipped AdReplica downloads a txt)",
 
       "export.title": "Export campaign",
-      "export.hint": "Saves the JSON package and media files to disk — to import into another account or keep a backup.",
-      "export.result": "Done: campaign_12023918643.json · 14 media files · 38.4 MB saved to downloads",
+      "export.hint":
+        "Saves the JSON package and media files to disk — to import into another account or keep a backup.",
+      "export.result":
+        "Done: campaign_12023918643.json · 14 media files · 38.4 MB saved to downloads",
       "import.title": "Import campaign from file",
       "import.json": "Export JSON",
-      "import.hint": "Package media is uploaded again when the account library does not have the files.",
-      "import.result": "Done: campaign 12023918777 created from the package · 3 ad sets · 12 ads · PAUSED",
+      "import.hint":
+        "Package media is uploaded again when the account library does not have the files.",
+      "import.result":
+        "Done: campaign 12023918777 created from the package · 3 ad sets · 12 ads · PAUSED",
       "import.mappings": "Mappings for this account",
-      "import.packageLog": "import: package → L3A3 · 974116454358643, campaign 12023918777",
-      "export.log": "export: JMS1 · Juan1 Lang Retry → campaign_12023918643.json",
+      "import.packageLog":
+        "import: package → L3A3 · 974116454358643, campaign 12023918777",
+      "export.log":
+        "export: JMS1 · Juan1 Lang Retry → campaign_12023918643.json",
 
       "field.account": "Account",
       "field.sourceAccount": "Source Account",
@@ -135,10 +205,13 @@
       "stat.budget": "budget / ad set",
       "stat.catalog": "catalog",
       "note.creative": "Creative",
-      "note.creativeText": "— the creative object: headline, body, CTA, link and its fan page.",
+      "note.creativeText":
+        "— the creative object: headline, body, CTA, link and its fan page.",
       "note.media": "Media",
-      "note.mediaText": "— the files themselves (video and images), copied into each account separately.",
-      "note.counts": "One creative can reference several media files, which is why the counts differ.",
+      "note.mediaText":
+        "— the files themselves (video and images), copied into each account separately.",
+      "note.counts":
+        "One creative can reference several media files, which is why the counts differ.",
       "media.summary": "Media in the package ({count} files · 38.4 MB)",
       "kind.video": "video",
       "kind.image": "image",
@@ -161,7 +234,8 @@
       "risk.creatingPixel": "will create a pixel",
       "risk.pixelSelected": "pixel selected",
       "risk.noCatalog": "no catalog",
-      "preview.hint": "Checked {n} accounts. Meta allows one pixel per account: an existing one is reused.",
+      "preview.hint":
+        "Checked {n} accounts. Meta allows one pixel per account: an existing one is reused.",
       "preview.log": "preflight: {n} accounts, 0 errors",
       "budget.day": "${amount} / day",
       "budget.dayForeign": "{amount} {cur} / day",
@@ -171,14 +245,17 @@
       "run.current": "current",
       "run.hint": "If an account fails, whatever was created in it is deleted.",
       "run.result": "Result: {done} done, {rolled} rolled back.",
-      "run.resultCancel": "Result: {done} done, {rolled} rolled back, {cancelled} cancelled.",
+      "run.resultCancel":
+        "Result: {done} done, {rolled} rolled back, {cancelled} cancelled.",
       "run.untouched": "Successful accounts are untouched.",
       "run.logResult": "result: {done} done, {rolled} rolled back",
-      "run.logResultCancel": "result: {done} done, {rolled} rolled back, {cancelled} cancelled",
+      "run.logResultCancel":
+        "result: {done} done, {rolled} rolled back, {cancelled} cancelled",
       "job.queued": "queued",
       "job.step": "{phase}…",
       "job.stopped": "stopped",
-      "job.failPage": "failed: page not available (#200) → deleting created objects",
+      "job.failPage":
+        "failed: page not available (#200) → deleting created objects",
       "job.failedOnAds": "failed on ads · created objects deleted",
       "job.done": "campaign {id} · 3 ad sets · 12 ads",
       "phase.package": "package",
@@ -195,13 +272,15 @@
       "state.cancelled": "cancelled",
       "state.queued": "queued",
       "log.cloned": "[{account}] cloned: campaign {id}",
-      "log.failPage": "[{account}] failed on \"{phase}\": page not available for the account (#200)",
-      "log.rollback": "[{account}] rollback: campaign deleted, 3 ad sets, 12 ads, 14 media — cleaned",
+      "log.failPage":
+        '[{account}] failed on "{phase}": page not available for the account (#200)',
+      "log.rollback":
+        "[{account}] rollback: campaign deleted, 3 ad sets, 12 ads, 14 media — cleaned",
       "backdrop.hint": "Select a campaign row to open the AdReplica panel",
       "viz.text": "the AdReplica interface over Ads Manager",
     },
     ru: {
-      "ver": "261026b1 · прототип интерфейса",
+      ver: "261026b1 · прототип интерфейса",
       "badge.prototype": "макет",
       "btn.gear": "Сервис",
       "btn.close": "Закрыть",
@@ -215,22 +294,30 @@
       "layout.docked": "сбоку 900",
       "layout.c580": "центр 580 (как сейчас)",
       "layout.c760": "центр 760",
-      "layout.title": "Ширина панели: реальная 580 · компромисс 760 · прототип 900",
+      "layout.title":
+        "Ширина панели: реальная 580 · компромисс 760 · прототип 900",
       "lang.ru": "Русский",
       "lang.en": "English",
       "log.started": "AdReplica 261026b1 · прототип интерфейса",
-      "log.saved": "журнал сохранён в файл (в реальном AdReplica — скачивание txt)",
+      "log.saved":
+        "журнал сохранён в файл (в реальном AdReplica — скачивание txt)",
 
       "export.title": "Экспорт кампании",
-      "export.hint": "Сохраняет JSON-пакет и медиафайлы на диск — для импорта в другой кабинет или бэкапа.",
-      "export.result": "Готово: campaign_12023918643.json · 14 медиафайлов · 38.4 МБ сохранено в загрузки",
+      "export.hint":
+        "Сохраняет JSON-пакет и медиафайлы на диск — для импорта в другой кабинет или бэкапа.",
+      "export.result":
+        "Готово: campaign_12023918643.json · 14 медиафайлов · 38.4 МБ сохранено в загрузки",
       "import.title": "Импорт кампании из файла",
       "import.json": "Export JSON",
-      "import.hint": "Медиа из пакета загружаются в кабинет заново, если файлов нет в библиотеке.",
-      "import.result": "Готово: кампания 12023918777 создана из пакета · 3 адсета · 12 объявлений · PAUSED",
+      "import.hint":
+        "Медиа из пакета загружаются в кабинет заново, если файлов нет в библиотеке.",
+      "import.result":
+        "Готово: кампания 12023918777 создана из пакета · 3 адсета · 12 объявлений · PAUSED",
       "import.mappings": "Маппинги для этого кабинета",
-      "import.packageLog": "импорт: пакет → L3A3 · 974116454358643, кампания 12023918777",
-      "export.log": "экспорт: JMS1 · Juan1 Lang Retry → campaign_12023918643.json",
+      "import.packageLog":
+        "импорт: пакет → L3A3 · 974116454358643, кампания 12023918777",
+      "export.log":
+        "экспорт: JMS1 · Juan1 Lang Retry → campaign_12023918643.json",
 
       "field.account": "Кабинет",
       "field.sourceAccount": "Кабинет-источник",
@@ -270,10 +357,13 @@
       "stat.budget": "бюджет / адсет",
       "stat.catalog": "каталог",
       "note.creative": "Креатив",
-      "note.creativeText": "— объект creative: заголовок, текст, CTA, ссылка и привязка к странице.",
+      "note.creativeText":
+        "— объект creative: заголовок, текст, CTA, ссылка и привязка к странице.",
       "note.media": "Медиа",
-      "note.mediaText": "— сами файлы (видео и изображения), которые копируются в каждый кабинет отдельно.",
-      "note.counts": "Один креатив может ссылаться на несколько медиафайлов, поэтому счётчики разные.",
+      "note.mediaText":
+        "— сами файлы (видео и изображения), которые копируются в каждый кабинет отдельно.",
+      "note.counts":
+        "Один креатив может ссылаться на несколько медиафайлов, поэтому счётчики разные.",
       "media.summary": "Медиа в пакете ({count} файлов · 38.4 МБ)",
       "kind.video": "видео",
       "kind.image": "изображение",
@@ -296,7 +386,8 @@
       "risk.creatingPixel": "создадим пиксель",
       "risk.pixelSelected": "пиксель выбран",
       "risk.noCatalog": "каталог недоступен",
-      "preview.hint": "Проверено {n} кабинетов. Пиксель Meta разрешает один на кабинет: где он уже есть — берём существующий.",
+      "preview.hint":
+        "Проверено {n} кабинетов. Пиксель Meta разрешает один на кабинет: где он уже есть — берём существующий.",
       "preview.log": "preflight: {n} кабинетов, ошибок 0",
       "budget.day": "{amount} / день",
       "budget.dayForeign": "{amount} {cur} / день",
@@ -304,12 +395,15 @@
       "run.rolled": "откат",
       "run.queued": "в очереди",
       "run.current": "сейчас",
-      "run.hint": "Если кабинет падает, созданное в нём удаляется автоматически.",
+      "run.hint":
+        "Если кабинет падает, созданное в нём удаляется автоматически.",
       "run.result": "Итог: готово {done}, откат {rolled}.",
-      "run.resultCancel": "Итог: готово {done}, откат {rolled}, отменено {cancelled}.",
+      "run.resultCancel":
+        "Итог: готово {done}, откат {rolled}, отменено {cancelled}.",
       "run.untouched": "Неупавшие кабинеты не затрагиваются.",
       "run.logResult": "итог: готово {done}, откат {rolled}",
-      "run.logResultCancel": "итог: готово {done}, откат {rolled}, отменено {cancelled}",
+      "run.logResultCancel":
+        "итог: готово {done}, откат {rolled}, отменено {cancelled}",
       "job.queued": "в очереди",
       "job.step": "{phase}…",
       "job.stopped": "остановлено",
@@ -330,8 +424,10 @@
       "state.cancelled": "отменено",
       "state.queued": "в очереди",
       "log.cloned": "[{account}] клонировано: кампания {id}",
-      "log.failPage": "[{account}] ошибка на «{phase}»: страница недоступна для кабинета (#200)",
-      "log.rollback": "[{account}] откат: кампания удалена, 3 адсета, 12 объявлений, 14 медиа — очищено",
+      "log.failPage":
+        "[{account}] ошибка на «{phase}»: страница недоступна для кабинета (#200)",
+      "log.rollback":
+        "[{account}] откат: кампания удалена, 3 адсета, 12 объявлений, 14 медиа — очищено",
       "backdrop.hint": "Выберите кампанию, чтобы открыть панель AdReplica",
       "viz.text": "интерфейс AdReplica поверх Ads Manager",
     },
@@ -351,7 +447,9 @@
   const t = (key, vars) => {
     const template = I18N[lang]?.[key] ?? I18N.en[key] ?? key;
     if (!vars) return template;
-    return template.replace(/\{(\w+)\}/g, (_, k) => (vars[k] === undefined ? "" : String(vars[k])));
+    return template.replace(/\{(\w+)\}/g, (_, k) =>
+      vars[k] === undefined ? "" : String(vars[k]),
+    );
   };
 
   const CSS = `
@@ -510,7 +608,8 @@
     tab: "clone",
     layoutIdx: 0,
   };
-  for (const a of ACCOUNTS) state.pixelChoice[a.id] = a.pixels?.[0] || "__create__";
+  for (const a of ACCOUNTS)
+    state.pixelChoice[a.id] = a.pixels?.[0] || "__create__";
 
   let root = null;
   const q = (sel) => root.querySelector(sel);
@@ -558,8 +657,12 @@
 
   function shell() {
     const flags = ["ru", "en"]
-      .map((code) => `<button class="flag${lang === code ? " active" : ""}" data-lang="${code}"
-        title="${t("lang." + code)}" aria-pressed="${lang === code}">${FLAGS[code]}</button>`)
+      .map(
+        (
+          code,
+        ) => `<button class="flag${lang === code ? " active" : ""}" data-lang="${code}"
+        title="${t("lang." + code)}" aria-pressed="${lang === code}">${FLAGS[code]}</button>`,
+      )
       .join("");
     return `${EMBED ? "" : amBackdrop()}
     <div class="panel${LAYOUTS[state.layoutIdx].centered ? " centered" : ""}"
@@ -678,8 +781,12 @@
         <details><summary>${t("media.summary", { count: SOURCE.media })}</summary>
           <table style="margin-top:8px"><thead><tr><th>${t("field.file")}</th><th>${t("field.kind")}</th>
             <th>${t("field.size")}</th></tr></thead><tbody>
-            ${MEDIA_FILES.map((f) => `<tr><td>${f.name}</td><td>${f.kind ? t("kind." + f.kind) : ""}</td>
-              <td>${f.size}</td></tr>`).join("")}
+            ${MEDIA_FILES.map(
+              (
+                f,
+              ) => `<tr><td>${f.name}</td><td>${f.kind ? t("kind." + f.kind) : ""}</td>
+              <td>${f.size}</td></tr>`,
+            ).join("")}
           </tbody></table>
         </details>
         <div class="row" style="margin-top:9px">
@@ -756,14 +863,27 @@
     q(".targets").innerHTML = ACCOUNTS.map((a) => {
       const chosen = state.pixelChoice[a.id];
       const pixOptions = (a.pixels || []).length
-        ? a.pixels.map((p) => `<option value="${p}" ${chosen === p ? "selected" : ""}>${p}</option>`).join("")
-          + `<option value="__create__" ${chosen === "__create__" ? "selected" : ""}>${t("opt.reuseExisting")}</option>`
+        ? a.pixels
+            .map(
+              (p) =>
+                `<option value="${p}" ${chosen === p ? "selected" : ""}>${p}</option>`,
+            )
+            .join("") +
+          `<option value="__create__" ${chosen === "__create__" ? "selected" : ""}>${t("opt.reuseExisting")}</option>`
         : `<option value="__create__">${t("opt.noPixel")}</option>`;
-      const conv = a.currency === SOURCE.currency
-        ? chip(a.currency)
-        : chip(t("currency.convert", { cur: a.currency, rate: USD_PHP }), "warn");
-      const catalog = a.kind === "bm" ? chip(t("catalog.copyInto", { biz: a.biz }), "ok") : chip("—");
-      const kind = a.kind === "bm" ? chip(t("type.bm"), "bm") : chip(t("type.personal"));
+      const conv =
+        a.currency === SOURCE.currency
+          ? chip(a.currency)
+          : chip(
+              t("currency.convert", { cur: a.currency, rate: USD_PHP }),
+              "warn",
+            );
+      const catalog =
+        a.kind === "bm"
+          ? chip(t("catalog.copyInto", { biz: a.biz }), "ok")
+          : chip("—");
+      const kind =
+        a.kind === "bm" ? chip(t("type.bm"), "bm") : chip(t("type.personal"));
       return `<tr data-id="${a.id}">
         <td><input type="checkbox" class="pick" ${state.selected.has(a.id) ? "checked" : ""} /></td>
         <td><div class="who">${a.name}<span class="id">${a.id}</span></div></td>
@@ -803,7 +923,9 @@
 
   function budgetFor(a) {
     if (a.currency === SOURCE.currency) {
-      return t("budget.day", { amount: "$" + SOURCE.budgetPerAdset.toFixed(2) });
+      return t("budget.day", {
+        amount: "$" + SOURCE.budgetPerAdset.toFixed(2),
+      });
     }
     return t("budget.dayForeign", {
       amount: Math.round(SOURCE.budgetPerAdset * USD_PHP),
@@ -815,18 +937,27 @@
     state.preflighted = true;
     q(".preview-card").classList.remove("hidden");
     const chosen = ACCOUNTS.filter((a) => state.selected.has(a.id));
-    q(".preview-body").innerHTML = chosen.map((a) => {
-      const pix = state.pixelChoice[a.id];
-      const risk = [];
-      if (a.pageRevoked) risk.push(chip(t("risk.pageRevoked"), "err"));
-      if (a.currency !== SOURCE.currency) risk.push(chip(t("risk.budgetConverted"), "warn"));
-      if (pix === "__create__") {
-        risk.push(chip((a.pixels || []).length ? t("risk.reusingPixel") : t("risk.creatingPixel"), "info"));
-      } else {
-        risk.push(chip(t("risk.pixelSelected"), "ok"));
-      }
-      if (a.kind !== "bm") risk.push(chip(t("risk.noCatalog")));
-      return `<tr>
+    q(".preview-body").innerHTML = chosen
+      .map((a) => {
+        const pix = state.pixelChoice[a.id];
+        const risk = [];
+        if (a.pageRevoked) risk.push(chip(t("risk.pageRevoked"), "err"));
+        if (a.currency !== SOURCE.currency)
+          risk.push(chip(t("risk.budgetConverted"), "warn"));
+        if (pix === "__create__") {
+          risk.push(
+            chip(
+              (a.pixels || []).length
+                ? t("risk.reusingPixel")
+                : t("risk.creatingPixel"),
+              "info",
+            ),
+          );
+        } else {
+          risk.push(chip(t("risk.pixelSelected"), "ok"));
+        }
+        if (a.kind !== "bm") risk.push(chip(t("risk.noCatalog")));
+        return `<tr>
         <td><div class="who">${a.name}<span class="id">${a.id}</span></div></td>
         <td>${SOURCE.page}</td>
         <td>${pix === "__create__" ? t("preview.newPixel") : pix}</td>
@@ -835,12 +966,21 @@
         <td>${budgetFor(a)}</td>
         <td>${risk.join("")}</td>
       </tr>`;
-    }).join("");
+      })
+      .join("");
     q(".preview-hint").textContent = t("preview.hint", { n: chosen.length });
     if (!silent) log("preview.log", { n: chosen.length });
   }
 
-  const PHASES = ["package", "media", "pixel", "campaign", "adsets", "ads", "verify"];
+  const PHASES = [
+    "package",
+    "media",
+    "pixel",
+    "campaign",
+    "adsets",
+    "ads",
+    "verify",
+  ];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   function jobPhaseText(job) {
@@ -848,30 +988,45 @@
     if (job.phaseKey === "stopped") return t("job.stopped");
     if (job.phaseKey === "failPage") return t("job.failPage");
     if (job.phaseKey === "failedOnAds") return t("job.failedOnAds");
-    if (job.phaseKey) return t("job.step", { phase: t("phase." + job.phaseKey) });
+    if (job.phaseKey)
+      return t("job.step", { phase: t("phase." + job.phaseKey) });
     return t("job.queued");
   }
 
   function renderJobs() {
-    q(".jobs").innerHTML = state.jobs.map((j) => `<div class="job ${j.state}">
+    q(".jobs").innerHTML = state.jobs
+      .map(
+        (j) => `<div class="job ${j.state}">
       <div><b>${j.account.name}</b> <span style="color:#777;font-size:10px">· ${j.account.id}</span>
         <div class="ph">${jobPhaseText(j)}</div></div>
-      <div>${j.state === "done" ? chip(t("state.done"), "ok")
-        : j.state === "fail" ? chip(t("state.failed"), "err")
-        : j.state === "rollback" ? chip(t("state.rolled"), "warn")
-        : j.state === "running" ? chip(t("state.running"), "info")
-        : j.state === "cancelled" ? chip(t("state.cancelled"), "warn")
-        : chip(t("state.queued"))}</div>
-    </div>`).join("");
+      <div>${
+        j.state === "done"
+          ? chip(t("state.done"), "ok")
+          : j.state === "fail"
+            ? chip(t("state.failed"), "err")
+            : j.state === "rollback"
+              ? chip(t("state.rolled"), "warn")
+              : j.state === "running"
+                ? chip(t("state.running"), "info")
+                : j.state === "cancelled"
+                  ? chip(t("state.cancelled"), "warn")
+                  : chip(t("state.queued"))
+      }</div>
+    </div>`,
+      )
+      .join("");
     const done = state.jobs.filter((j) => j.state === "done").length;
     const rolled = state.jobs.filter((j) => j.state === "rollback").length;
     q(".c-done").textContent = done;
     q(".c-rollback").textContent = rolled;
-    q(".c-queue").textContent = state.jobs.filter((j) => j.state === "queued").length;
+    q(".c-queue").textContent = state.jobs.filter(
+      (j) => j.state === "queued",
+    ).length;
     const active = state.jobs.find((j) => j.state === "running");
     q(".c-now").textContent = active ? active.account.name : "—";
     q(".run-card .progress > i").style.width = state.jobs.length
-      ? Math.round(((done + rolled) / state.jobs.length) * 100) + "%" : "0";
+      ? Math.round(((done + rolled) / state.jobs.length) * 100) + "%"
+      : "0";
     q(".retry").disabled = !rolled || state.running;
   }
 
@@ -889,7 +1044,10 @@
       renderJobs();
       await sleep(240 + Math.random() * 260);
       if (failsAt && phase === failsAt) {
-        log("log.failPage", { account: job.account.name, phase: t("phase." + phase) });
+        log("log.failPage", {
+          account: job.account.name,
+          phase: t("phase." + phase),
+        });
         job.phaseKey = "failPage";
         job.state = "fail";
         renderJobs();
@@ -918,8 +1076,12 @@
     q(".run-card").classList.remove("hidden");
     q(".run-card").scrollIntoView({ block: "nearest" });
     q(".stop").disabled = false;
-    state.jobs = ACCOUNTS.filter((a) => state.selected.has(a.id))
-      .map((a) => ({ account: a, state: "queued", phaseKey: null, campaign: null }));
+    state.jobs = ACCOUNTS.filter((a) => state.selected.has(a.id)).map((a) => ({
+      account: a,
+      state: "queued",
+      phaseKey: null,
+      campaign: null,
+    }));
     renderJobs();
     for (const job of state.jobs) {
       if (state.stop) {
@@ -934,9 +1096,19 @@
     const done = state.jobs.filter((j) => j.state === "done").length;
     const rolled = state.jobs.filter((j) => j.state === "rollback").length;
     const cancelled = state.jobs.filter((j) => j.state === "cancelled").length;
-    q(".runhint").textContent = t(cancelled ? "run.resultCancel" : "run.result",
-      { done, rolled, cancelled }) + " " + t("run.untouched");
-    log(cancelled ? "run.logResultCancel" : "run.logResult", { done, rolled, cancelled });
+    q(".runhint").textContent =
+      t(cancelled ? "run.resultCancel" : "run.result", {
+        done,
+        rolled,
+        cancelled,
+      }) +
+      " " +
+      t("run.untouched");
+    log(cancelled ? "run.logResultCancel" : "run.logResult", {
+      done,
+      rolled,
+      cancelled,
+    });
     afterSelection();
     renderJobs();
   }
@@ -951,8 +1123,12 @@
 
   function activateTab(name) {
     state.tab = name;
-    qa(".tab").forEach((t2) => t2.classList.toggle("active", t2.dataset.tab === name));
-    qa(".pane").forEach((p) => p.classList.toggle("hidden", p.dataset.pane !== name));
+    qa(".tab").forEach((t2) =>
+      t2.classList.toggle("active", t2.dataset.tab === name),
+    );
+    qa(".pane").forEach((p) =>
+      p.classList.toggle("hidden", p.dataset.pane !== name),
+    );
   }
 
   function restoreView() {
@@ -1000,7 +1176,8 @@
     q(".close").onclick = () => root.remove();
     q(".master").onchange = (event) => {
       state.selected.clear();
-      if (event.target.checked) ACCOUNTS.forEach((a) => state.selected.add(a.id));
+      if (event.target.checked)
+        ACCOUNTS.forEach((a) => state.selected.add(a.id));
       renderTargets();
     };
     q(".show-preview").onclick = () => {
@@ -1024,7 +1201,9 @@
       afterSelection();
     };
     q(".retry").onclick = () => {
-      const failed = state.jobs.filter((j) => j.state === "rollback").map((j) => j.account);
+      const failed = state.jobs
+        .filter((j) => j.state === "rollback")
+        .map((j) => j.account);
       state.selected = new Set(failed.map((a) => a.id));
       renderTargets();
       state.jobs = [];
@@ -1049,7 +1228,9 @@
     document.getElementById(ROOT_ID)?.remove();
     root = document.createElement("div");
     root.id = ROOT_ID;
-    if (!EMBED) root.style.cssText = "position:relative;min-height:100vh;background:#f0f2f5";
+    if (!EMBED)
+      root.style.cssText =
+        "position:relative;min-height:100vh;background:#f0f2f5";
     root.innerHTML = shell();
     document.body.appendChild(root);
     bind();
