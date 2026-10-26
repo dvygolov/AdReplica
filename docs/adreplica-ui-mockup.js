@@ -15,7 +15,8 @@
  *
  * Standalone: open the html wrapper, a mock Ads Manager backdrop is drawn.
  * Injected: evaluated inside a real Ads Manager tab, the backdrop is skipped and
- * the panel docks to the right.
+ * the panel sits centred in the viewport (760 px wide — the narrowest centred
+ * width at which the target table still fits without horizontal scrolling).
  *
  * Account ids, names, business managers, currencies and known pixels come from a
  * live YellowFox profile; pixel state for unprobed accounts is marked as demo.
@@ -28,6 +29,7 @@
   document.getElementById("adreplica-prototype-style")?.remove();
 
   const USD_PHP = 58.5;
+  const PANEL_WIDTH = 760;
 
   const ACCOUNTS = [
     {
@@ -139,11 +141,6 @@
       "tab.clone": "Clone",
       "logs.title": "Log",
       "logs.download": "Download log",
-      "layout.docked": "docked 900",
-      "layout.c580": "centred 580 (shipped)",
-      "layout.c760": "centred 760",
-      "layout.title":
-        "Panel width: shipped 580 · compromise 760 · prototype 900",
       "lang.ru": "Russian",
       "lang.en": "English",
       "log.started": "AdReplica 261026b1 · interface prototype",
@@ -204,14 +201,6 @@
       "stat.media": "media files",
       "stat.budget": "budget / ad set",
       "stat.catalog": "catalog",
-      "note.creative": "Creative",
-      "note.creativeText":
-        "— the creative object: headline, body, CTA, link and its fan page.",
-      "note.media": "Media",
-      "note.mediaText":
-        "— the files themselves (video and images), copied into each account separately.",
-      "note.counts":
-        "One creative can reference several media files, which is why the counts differ.",
       "media.summary": "Media in the package ({count} files · 38.4 MB)",
       "kind.video": "video",
       "kind.image": "image",
@@ -291,11 +280,6 @@
       "tab.clone": "Клон",
       "logs.title": "Журнал",
       "logs.download": "Скачать журнал",
-      "layout.docked": "сбоку 900",
-      "layout.c580": "центр 580 (как сейчас)",
-      "layout.c760": "центр 760",
-      "layout.title":
-        "Ширина панели: реальная 580 · компромисс 760 · прототип 900",
       "lang.ru": "Русский",
       "lang.en": "English",
       "log.started": "AdReplica 261026b1 · прототип интерфейса",
@@ -356,14 +340,6 @@
       "stat.media": "медиафайлов",
       "stat.budget": "бюджет / адсет",
       "stat.catalog": "каталог",
-      "note.creative": "Креатив",
-      "note.creativeText":
-        "— объект creative: заголовок, текст, CTA, ссылка и привязка к странице.",
-      "note.media": "Медиа",
-      "note.mediaText":
-        "— сами файлы (видео и изображения), которые копируются в каждый кабинет отдельно.",
-      "note.counts":
-        "Один креатив может ссылаться на несколько медиафайлов, поэтому счётчики разные.",
       "media.summary": "Медиа в пакете ({count} файлов · 38.4 МБ)",
       "kind.video": "видео",
       "kind.image": "изображение",
@@ -456,10 +432,10 @@
   #${ROOT_ID}{position:${EMBED ? "fixed" : "relative"};${EMBED ? "inset:0;" : ""}z-index:2147483647;
     font-family:"Segoe UI","Trebuchet MS",sans-serif;pointer-events:none}
   #${ROOT_ID} *{box-sizing:border-box}
-  #${ROOT_ID} .panel{position:absolute;top:16px;right:16px;bottom:16px;width:900px;display:flex;
+  #${ROOT_ID} .panel{position:absolute;top:16px;bottom:16px;left:50%;transform:translateX(-50%);
+    width:${PANEL_WIDTH}px;display:flex;
     flex-direction:column;background:#1a1a1a;color:#f5f5f5;border:2px solid #ffc107;border-radius:10px;
     box-shadow:0 12px 40px rgba(0,0,0,.7);pointer-events:auto;font-size:12.5px;overflow:hidden}
-  #${ROOT_ID} .panel.centered{left:50%;right:auto;transform:translateX(-50%)}
   #${ROOT_ID} .head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #333;
     background:linear-gradient(180deg,#242400,#1a1a1a)}
   #${ROOT_ID} .mark{width:26px;height:26px;flex:0 0 auto;border-radius:7px;background:#ffc107;color:#1a1a1a;
@@ -502,28 +478,29 @@
   #${ROOT_ID} .stat{background:#1c1c1c;border:1px solid #333;border-radius:6px;padding:6px 8px}
   #${ROOT_ID} .stat b{display:block;font-size:15px;color:#fff}
   #${ROOT_ID} .stat span{font-size:10px;color:#9a9a9a}
-  #${ROOT_ID} .note{font-size:10.5px;color:#8a8a8a;line-height:1.5;margin:8px 0 0}
-  #${ROOT_ID} .note b{color:#cfcfcf}
   #${ROOT_ID} table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed}
   #${ROOT_ID} th,#${ROOT_ID} td{text-align:left;padding:5px 7px;border-bottom:1px solid #2b2b2b;vertical-align:middle;
     overflow-wrap:anywhere}
   #${ROOT_ID} th{color:#b9b9b9;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;
     background:#1d1d1d;position:sticky;top:0}
   #${ROOT_ID} .t-targets{min-width:600px}
-  #${ROOT_ID} .t-preview{min-width:660px}
+  #${ROOT_ID} .t-preview{min-width:690px}
   #${ROOT_ID} .t-targets th:first-child,#${ROOT_ID} .t-targets td:first-child{width:30px;padding-right:0}
   #${ROOT_ID} .t-targets th:nth-child(2){width:30%}
   #${ROOT_ID} .t-targets th:nth-child(3){width:13%}
   #${ROOT_ID} .t-targets th:nth-child(4){width:19%}
   #${ROOT_ID} .t-targets th:nth-child(5){width:19%}
   #${ROOT_ID} .t-targets th:nth-child(6){width:19%}
-  #${ROOT_ID} .t-preview th:nth-child(1){width:22%}
-  #${ROOT_ID} .t-preview th:nth-child(2){width:16%}
-  #${ROOT_ID} .t-preview th:nth-child(3){width:17%}
-  #${ROOT_ID} .t-preview th:nth-child(4){width:15%}
-  #${ROOT_ID} .t-preview th:nth-child(5){width:9%}
-  #${ROOT_ID} .t-preview th:nth-child(6){width:12%}
-  #${ROOT_ID} .t-preview th:nth-child(7){width:9%}
+  #${ROOT_ID} .t-preview th:nth-child(1){width:19%}
+  #${ROOT_ID} .t-preview th:nth-child(2){width:11%}
+  #${ROOT_ID} .t-preview th:nth-child(3){width:16%}
+  #${ROOT_ID} .t-preview th:nth-child(4){width:13%}
+  #${ROOT_ID} .t-preview th:nth-child(5){width:8%}
+  #${ROOT_ID} .t-preview th:nth-child(6){width:11%}
+  #${ROOT_ID} .t-preview th:nth-child(7){width:22%}
+  #${ROOT_ID} .preview-body td{padding:4px 6px;font-size:11px}
+  #${ROOT_ID} .preview-body .chip{font-size:9.5px;padding:1px 5px;margin:1px 2px 1px 0}
+  #${ROOT_ID} .preview-body .who .id{font-size:9px}
   #${ROOT_ID} .who{font-size:11.5px}
   #${ROOT_ID} .who .id{display:block;color:#777;font-size:9.5px;letter-spacing:.02em}
   #${ROOT_ID} select.pix{width:100%;font-size:10.5px;padding:3px 5px}
@@ -591,12 +568,6 @@
   #${ROOT_ID} .viz b{color:#ffc107}
   `;
 
-  const LAYOUTS = [
-    { w: 900, centered: false, labelKey: "layout.docked" },
-    { w: 580, centered: true, labelKey: "layout.c580" },
-    { w: 760, centered: true, labelKey: "layout.c760" },
-  ];
-
   const state = {
     selected: new Set(),
     pixelChoice: {},
@@ -606,7 +577,6 @@
     jobs: [],
     logs: [],
     tab: "clone",
-    layoutIdx: 0,
   };
   for (const a of ACCOUNTS)
     state.pixelChoice[a.id] = a.pixels?.[0] || "__create__";
@@ -665,8 +635,7 @@
       )
       .join("");
     return `${EMBED ? "" : amBackdrop()}
-    <div class="panel${LAYOUTS[state.layoutIdx].centered ? " centered" : ""}"
-      style="width:${LAYOUTS[state.layoutIdx].w}px">
+    <div class="panel">
       <div class="head">
         <div class="mark">A</div>
         <div>
@@ -675,7 +644,6 @@
         </div>
         <div class="right">
           ${chip(t("badge.prototype"), "warn")}
-          <button class="layout-toggle" title="${t("layout.title")}">${t(LAYOUTS[state.layoutIdx].labelKey)}</button>
           <div class="lang">${flags}</div>
           <button class="gear" title="${t("btn.gear")}">⚙</button>
           <button class="close" title="${t("btn.close")}">✕</button>
@@ -775,9 +743,6 @@
           <div class="stat"><b>$${SOURCE.budgetPerAdset}</b><span>${t("stat.budget")}</span></div>
           <div class="stat"><b>1</b><span>${t("stat.catalog")}</span></div>
         </div>
-        <p class="note"><b>${t("note.creative")}</b> ${t("note.creativeText")}<br />
-          <b>${t("note.media")}</b> ${t("note.mediaText")}<br />
-          ${t("note.counts")}</p>
         <details><summary>${t("media.summary", { count: SOURCE.media })}</summary>
           <table style="margin-top:8px"><thead><tr><th>${t("field.file")}</th><th>${t("field.kind")}</th>
             <th>${t("field.size")}</th></tr></thead><tbody>
@@ -1113,14 +1078,6 @@
     renderJobs();
   }
 
-  function applyLayout() {
-    const layout = LAYOUTS[state.layoutIdx];
-    const panel = q(".panel");
-    panel.classList.toggle("centered", layout.centered);
-    panel.style.width = layout.w + "px";
-    q(".layout-toggle").textContent = t(layout.labelKey);
-  }
-
   function activateTab(name) {
     state.tab = name;
     qa(".tab").forEach((t2) =>
@@ -1132,7 +1089,6 @@
   }
 
   function restoreView() {
-    applyLayout();
     activateTab(state.tab);
     renderTargets();
     if (state.preflighted) renderPreview(true);
@@ -1153,11 +1109,6 @@
     qa(".tab").forEach((tab) => {
       tab.onclick = () => activateTab(tab.dataset.tab);
     });
-    q(".layout-toggle").onclick = () => {
-      state.layoutIdx = (state.layoutIdx + 1) % LAYOUTS.length;
-      applyLayout();
-      if (state.preflighted) renderPreview(true);
-    };
     qa(".flag").forEach((btn) => {
       btn.onclick = () => {
         if (btn.dataset.lang === lang) return;
