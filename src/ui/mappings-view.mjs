@@ -103,7 +103,12 @@ export class MappingsView {
           ((pixels || []).some((item) => item.id === pixel.id)
             ? pixel.id
             : "__create__");
-        const options = [`<option value="__create__">Create new pixel</option>`]
+        const createOptionLabel = (pixels || []).length
+          ? "Create new pixel (account already has one - will reuse it)"
+          : "Create new pixel";
+        const options = [
+          `<option value="__create__">${createOptionLabel}</option>`,
+        ]
           .concat(
             (pixels || []).map(
               (item) =>
