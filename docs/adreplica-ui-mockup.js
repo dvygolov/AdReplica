@@ -65,9 +65,10 @@
   #${ROOT_ID}{position:${EMBED ? "fixed" : "relative"};${EMBED ? "inset:0;" : ""}z-index:2147483647;
     font-family:"Segoe UI","Trebuchet MS",sans-serif;pointer-events:none}
   #${ROOT_ID} *{box-sizing:border-box}
-  #${ROOT_ID} .panel{position:absolute;top:16px;right:16px;bottom:16px;width:var(--panel-w,900px);display:flex;
+  #${ROOT_ID} .panel{position:absolute;top:16px;right:16px;bottom:16px;width:900px;display:flex;
     flex-direction:column;background:#1a1a1a;color:#f5f5f5;border:2px solid #ffc107;border-radius:10px;
     box-shadow:0 12px 40px rgba(0,0,0,.7);pointer-events:auto;font-size:12.5px;overflow:hidden}
+  #${ROOT_ID} .panel.centered{left:50%;right:auto;transform:translateX(-50%)}
   #${ROOT_ID} .head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #333;
     background:linear-gradient(180deg,#242400,#1a1a1a)}
   #${ROOT_ID} .mark{width:26px;height:26px;flex:0 0 auto;border-radius:7px;background:#ffc107;color:#1a1a1a;
@@ -111,6 +112,8 @@
     overflow-wrap:anywhere}
   #${ROOT_ID} th{color:#b9b9b9;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;
     background:#1d1d1d;position:sticky;top:0}
+  #${ROOT_ID} .t-targets{min-width:600px}
+  #${ROOT_ID} .t-preview{min-width:660px}
   #${ROOT_ID} .t-targets th:first-child,#${ROOT_ID} .t-targets td:first-child{width:30px;padding-right:0}
   #${ROOT_ID} .t-targets th:nth-child(2){width:30%}
   #${ROOT_ID} .t-targets th:nth-child(3){width:13%}
@@ -211,6 +214,7 @@
         </div>
         <div class="right">
           <span class="chip warn">макет</span>
+          <button class="layout-toggle" title="Ширина панели: реальная 580 · компромисс 760 · прототип 900">сбоку 900</button>
           <button class="gear" title="Service">⚙</button>
           <button class="close" title="Close">✕</button>
         </div>
@@ -417,7 +421,7 @@
           <div class="right">
             <button class="edit-selection" disabled>Изменить выбор</button>
             <button class="danger stop">Стоп</button>
-            <button class="retry" disabled>Повторить неупавшие</button>
+            <button class="retry" disabled>Повторить ошибки</button>
             <button class="reset">Сбросить</button>
           </div>
         </div>
@@ -607,6 +611,21 @@
       qa(".pane").forEach((p) => p.classList.toggle("hidden", p.dataset.pane !== tab.dataset.tab));
     };
   });
+  const LAYOUTS = [
+    { w: 900, centered: false, name: "сбоку 900" },
+    { w: 580, centered: true, name: "центр 580 (как сейчас)" },
+    { w: 760, centered: true, name: "центр 760" },
+  ];
+  let layoutIdx = 0;
+  q(".layout-toggle").onclick = () => {
+    layoutIdx = (layoutIdx + 1) % LAYOUTS.length;
+    const layout = LAYOUTS[layoutIdx];
+    const panel = q(".panel");
+    panel.classList.toggle("centered", layout.centered);
+    panel.style.width = layout.w + "px";
+    q(".layout-toggle").textContent = layout.name;
+    if (state.preflighted) renderPreview();
+  };
   q(".gear").onclick = () => q(".menu").classList.toggle("hidden");
   q(".close").onclick = () => root.remove();
   q(".master").onchange = (e) => {
