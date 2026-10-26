@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>AdReplica 261026b1 — Mass clone prototype</title>
+<style>
+  :root{
+    --bg:#1a1a1a; --bg2:#212121; --bg3:#2a2a2a; --line:#383838;
+    --fg:#f5f5f5; --dim:#9a9a9a; --accent:#ffc107;
+    --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --info:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:24px; background:#0e0e0e; color:var(--fg);
+    font-family:"Segoe UI","Trebuchet MS",sans-serif; font-size:13px;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .head h1{margin:0;font-size:20px;color:var(--accent);letter-spacing:.02em}
+  .build{color:#888;font-size:11px;letter-spacing:.04em}
+  .badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+  .badge.demo{background:rgba(56,189,248,.14);color:var(--info);border:1px solid rgba(56,189,248,.35)}
+  .badge.src{background:rgba(255,193,7,.12);color:var(--accent);border:1px solid rgba(255,193,7,.35)}
+  .sub{color:var(--dim);font-size:12px;margin:0 0 16px}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:4px;min-width:200px;flex:1}
+  .field span{font-size:11px;color:var(--dim);letter-spacing:.03em}
+  select,input[type=text]{
+    background:var(--bg3);color:var(--fg);border:1px solid var(--line);border-radius:6px;
+    padding:7px 9px;font-size:12px;font-family:inherit;
+  }
+  button{
+    background:var(--bg3);color:var(--fg);border:1px solid var(--line);border-radius:6px;
+    padding:7px 11px;font-size:12px;font-family:inherit;cursor:pointer;
+  }
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--accent);color:#1a1a1a;border-color:var(--accent);font-weight:600}
+  button.primary:hover:not(:disabled){filter:brightness(1.08);color:#1a1a1a}
+  button.danger{border-color:rgba(239,68,68,.5);color:#fca5a5}
+  .summary{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--dim)}
+  .summary b{color:var(--fg)}
+  .accounts{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;scrollbar-width:thin;scrollbar-color:#4b4b4b #202020}
+  .accounts::-webkit-scrollbar{width:10px}
+  .accounts::-webkit-scrollbar-track{background:#202020}
+  .accounts::-webkit-scrollbar-thumb{background:#4b4b4b;border-radius:6px}
+  .scrollhint{font-size:11px;color:var(--dim);padding:6px 10px;border-bottom:1px solid #2b2b2b;background:#1f1f1f}
+  .diswarn{font-size:11px;color:#fcd34d;margin-top:8px}
+  .acc{display:grid;grid-template-columns:22px 1fr auto auto auto;gap:10px;align-items:center;padding:7px 10px;border-bottom:1px solid #2b2b2b}
+  .acc:last-child{border-bottom:none}
+  .acc:hover{background:#242424}
+  .acc.off{opacity:.6}
+  .acc .name{font-size:12px}
+  td.risk{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start}
+  .acc .id{color:#777;font-size:10px;letter-spacing:.03em}
+  .chip{font-size:10px;padding:2px 6px;border-radius:999px;border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+  .chip.bm{border-color:rgba(255,193,7,.4);color:var(--accent)}
+  .chip.lk{border-color:#4b4b4b;color:#cfcfcf}
+  .chip.ok{border-color:rgba(34,197,94,.45);color:#86efac}
+  .chip.warn{border-color:rgba(245,158,11,.45);color:#fcd34d}
+  .chip.err{border-color:rgba(239,68,68,.45);color:#fca5a5}
+  .chip.info{border-color:rgba(56,189,248,.45);color:#7dd3fc}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #2b2b2b;vertical-align:top}
+  th{color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px;flex-wrap:wrap}
+  .toolbar .right{display:flex;gap:8px;align-items:center}
+  .bar{height:6px;background:#303030;border-radius:999px;overflow:hidden;margin:10px 0 4px}
+  .bar > i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s ease}
+  .job{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px 10px;border-bottom:1px solid #2b2b2b}
+  .job:last-child{border-bottom:none}
+  .job .phase{color:var(--dim);font-size:11px;margin-top:2px}
+  .job.done .phase{color:#86efac}
+  .job.fail .phase{color:#fca5a5}
+  .job.queued{opacity:.55}
+  .log{background:#141414;border:1px solid #2b2b2b;border-radius:8px;padding:8px 10px;margin-top:10px;font-family:Consolas,monospace;font-size:11px;color:#bfbfbf;max-height:120px;overflow:auto}
+  .log div{white-space:pre-wrap}
+  .hidden{display:none}
+  .hint{font-size:11px;color:var(--dim);margin-top:8px;line-height:1.5}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:8px}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>AdReplica</h1>
+    <span class="build">261026b1</span>
+    <span class="badge demo">макет · демо-данные</span>
+  </div>
+  <p class="sub">Массовый клон: одна кампания → несколько кабинетов. Кабинеты взяты из реального NRD Lazy 3 (id, названия, BM, валюта, статус — фактические; пиксели — только там, где проверено).</p>
+
+  <div class="card">
+    <h2>1 · Что клонируем</h2>
+    <div class="row">
+      <label class="field"><span>Кабинет-источник</span>
+        <select id="srcAcc">
+          <option>JMS1 · 3950356461902900</option>
+          <option>L3A3 · 974116454358643</option>
+        </select>
+      </label>
+      <label class="field"><span>Кампания</span>
+        <select id="srcCamp">
+          <option>Juan1 Lang Retry · PAUSED</option>
+          <option>AdReplica Catalog Source · PAUSED</option>
+        </select>
+      </label>
+    </div>
+    <div class="summary">
+      <div>Кампания: <b>1</b></div>
+      <div>Адсеты: <b>3</b></div>
+      <div>Объявления: <b>12</b></div>
+      <div>Креативы: <b>9</b></div>
+      <div>Медиа: <b>14 файлов</b> (копируются по кабинетам)</div>
+      <div>Каталог: <b>1</b> · пиксель: <b>1</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Куда клонируем</h2>
+    <div class="toolbar">
+      <div class="right">
+        <button id="selActive">Выбрать активные</button>
+        <button id="selAll">Все</button>
+        <button id="selNone">Снять</button>
+      </div>
+      <div style="color:var(--dim)">Выбрано: <b id="selCount" style="color:var(--fg)">0</b> из <span id="totalCount">13</span></div>
+    </div>
+    <div class="accounts" id="accounts"></div>
+    <div class="diswarn hidden" id="disWarn"></div>
+    <div class="legend">
+      <div><i style="background:var(--accent)"></i>БМ-кабинет</div>
+      <div><i style="background:#6b7280"></i>личный кабинет</div>
+      <div><i style="background:var(--err)"></i>отключён (клон упадёт)</div>
+    </div>
+    <div class="toolbar">
+      <div class="hint">Preflight проверяет по каждому кабинету: доступ к странице, пиксель, каталог, режим. Ничего не создаётся.</div>
+      <div class="right">
+        <button id="preflight" disabled>Проверить выбранные</button>
+        <button id="startClone" class="primary" disabled>Клонировать</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="preflightCard">
+    <h2>3 · Предпросмотр маппингов</h2>
+    <table>
+      <thead><tr><th>Кабинет</th><th>Страница</th><th>Пиксель</th><th>Каталог</th><th>Режим</th><th>Риск</th></tr></thead>
+      <tbody id="preflightBody"></tbody>
+    </table>
+    <div class="hint" id="preflightHint"></div>
+  </div>
+
+  <div class="card hidden" id="runCard">
+    <h2>4 · Выполнение</h2>
+    <div class="bar"><i id="runBar"></i></div>
+    <div class="summary" style="margin-top:4px">
+      <div>Готово: <b id="cDone">0</b></div>
+      <div>Ошибки: <b id="cFail">0</b></div>
+      <div>В очереди: <b id="cQueue">0</b></div>
+      <div>Сейчас: <b id="cNow">—</b></div>
+    </div>
+    <div class="accounts" id="jobs" style="max-height:300px"></div>
+    <div class="log" id="log"></div>
+    <div class="toolbar">
+      <div class="right">
+        <button id="stopRun" class="danger">Стоп</button>
+        <button id="retryFail" disabled>Повторить неуспешные</button>
+        <button id="resetRun">Сбросить</button>
+      </div>
+      <div class="hint" id="runHint">Клон идёт последовательно: один кабинет за раз. Так Meta не получит пачку запросов из одного профиля.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ACCOUNTS = [
+  {id:"974116454358643",  name:"L3A3", status:1, currency:"USD", biz:null, pixels:["1621554896153020"], verified:true},
+  {id:"796194912465909",  name:"L3A9", status:1, currency:"USD", biz:null, pixels:["1693276409004593"], verified:true},
+  {id:"3712757899043650", name:"L3A4", status:1, currency:"USD", biz:null, pixels:null},
+  {id:"1306348530321309", name:"L3A8", status:1, currency:"USD", biz:null, pixels:null},
+  {id:"1779940055831443", name:"L3A6", status:1, currency:"USD", biz:null, pixels:null},
+  {id:"654144733542828",  name:"L3A1", status:2, currency:"USD", biz:null, pixels:null},
+  {id:"1635614067189984", name:"L3A7", status:1, currency:"USD", biz:null, pixels:null},
+  {id:"2313829705488751", name:"L3A5", status:1, currency:"USD", biz:null, pixels:null},
+  {id:"426472413446384",  name:"Juan Miguel S. Bernardo", status:1, currency:"PHP", biz:null, pixels:null},
+  {id:"856230013114912",  name:"L3 PV1", status:2, currency:"USD", biz:"L3 ProfitVision", pixels:["1573076034588284"], verified:true},
+  {id:"343643318385126",  name:"L3A2", status:1, currency:"USD", biz:null, pixels:null},
+  {id:"3950356461902900", name:"JMS1", status:1, currency:"USD", biz:"Juan Miguel S.", pixels:["2457052461465059"], verified:true},
+  {id:"1499871348321734", name:"Juan1", status:2, currency:"USD", biz:"Juan Playground", pixels:null},
+];
+const SOURCE = {currency:"USD", page:"используется страница из пакета"};
+
+const el = (id) => document.getElementById(id);
+const selected = new Set();
+let preflighted = [];
+let jobs = [];
+let running = false;
+let stopRequested = false;
+
+const chip = (text, cls) => `<span class="chip ${cls||""}">${text}</span>`;
+
+function renderAccounts(){
+  el("accounts").innerHTML = ACCOUNTS.map((a)=>{
+    const off = a.status !== 1;
+    const kind = a.biz ? chip("БМ · " + a.biz, "bm") : chip("личный", "lk");
+    const px = a.pixels === null
+      ? chip("пиксель: не проверено", "warn")
+      : a.pixels.length
+        ? chip("пиксель: " + a.pixels[0], "ok")
+        : chip("пикселя нет", "info");
+    return `<label class="acc ${off?"off":""}">
+      <input type="checkbox" data-id="${a.id}" ${selected.has(a.id)?"checked":""} ${a.status===1?"":"data-off=1"} />
+      <span><span class="name">${a.name}</span> <span class="id">· ${a.id} · ${a.currency}</span></span>
+      ${kind}${px}${off?chip("отключён","err"):chip("активен","ok")}
+    </label>`;
+  }).join("");
+  el("accounts").querySelectorAll("input[type=checkbox]").forEach((cb)=>{
+    cb.addEventListener("change", ()=>{
+      cb.checked ? selected.add(cb.dataset.id) : selected.delete(cb.dataset.id);
+      afterSelectionChange();
+    });
+  });
+  afterSelectionChange();
+}
+
+function afterSelectionChange(){
+  el("selCount").textContent = selected.size;
+  el("preflight").disabled = selected.size === 0 || running;
+  el("startClone").disabled = preflighted.length === 0 || running;
+  el("startClone").textContent = selected.size ? `Клонировать в ${selected.size}` : "Клонировать";
+  const off = ACCOUNTS.filter((a)=>a.status !== 1 && selected.has(a.id));
+  const warn = el("disWarn");
+  if (off.length){
+    warn.classList.remove("hidden");
+    warn.textContent = `Выбрано ${off.length} отключённых кабинетов (${off.map((a)=>a.name).join(", ")}): клон там вернёт ошибку Meta. Она изолирована — остальные кабинеты выполнятся, неуспешные можно повторить.`;
+  } else {
+    warn.classList.add("hidden");
+  }
+}
+
+function pixelsPromise(a){
+  if (a.pixels !== null) return Promise.resolve(a.pixels);
+  const seeded = [...a.id].reduce((sum, ch)=> sum + ch.charCodeAt(0), 0) % 10;
+  el("log").innerHTML += `<div>проверка пикселей act_${a.id}…</div>`;
+  return new Promise((resolve)=> setTimeout(()=> resolve(seeded >= 4 ? ["demo_" + a.id.slice(-6)] : []), 220));
+}
+
+async function runPreflight(){
+  preflighted = [];
+  el("log").innerHTML = "";
+  const chosen = ACCOUNTS.filter((a)=>selected.has(a.id));
+  for (const a of chosen){
+    const pixels = await pixelsPromise(a);
+    const mismatch = a.currency !== SOURCE.currency;
+    const risk = [];
+    if (a.status !== 1) risk.push(chip("кабинет отключён","err"));
+    if (mismatch) risk.push(chip("валюта " + a.currency,"warn"));
+    if (pixels.length) risk.push(chip("переиспользуем пиксель","ok"));
+    else risk.push(chip("создадим пиксель","info"));
+    if (!a.biz) risk.push(chip("каталог недоступен","warn"));
+    preflighted.push({
+      account:a,
+      page: SOURCE.page,
+      pixel: pixels.length
+        ? (String(pixels[0]).startsWith("demo_")
+            ? "есть пиксель · демо-данные"
+            : pixels[0])
+        : "новый (POST act_" + a.id.slice(0,4) + "…/adspixels)",
+      catalog: a.biz ? "копия в " + a.biz : "— (нет BM)",
+      mode: a.biz ? "DRAFT" : "PAUSED",
+      risk: risk.join(" ")
+    });
+  }
+  el("preflightCard").classList.remove("hidden");
+  el("preflightBody").innerHTML = preflighted.map((p)=>`
+    <tr>
+      <td><b>${p.account.name}</b><div class="id">${p.account.id}</div></td>
+      <td>${p.page}</td>
+      <td>${p.pixel}</td>
+      <td>${p.catalog}</td>
+      <td>${p.mode}</td>
+      <td class="risk">${p.risk}</td>
+    </tr>`).join("");
+  el("preflightHint").textContent = `Проверено кабинетов: ${preflighted.length}. Пиксель Meta разрешает создать только один на кабинет: где он уже есть — берём существующий.`;
+  afterSelectionChange();
+}
+
+const PHASES = ["пакет", "медиа", "пиксель", "кампания", "адсеты", "объявления", "проверка"];
+const sleep = (ms)=> new Promise((r)=> setTimeout(r, ms));
+
+function renderJobs(){
+  el("jobs").innerHTML = jobs.map((j)=>`
+    <div class="job ${j.state}">
+      <div>
+        <b>${j.account.name}</b> <span class="id">· ${j.account.id}</span>
+        <div class="phase">${j.phaseText || "в очереди"}</div>
+      </div>
+      <div>${j.state === "done" ? chip("готово","ok") : j.state === "fail" ? chip("ошибка","err") : j.state === "running" ? chip("идёт","info") : j.state === "cancelled" ? chip("отменено","warn") : chip("в очереди","warn")}</div>
+    </div>`).join("");
+  const done = jobs.filter((j)=>j.state==="done").length;
+  const fail = jobs.filter((j)=>j.state==="fail").length;
+  const queued = jobs.filter((j)=>j.state==="queued").length;
+  el("cDone").textContent = done;
+  el("cFail").textContent = fail;
+  el("cQueue").textContent = queued;
+  const active = jobs.find((j)=>j.state==="running");
+  el("cNow").textContent = active ? active.account.name : "—";
+  el("runBar").style.width = jobs.length ? Math.round(((done+fail)/jobs.length)*100) + "%" : "0";
+  el("retryFail").disabled = !fail || running;
+}
+
+async function runOne(job){
+  job.state = "running";
+  const failEarly = job.account.status !== 1;
+  for (const phase of PHASES){
+    if (stopRequested){ job.state="cancelled"; job.phaseText="остановлено пользователем"; renderJobs(); return; }
+    job.phaseText = phase + "…";
+    renderJobs();
+    await sleep(240 + Math.random()*260);
+    if (failEarly && phase === "кампания"){
+      job.state = "fail";
+      job.phaseText = "ошибка: (#200) Permissions error — кабинет отключён";
+      el("log").innerHTML += `<div>[${job.account.name}] #200 Permissions error на создании кампании; остальные кабинеты продолжаются</div>`;
+      renderJobs();
+      return;
+    }
+  }
+  job.state = "done";
+  job.phaseText = "готово · кампания 1202391" + job.account.id.slice(-4) + " · 3 адсета · 12 объявлений";
+  el("log").innerHTML += `<div>[${job.account.name}] клон завершён</div>`;
+  renderJobs();
+}
+
+async function startClone(){
+  if (running) return;
+  running = true; stopRequested = false;
+  el("runCard").classList.remove("hidden");
+  el("log").innerHTML = "";
+  jobs = preflighted.map((p)=>({account:p.account, state:"queued", phaseText:""}));
+  el("stopRun").disabled = false;
+  renderJobs();
+  for (const job of jobs){
+    if (stopRequested){ job.state = "cancelled"; renderJobs(); continue; }
+    await runOne(job);
+  }
+  running = false;
+  el("stopRun").disabled = true;
+  const done = jobs.filter((j)=>j.state==="done").length;
+  const fail = jobs.filter((j)=>j.state==="fail").length;
+  const cancelled = jobs.filter((j)=>j.state==="cancelled").length;
+  el("runHint").textContent = `Итог: готово ${done}, ошибок ${fail}${cancelled?`, отменено ${cancelled}`:""}. Успешные кабинеты не откатываются; неуспешные можно повторить.`;
+  afterSelectionChange();
+  renderJobs();
+}
+
+el("selActive").onclick = ()=>{ selected.clear(); ACCOUNTS.filter((a)=>a.status===1).forEach((a)=>selected.add(a.id)); renderAccounts(); };
+el("selAll").onclick = ()=>{ selected.clear(); ACCOUNTS.forEach((a)=>selected.add(a.id)); renderAccounts(); };
+el("selNone").onclick = ()=>{ selected.clear(); renderAccounts(); };
+el("preflight").onclick = runPreflight;
+el("startClone").onclick = startClone;
+el("stopRun").onclick = ()=>{ stopRequested = true; el("stopRun").disabled = true; };
+el("retryFail").onclick = ()=>{ jobs = jobs.filter((j)=>j.state==="fail").map((j)=>({...j, state:"queued", phaseText:""})); preflighted = jobs.map((j)=>({account:j.account})); startClone(); };
+el("resetRun").onclick = ()=>{ jobs = []; el("runCard").classList.add("hidden"); el("log").innerHTML=""; el("runHint").textContent = "Клон идёт последовательно: один кабинет за раз. Так Meta не получит пачку запросов из одного профиля."; };
+
+renderAccounts();
+</script>
+</body>
+</html>
