@@ -441,13 +441,13 @@ export function buildStudioStyles(appId) {
       }
       #${appId} .sk-report-card .sk-actions button.sk-primary:hover { background: #ffe033; }
       /* fan page cell: avatar + listbox, because a native select cannot show a logo */
-      #${appId} .sk-fp-cell { position: relative; min-width: 150px; }
+      #${appId} .sk-fp-cell { position: relative; min-width: 130px; }
       #${appId} .sk-fp-btn {
         display: flex;
         align-items: center;
         gap: 8px;
         width: 100%;
-        max-width: 220px;
+        max-width: 168px;
         height: 30px;
         padding: 0 8px;
         border: 1px solid #4a4a4a;
@@ -518,10 +518,12 @@ export function buildStudioStyles(appId) {
         white-space: nowrap;
         text-overflow: ellipsis;
       }
-      #${appId} .sk-pix { width: 140px; }
-      #${appId} .sk-cat { width: 180px; }
+      #${appId} .sk-pix { width: 104px; }
+      #${appId} .sk-cat { width: 142px; }
       #${appId} .sk-tbl td select { max-width: 100%; }
       #${appId} .sk-cur { white-space: nowrap; }
+      #${appId} .sk-cur .sk-chip { padding: 2px 6px; font-size: 11px; }
+      #${appId} .sk-tbl th, #${appId} .sk-tbl td { padding: 6px 6px; }
       #${appId} .sk-cur .sk-chip { cursor: help; }
       @media (max-width: 800px) {
         #${appId} { inset: 10px; }

@@ -250,6 +250,7 @@ export class MassCloneView {
           sourceCurrency && currency && currency !== sourceCurrency;
         const knownRate = Number.isFinite(Number(rate)) && Number(rate) > 0;
         const rateText = knownRate ? `×${rate}` : t("currency.auto");
+        // Narrow column: only the code, the conversion story lives in the tooltip.
         const currencyChip = converts
           ? `<span class="sk-chip sk-warn" title="${escapeHtml(
               t(knownRate ? "currency.tooltipRate" : "currency.tooltip", {
@@ -257,9 +258,7 @@ export class MassCloneView {
                 to: currency,
                 rate: rateText,
               }),
-            )}">${escapeHtml(
-              t("currency.convert", { cur: currency, rate: rateText }),
-            )}</span>`
+            )}">${escapeHtml(currency)}</span>`
           : `<span class="sk-chip" title="${escapeHtml(
               t("currency.same", { cur: currency || "—" }),
             )}">${escapeHtml(currency || "—")}</span>`;
@@ -276,7 +275,9 @@ export class MassCloneView {
             )}</span>`
           : `<span class="sk-chip">${escapeHtml(t("chip.personal"))}</span>`;
         const catalogCell = catalogColumn
-          ? `<td><select class="sk-cat" data-mass-catalog="${escapeHtml(
+          ? `<td><select class="sk-cat" title="${escapeHtml(
+              t("opt.noCatalogHint"),
+            )}" data-mass-catalog="${escapeHtml(
               accountId,
             )}" ${state.massRunning ? "disabled" : ""}>${this.catalogOptions(
               accountId,
@@ -300,7 +301,9 @@ export class MassCloneView {
               : ""
           }</td>
           ${this.pageCell(accountId, picked)}
-          <td><select class="sk-pix" data-mass-pixel="${escapeHtml(accountId)}" ${
+          <td><select class="sk-pix" title="${escapeHtml(
+            t("opt.noPixelHint"),
+          )}" data-mass-pixel="${escapeHtml(accountId)}" ${
             state.massRunning ? "disabled" : ""
           }>${this.pixelOptions(accountId, String(picked.pixelId || ""))}</select></td>
           ${catalogCell}

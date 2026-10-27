@@ -68,8 +68,10 @@ const DICT = {
     "btn.reset": "Reset",
 
     "opt.reuseExisting": "Reuse existing pixel",
-    "opt.noPixel": "Auto (reuse or create)",
-    "opt.noCatalog": "Auto (source catalog)",
+    "opt.noPixel": "Auto",
+    "opt.noPixelHint": "Reuse the existing pixel or create a new one",
+    "opt.noCatalog": "Auto",
+    "opt.noCatalogHint": "Catalog from the source package",
     "opt.copyCatalog": "Copy to BM {bm}",
     "opt.autoPage": "Auto (page from source)",
     "opt.autoPageShort": "Auto",
@@ -202,8 +204,11 @@ const DICT = {
     "btn.reset": "Сбросить",
 
     "opt.reuseExisting": "Переиспользовать пиксель",
-    "opt.noPixel": "Авто (переиспользовать/создать)",
-    "opt.noCatalog": "Авто (каталог из источника)",
+    "opt.noPixel": "Авто",
+    "opt.noPixelHint":
+      "Переиспользовать существующий пиксель или создать новый",
+    "opt.noCatalog": "Авто",
+    "opt.noCatalogHint": "Каталог из источника",
     "opt.copyCatalog": "Копировать в BM {bm}",
     "opt.autoPage": "Авто (страница из источника)",
     "opt.autoPageShort": "Авто",
