@@ -518,7 +518,8 @@ export function buildStudioStyles(appId) {
         white-space: nowrap;
         text-overflow: ellipsis;
       }
-      #${appId} .sk-pix, #${appId} .sk-cat { max-width: 150px; }
+      #${appId} .sk-pix { max-width: 150px; }
+      #${appId} .sk-cat { max-width: 200px; }
       #${appId} .sk-cur { white-space: nowrap; }
       #${appId} .sk-cur .sk-chip { cursor: help; }
       @media (max-width: 800px) {
