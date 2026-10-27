@@ -1,37 +1,37 @@
 {
   "app": "AdReplica",
-  "build": "271026b8",
-  "version": "271026b8",
-  "generatedAt": "2026-10-27T17:19:53.665Z",
+  "build": "271026b9",
+  "version": "271026b9",
+  "generatedAt": "2026-10-27T17:25:27.458Z",
   "payload": {
     "encoding": "base64",
-    "sha256": "ecdc183e5dd6ca15fbd0275a15bf04880032a6f119c7c3920d23da66b964ed43",
-    "byteLength": 334783
+    "sha256": "d8ee6416b744c65b651f0dc92ff99c26ca07905db8aa014a3c7110ac91ecdc18",
+    "byteLength": 334826
   },
   "chunks": [
     {
       "index": 1,
       "file": "og/chunk-001.html",
-      "url": "https://adreplica.pages.dev/adreplica/271026b8/og/chunk-001",
+      "url": "https://adreplica.pages.dev/adreplica/271026b9/og/chunk-001",
       "latestUrl": "https://adreplica.pages.dev/adreplica/latest/og/chunk-001",
       "ogObjectId": "",
       "base64Length": 350000,
-      "base64Sha256": "b222081c0b08b6e101db227272ff55e73b04464594f93d0a324fe5d96d44b42c"
+      "base64Sha256": "691a33ca25ffa8aa1ca65c4c0d7eb4d34febb6f4e9fffde63fc2149dc944843e"
     },
     {
       "index": 2,
       "file": "og/chunk-002.html",
-      "url": "https://adreplica.pages.dev/adreplica/271026b8/og/chunk-002",
+      "url": "https://adreplica.pages.dev/adreplica/271026b9/og/chunk-002",
       "latestUrl": "https://adreplica.pages.dev/adreplica/latest/og/chunk-002",
       "ogObjectId": "",
-      "base64Length": 96380,
-      "base64Sha256": "a164a396c8176bcb93a3858b7443a235a6d980ef26ce4af56ff48c8ec9f458ff"
+      "base64Length": 96436,
+      "base64Sha256": "71e72d40a04d010b4924731f942ba889734cf374b1fb108ea07cd976ab57aaaa"
     }
   ],
   "source": "adreplica.js",
   "chunkSize": 350000,
   "payloadFile": "payload.js",
   "manifestFile": "manifest.html",
-  "manifestUrl": "https://adreplica.pages.dev/adreplica/271026b8/manifest",
+  "manifestUrl": "https://adreplica.pages.dev/adreplica/271026b9/manifest",
   "latestManifestUrl": "https://adreplica.pages.dev/adreplica/latest/manifest"
 }
