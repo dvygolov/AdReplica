@@ -79,7 +79,7 @@ export class MassCloneView {
   }
 
   catalogOptions(accountId, selectedCatalogId) {
-    const { state, dom } = this.dependencies;
+    const { state } = this.dependencies;
     const catalogs = state.massCatalogs?.[accountId] || [];
     const business = state.massCatalogBusiness?.[accountId];
     const head = `<option value="" ${selectedCatalogId ? "" : "selected"}>${escapeHtml(
@@ -90,7 +90,6 @@ export class MassCloneView {
           selectedCatalogId === "__copy__" ? "selected" : ""
         }>${escapeHtml(t("opt.copyCatalog", { bm: business.name || business.id }))}</option>`
       : "";
-    void dom;
     return (
       head +
       copy +
