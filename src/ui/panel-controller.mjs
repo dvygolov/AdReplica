@@ -2,10 +2,10 @@ import { Config } from "../config.mjs";
 import {
   APP_ID,
   APP_MARK_SVG,
-  APP_TITLE,
   NATIVE_FETCH_FRAME_ID,
 } from "../app/constants.mjs";
 import { buildAdReplicaStyles } from "./styles.mjs";
+import { FLAGS, getLang, setLang, t } from "./i18n.mjs";
 
 /** PanelController. Dependencies are supplied by the application composition root. */
 export class PanelController {
@@ -39,8 +39,7 @@ export class PanelController {
     } = this.dependencies.campaignController;
     const { exportSelectedCampaign } = this.dependencies.exportWorkflow;
     const { massCloneController } = this.dependencies;
-    const { ensureClonePackageLoaded, cloneCampaignToAccount } =
-      this.dependencies.cloneWorkflow;
+    const { ensureClonePackageLoaded } = this.dependencies.cloneWorkflow;
     const { handleImportJsonSelected } = this.dependencies.importController;
     const { clearCurrentAccountDrafts } = this.dependencies.draftController;
     const { importPackage } = this.dependencies.importWorkflow;
@@ -52,151 +51,225 @@ export class PanelController {
     root.id = APP_ID;
     root.innerHTML = `
       <div class="sk-shell">
-        <div class="sk-loading-overlay" id="${APP_ID}-loading">
+        <div class="sk-loading" id="${APP_ID}-loading">
           <div class="sk-spinner"></div>
         </div>
+
         <div class="sk-head">
-          <div>
-            <div class="sk-title-row">${APP_MARK_SVG}<h2>${APP_TITLE} <span class="sk-build">build ${Config.VERSION}</span></h2></div>
-            <a class="sk-byline" href="https://yellowweb.top" target="_blank">by Yellow Web</a>
+          <div class="sk-brand">
+            ${APP_MARK_SVG}
+            <div class="sk-brand-text">
+              <h2>AdReplica</h2>
+              <div class="sk-build">${t("ver", { version: Config.VERSION })}</div>
+              <a class="sk-byline" href="https://yellowweb.top" target="_blank">by Yellow Web</a>
+            </div>
           </div>
-          <div class="sk-head-actions">
-            <button id="${APP_ID}-service" class="sk-service-button" title="Service" aria-label="Service" aria-expanded="false">&#9881;</button>
-            <div id="${APP_ID}-service-menu" class="sk-service-menu sk-hidden">
-              <button data-role="busy-lock" id="${APP_ID}-clear-drafts" type="button">Clear Drafts</button>
-              <button id="${APP_ID}-previous-version" type="button">Load previous version</button>
+          <div class="sk-head-right">
+            <div class="sk-lang" role="group" aria-label="Language">
+              <button type="button" data-lang="ru" data-always-enabled title="${t("lang.ru")}" aria-pressed="false">${FLAGS.ru}</button>
+              <button type="button" data-lang="en" data-always-enabled title="${t("lang.en")}" aria-pressed="true">${FLAGS.en}</button>
+            </div>
+            <button id="${APP_ID}-service" class="sk-icon" data-always-enabled title="${t("btn.service")}" aria-label="${t("btn.service")}" aria-expanded="false">&#9881;</button>
+            <button id="${APP_ID}-close" class="sk-icon sk-close" data-always-enabled title="${t("btn.close")}" aria-label="${t("btn.close")}">&#x2715;</button>
+            <div id="${APP_ID}-service-menu" class="sk-menu sk-hidden">
+              <button data-role="busy-lock" id="${APP_ID}-clear-drafts" type="button">${t("menu.clearDrafts")}</button>
+              <button id="${APP_ID}-previous-version" type="button">${t("menu.prevVersion")}</button>
               <div id="${APP_ID}-version-note" class="sk-version-note" role="status"></div>
             </div>
-            <button id="${APP_ID}-close" class="sk-close" title="Close">&#x2715;</button>
           </div>
         </div>
 
         <div class="sk-tabs">
-          <button class="sk-tab sk-tab-active" data-tab="export">Export</button>
-          <button class="sk-tab" data-tab="import">Import</button>
-          <button class="sk-tab" data-tab="clone">Clone</button>
-          <button class="sk-tab" data-tab="mass">Mass clone</button>
+          <button class="sk-tab sk-tab-active" data-tab="export">${t("tab.export")}</button>
+          <button class="sk-tab" data-tab="import">${t("tab.import")}</button>
+          <button class="sk-tab" data-tab="clone">${t("tab.clone")}</button>
         </div>
 
-        <div class="sk-tab-panel" id="${APP_ID}-panel-export">
-          <section class="sk-card">
-            <label class="sk-field">
-              <span>Account</span>
-              <select id="${APP_ID}-export-account"></select>
-            </label>
-            <label class="sk-field">
-              <span>Campaign</span>
-              <select id="${APP_ID}-export-campaign"></select>
-            </label>
-            <div class="sk-actions">
-              <button data-role="busy-lock" id="${APP_ID}-export">Export</button>
-            </div>
-            <p class="sk-note">Export saves JSON and media files.</p>
-          </section>
+        <div class="sk-body">
+          <div class="sk-tab-panel" id="${APP_ID}-panel-export">
+            <section class="sk-card">
+              <h3 class="sk-sec">${t("tab.export")}</h3>
+              <div class="sk-row">
+                <label class="sk-field">
+                  <span>${t("field.account")}</span>
+                  <select id="${APP_ID}-export-account"></select>
+                </label>
+                <label class="sk-field">
+                  <span>${t("field.campaign")}</span>
+                  <select id="${APP_ID}-export-campaign"></select>
+                </label>
+              </div>
+              <div class="sk-bar">
+                <div class="sk-hint">${t("export.hint")}</div>
+                <div class="sk-bar-right">
+                  <button class="sk-primary" data-role="busy-lock" id="${APP_ID}-export">${t("btn.export")}</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="sk-tab-panel sk-hidden" id="${APP_ID}-panel-import">
+            <section class="sk-card">
+              <h3 class="sk-sec">${t("tab.import")}</h3>
+              <div class="sk-row">
+                <label class="sk-field">
+                  <span>${t("field.account")}</span>
+                  <select id="${APP_ID}-import-account"></select>
+                </label>
+                <label class="sk-field">
+                  <span>${t("import.json")}</span>
+                  <input type="file" id="${APP_ID}-import-json" accept=".json,application/json" />
+                </label>
+              </div>
+              <div class="sk-row">
+                <label class="sk-field">
+                  <span>${t("field.campaignName")}</span>
+                  <input type="text" id="${APP_ID}-import-campaign-name" placeholder="${t("opt.notSelected")}" />
+                </label>
+                <label class="sk-field sk-narrow">
+                  <span>${t("field.mode")}</span>
+                  <select id="${APP_ID}-import-mode">
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="PAUSED" selected>PAUSED</option>
+                  </select>
+                </label>
+              </div>
+              <details class="sk-mappings">
+                <summary>${t("clone.mappings")}</summary>
+                <div id="${APP_ID}-import-mappings"></div>
+              </details>
+              <div class="sk-bar">
+                <div class="sk-hint">${t("import.hint")}</div>
+                <div class="sk-bar-right">
+                  <button class="sk-primary" data-role="busy-lock" id="${APP_ID}-import">${t("btn.import")}</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="sk-tab-panel sk-hidden" id="${APP_ID}-panel-clone">
+            <section class="sk-card">
+              <h3 class="sk-sec">${t("clone.s1")}</h3>
+              <div class="sk-row">
+                <label class="sk-field">
+                  <span>${t("field.sourceAccount")}</span>
+                  <select id="${APP_ID}-clone-source-account"></select>
+                </label>
+                <label class="sk-field">
+                  <span>${t("field.sourceCampaign")}</span>
+                  <select id="${APP_ID}-clone-source-campaign"></select>
+                </label>
+              </div>
+              <div class="sk-stats" id="${APP_ID}-clone-package-summary"></div>
+              <details class="sk-mappings" id="${APP_ID}-clone-media-box">
+                <summary id="${APP_ID}-clone-media-toggle"></summary>
+                <div id="${APP_ID}-clone-media" class="sk-media-list"></div>
+              </details>
+              <div class="sk-row">
+                <label class="sk-field sk-grow">
+                  <span>${t("field.template")}
+                    <button type="button" class="sk-info" id="${APP_ID}-clone-macros" data-always-enabled aria-label="${t("macros.title")}">i</button>
+                  </span>
+                  <input type="text" id="${APP_ID}-clone-campaign-name" placeholder="{source} — {account}" />
+                </label>
+                <label class="sk-field sk-narrow">
+                  <span>${t("field.mode")}</span>
+                  <select id="${APP_ID}-clone-mode">
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="PAUSED" selected>PAUSED</option>
+                  </select>
+                </label>
+              </div>
+              <div class="sk-macros-pop sk-hidden" id="${APP_ID}-clone-macros-pop" data-always-enabled>
+                <b>${t("macros.hint")}</b>
+                <ul>
+                  <li><code>{source}</code><span>${t("macros.source")}</span></li>
+                  <li><code>{account}</code><span>${t("macros.account")}</span></li>
+                  <li><code>{account_id}</code><span>${t("macros.accountId")}</span></li>
+                  <li><code>{currency}</code><span>${t("macros.currency")}</span></li>
+                  <li><code>{mode}</code><span>${t("macros.mode")}</span></li>
+                  <li><code>{date}</code><span>${t("macros.date")}</span></li>
+                </ul>
+              </div>
+            </section>
+
+            <section class="sk-card">
+              <h3 class="sk-sec">${t("clone.s2")} <span class="sk-count" id="${APP_ID}-clone-targets-count"></span></h3>
+              <div class="sk-scroll">
+                <table class="sk-tbl sk-tbl-targets">
+                  <thead>
+                    <tr>
+                      <th class="sk-chk"><input type="checkbox" id="${APP_ID}-clone-master" data-always-enabled /></th>
+                      <th>${t("field.account")}</th>
+                      <th>${t("field.type")}</th>
+                      <th>${t("field.pixel")}</th>
+                      <th>${t("field.currency")}</th>
+                    </tr>
+                  </thead>
+                  <tbody id="${APP_ID}-clone-targets-body"></tbody>
+                </table>
+              </div>
+              <details class="sk-mappings">
+                <summary>${t("clone.mappings")}</summary>
+                <div id="${APP_ID}-clone-mappings"></div>
+              </details>
+            </section>
+
+            <section class="sk-card sk-hidden" id="${APP_ID}-clone-preview-card">
+              <h3 class="sk-sec">${t("clone.s3")} <span class="sk-count">${t("clone.s3note")}</span></h3>
+              <div class="sk-scroll">
+                <table class="sk-tbl sk-tbl-preview">
+                  <thead>
+                    <tr>
+                      <th>${t("field.account")}</th>
+                      <th>${t("field.fanPage")}</th>
+                      <th>${t("field.pixel")}</th>
+                      <th>${t("field.mode")}</th>
+                      <th>${t("field.budget")}</th>
+                      <th>${t("field.risk")}</th>
+                    </tr>
+                  </thead>
+                  <tbody id="${APP_ID}-clone-preview-body"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="sk-card sk-hidden" id="${APP_ID}-clone-run-card">
+              <h3 class="sk-sec">${t("clone.s4")} <span class="sk-count">${t("clone.s4note")}</span></h3>
+              <div class="sk-progress"><i id="${APP_ID}-clone-progress"></i></div>
+              <div class="sk-run-stats" id="${APP_ID}-clone-counters"></div>
+              <div class="sk-scroll sk-jobs" id="${APP_ID}-mass-progress"></div>
+              <div class="sk-console" id="${APP_ID}-clone-console"></div>
+              <div class="sk-bar">
+                <div class="sk-hint">${t("run.hint")}</div>
+                <div class="sk-bar-right">
+                  <button id="${APP_ID}-mass-stop" class="sk-danger" data-always-enabled disabled>${t("btn.stop")}</button>
+                  <button id="${APP_ID}-mass-retry" class="sk-secondary" disabled>${t("btn.retry")}</button>
+                  <button id="${APP_ID}-mass-reset" class="sk-secondary" data-always-enabled>${t("btn.reset")}</button>
+                </div>
+              </div>
+            </section>
+
+            <select id="${APP_ID}-clone-target-account" class="sk-hidden"></select>
+          </div>
         </div>
 
-        <div class="sk-tab-panel sk-hidden" id="${APP_ID}-panel-import">
-          <section class="sk-card">
-            <label class="sk-field">
-              <span>Account</span>
-              <select id="${APP_ID}-import-account"></select>
-            </label>
-            <label class="sk-field">
-              <span>Export JSON file</span>
-              <input type="file" id="${APP_ID}-import-json" accept=".json,application/json" />
-            </label>
-            <label class="sk-field">
-              <span>Campaign name</span>
-              <input type="text" id="${APP_ID}-import-campaign-name" placeholder="Will use original name if empty" />
-            </label>
-            <label class="sk-field">
-              <span>Import mode</span>
-              <select id="${APP_ID}-import-mode">
-                <option value="DRAFT">DRAFT</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="PAUSED" selected>PAUSED</option>
-              </select>
-            </label>
-            <div id="${APP_ID}-import-mappings"></div>
-            <div class="sk-actions">
-              <button data-role="busy-lock" id="${APP_ID}-import">Import</button>
-            </div>
-          </section>
+        <div class="sk-footer sk-hidden" id="${APP_ID}-clone-footer">
+          <div class="sk-hint" id="${APP_ID}-clone-hint">${t("clone.hint")}</div>
+          <div class="sk-bar-right">
+            <button id="${APP_ID}-clone-preview" class="sk-secondary">${t("btn.preview")}</button>
+            <button data-role="busy-lock" id="${APP_ID}-clone" class="sk-primary">${t("btn.clone")}</button>
+          </div>
         </div>
-
-        <div class="sk-tab-panel sk-hidden" id="${APP_ID}-panel-clone">
-          <section class="sk-card">
-            <label class="sk-field">
-              <span>Source Account</span>
-              <select id="${APP_ID}-clone-source-account"></select>
-            </label>
-            <label class="sk-field">
-              <span>Source Campaign</span>
-              <select id="${APP_ID}-clone-source-campaign"></select>
-            </label>
-            <div id="${APP_ID}-clone-package-summary"></div>
-            <label class="sk-field">
-              <span>Target Account</span>
-              <select id="${APP_ID}-clone-target-account"></select>
-            </label>
-            <label class="sk-field">
-              <span>Campaign name</span>
-              <input type="text" id="${APP_ID}-clone-campaign-name" placeholder="Will use source campaign name if empty" />
-            </label>
-            <label class="sk-field">
-              <span>Clone mode</span>
-              <select id="${APP_ID}-clone-mode">
-                <option value="DRAFT">DRAFT</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="PAUSED" selected>PAUSED</option>
-              </select>
-            </label>
-            <div id="${APP_ID}-clone-mappings"></div>
-            <div class="sk-actions">
-              <button data-role="busy-lock" id="${APP_ID}-clone">Clone</button>
-            </div>
-            <p class="sk-note">Clone copies JSON structure and source media directly in memory, without saving files to disk.</p>
-          </section>
-        </div>
-
-        <div class="sk-tab-panel sk-hidden" id="${APP_ID}-panel-mass">
-          <section class="sk-card">
-            <p class="sk-note">Uses the source account and campaign of the Clone tab. Targets are cloned one by one; a failed target is rolled back automatically.</p>
-            <label class="sk-field">
-              <span>Mode</span>
-              <select id="${APP_ID}-mass-mode">
-                <option value="DRAFT" selected>DRAFT</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="PAUSED">PAUSED</option>
-              </select>
-            </label>
-            <label class="sk-field">
-              <span>Campaign name template</span>
-              <input type="text" id="${APP_ID}-mass-name" placeholder="{source} — {account}" />
-            </label>
-            <label class="sk-field">
-              <span>FX rate for budgets (blank = automatic ECB rate)</span>
-              <input type="text" id="${APP_ID}-mass-rate" placeholder="1.0" />
-            </label>
-            <p class="sk-note sk-mass-currency" id="${APP_ID}-mass-currency"></p>
-            <div class="sk-mass-list" id="${APP_ID}-mass-list"></div>
-            <div class="sk-actions">
-              <button data-role="busy-lock" id="${APP_ID}-mass-run">Clone to selected accounts</button>
-              <button id="${APP_ID}-mass-retry" disabled>Retry failed</button>
-              <button id="${APP_ID}-mass-stop" disabled>Stop</button>
-            </div>
-            <div class="sk-mass-progress" id="${APP_ID}-mass-progress"></div>
-          </section>
-        </div>
-
         <details class="sk-logs">
-          <summary class="sk-log-summary">
-            <span>Log</span>
-            <button type="button" class="sk-secondary sk-log-download" id="${APP_ID}-download-logs">Download log</button>
+          <summary class="sk-log-head">
+            <span>${t("logs.title")}</span>
+            <button type="button" class="sk-secondary sk-log-dl" id="${APP_ID}-download-logs">${t("logs.download")}</button>
           </summary>
           <textarea id="${APP_ID}-logs" class="sk-log-area" readonly></textarea>
         </details>
-
       </div>
     `;
 
@@ -229,10 +302,28 @@ export class PanelController {
     );
     dom.cloneModeSelect = root.querySelector(`#${APP_ID}-clone-mode`);
     dom.cloneMappings = root.querySelector(`#${APP_ID}-clone-mappings`);
-    dom.massCloneList = root.querySelector(`#${APP_ID}-mass-list`);
+    dom.cloneTargetsBody = root.querySelector(`#${APP_ID}-clone-targets-body`);
+    dom.cloneMaster = root.querySelector(`#${APP_ID}-clone-master`);
+    dom.cloneTargetsCount = root.querySelector(
+      `#${APP_ID}-clone-targets-count`,
+    );
+    dom.clonePreviewButton = root.querySelector(
+      `#${APP_ID}-clone-preview`,
+    );
+    dom.clonePreviewCard = root.querySelector(`#${APP_ID}-clone-preview-card`);
+    dom.clonePreviewBody = root.querySelector(`#${APP_ID}-clone-preview-body`);
+    dom.cloneRunCard = root.querySelector(`#${APP_ID}-clone-run-card`);
+    dom.cloneFooter = root.querySelector(`#${APP_ID}-clone-footer`);
+    dom.cloneProgressBar = root.querySelector(`#${APP_ID}-clone-progress`);
+    dom.cloneCounters = root.querySelector(`#${APP_ID}-clone-counters`);
+    dom.cloneConsole = root.querySelector(`#${APP_ID}-clone-console`);
+    dom.cloneMediaBox = root.querySelector(`#${APP_ID}-clone-media-box`);
+    dom.cloneMediaToggle = root.querySelector(`#${APP_ID}-clone-media-toggle`);
+    dom.cloneMedia = root.querySelector(`#${APP_ID}-clone-media`);
+    dom.macrosButton = root.querySelector(`#${APP_ID}-clone-macros`);
+    dom.macrosPop = root.querySelector(`#${APP_ID}-clone-macros-pop`);
     dom.massCloneProgress = root.querySelector(`#${APP_ID}-mass-progress`);
-    dom.massRateInput = root.querySelector(`#${APP_ID}-mass-rate`);
-    dom.massCurrencyNote = root.querySelector(`#${APP_ID}-mass-currency`);
+    dom.massResetButton = root.querySelector(`#${APP_ID}-mass-reset`);
     dom.logs = root.querySelector(`#${APP_ID}-logs`);
     dom.downloadLogs = root.querySelector(`#${APP_ID}-download-logs`);
 
@@ -264,6 +355,8 @@ export class PanelController {
     root.querySelector(`#${APP_ID}-close`).addEventListener("click", destroy);
     root.querySelectorAll(".sk-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
+        state.activeTab = btn.dataset.tab;
+        renderUI();
         root
           .querySelectorAll(".sk-tab")
           .forEach((t) => t.classList.remove("sk-tab-active"));
@@ -274,14 +367,17 @@ export class PanelController {
         root
           .querySelector(`#${APP_ID}-panel-${btn.dataset.tab}`)
           .classList.remove("sk-hidden");
-        if (btn.dataset.tab === "mass") {
+        if (btn.dataset.tab === "clone") {
           massCloneController.ensureTargetsLoaded();
         }
       });
     });
-    // Bind the mass tab up front: the panel is remounted on session changes and
-    // the tab-specific wiring must exist before the first click.
+    // Bind the clone flow up front: the panel is remounted on session changes
+    // and the wiring must exist before the first click.
     massCloneController.bind(root);
+    if (state.activeTab && state.activeTab !== "export") {
+      root.querySelector(`.sk-tab[data-tab="${state.activeTab}"]`)?.click();
+    }
     root
       .querySelector(`#${APP_ID}-export`)
       .addEventListener("click", exportSelectedCampaign);
@@ -290,7 +386,40 @@ export class PanelController {
       .addEventListener("click", () => importPackage());
     root
       .querySelector(`#${APP_ID}-clone`)
-      .addEventListener("click", () => cloneCampaignToAccount());
+      .addEventListener("click", () => massCloneController.runMassClone());
+    const syncLangButtons = () => {
+      root.querySelectorAll("[data-lang]").forEach((button) => {
+        button.classList.toggle("sk-active", button.dataset.lang === getLang());
+        button.setAttribute(
+          "aria-pressed",
+          button.dataset.lang === getLang() ? "true" : "false",
+        );
+      });
+    };
+    syncLangButtons();
+    root.querySelectorAll("[data-lang]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.lang === getLang()) return;
+        setLang(button.dataset.lang);
+        dom.root?.remove();
+        this.mount();
+      });
+    });
+    if (dom.macrosButton && dom.macrosPop) {
+      dom.macrosButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        dom.macrosPop.classList.toggle("sk-hidden");
+      });
+      dom.macrosPop.addEventListener("click", (event) => event.stopPropagation());
+      document.addEventListener("click", () => {
+        dom.macrosPop?.classList.add("sk-hidden");
+      });
+    }
+    if (dom.clonePreviewButton) {
+      dom.clonePreviewButton.addEventListener("click", () => {
+        massCloneController.togglePreview();
+      });
+    }
     dom.downloadLogs.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -353,6 +482,7 @@ export class PanelController {
       if (state.cloneSourceAccountId) {
         await loadCloneSourceCampaigns();
         await refreshCloneSourceContext();
+        renderUI();
       }
     });
     dom.cloneSourceCampaignSelect.addEventListener("change", async (event) => {
@@ -364,6 +494,7 @@ export class PanelController {
       renderUI();
       if (state.cloneSourceCampaignId) {
         await ensureClonePackageLoaded();
+        renderUI();
       } else {
         state.clonePackageLoading = false;
         renderUI();

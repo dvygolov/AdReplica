@@ -1,3 +1,6 @@
+import { APP_ID } from "../app/constants.mjs";
+import { t } from "./i18n.mjs";
+
 /** PanelView. Dependencies are supplied by the application composition root. */
 export class PanelView {
   constructor(dependencies) {
@@ -22,14 +25,14 @@ export class PanelView {
     if (!dom.status) return;
     const pieces = [];
     if (state.loadingSession) {
-      pieces.push("Looking for access_token...");
+      pieces.push(t("status.loading"));
     } else if (state.sessionReady) {
-      pieces.push("Session ready");
+      pieces.push(t("status.ready"));
     } else {
-      pieces.push("Session not loaded");
+      pieces.push(t("status.missing"));
     }
     if (state.busy) {
-      pieces.push("operation in progress");
+      pieces.push(t("status.busy"));
     }
     dom.status.textContent = pieces.join(" / ");
   }
@@ -40,6 +43,7 @@ export class PanelView {
       this.dependencies.mappingController;
     if (!dom.root) return;
     dom.root.querySelectorAll("input,select,button").forEach((element) => {
+      if (element.dataset.alwaysEnabled !== undefined) return;
       element.disabled =
         state.busy ||
         state.loadingSession ||
@@ -89,6 +93,24 @@ export class PanelView {
       getModeOptionsMarkup,
     } = this.dependencies.mappingController;
     if (!state.uiReady) return;
+    if (state.activeTab && dom.root) {
+      const active = ["export", "import", "clone"].includes(state.activeTab)
+        ? state.activeTab
+        : "export";
+      dom.root.querySelectorAll(".sk-tab").forEach((button) => {
+        button.classList.toggle(
+          "sk-tab-active",
+          button.dataset.tab === active,
+        );
+      });
+      dom.root.querySelectorAll(".sk-tab-panel").forEach((panel) => {
+        panel.classList.toggle(
+          "sk-hidden",
+          panel.id !== `${APP_ID}-panel-${active}`,
+        );
+      });
+      dom.cloneFooter?.classList.toggle("sk-hidden", active !== "clone");
+    }
     if (dom.loadingOverlay) {
       dom.loadingOverlay.style.display =
         state.sessionReady && !state.loadingSession ? "none" : "flex";
@@ -138,11 +160,9 @@ export class PanelView {
         ? "DRAFT"
         : state.cloneStatus;
     }
-    if (
-      dom.cloneCampaignName &&
-      dom.cloneCampaignName.value !== state.cloneCampaignName
-    ) {
-      dom.cloneCampaignName.value = state.cloneCampaignName;
+    const templateValue = state.massNameTemplate || state.cloneCampaignName;
+    if (dom.cloneCampaignName && dom.cloneCampaignName.value !== templateValue) {
+      dom.cloneCampaignName.value = templateValue;
     }
     renderLogs();
     renderImportMappings();

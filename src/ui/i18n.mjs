@@ -1,0 +1,302 @@
+/** Panel translations. English is the default; the choice is persisted. */
+
+const LANG_KEY = "adreplica.panel.lang";
+
+const DICT = {
+  en: {
+    "lang.ru": "Русский",
+    "lang.en": "English",
+    "ver": "build {version}",
+    "btn.service": "Service",
+    "btn.close": "Close",
+    "menu.clearDrafts": "Clear Drafts",
+    "menu.prevVersion": "Load previous version",
+    "tab.export": "Export",
+    "tab.import": "Import",
+    "tab.clone": "Clone",
+
+    "field.account": "Ad account",
+    "field.sourceAccount": "Source ad account",
+    "field.campaign": "Campaign",
+    "field.sourceCampaign": "Source campaign",
+    "field.campaignName": "Campaign name",
+    "field.template": "Campaign name template",
+    "field.mode": "Clone mode",
+    "field.fanPage": "Facebook page",
+    "field.pixel": "Pixel",
+    "field.catalog": "Catalog",
+    "field.currency": "Currency",
+    "field.type": "Type",
+    "field.file": "File",
+    "field.kind": "Type",
+    "field.size": "Size",
+    "field.budget": "Budget",
+    "field.risk": "Risk",
+
+    "clone.s1": "1 · What to clone",
+    "clone.s2": "2 · Where to clone",
+    "clone.s2note": "active accounts only",
+    "clone.s3": "3 · Mapping preview",
+    "clone.s3note": "nothing is created",
+    "clone.s4": "4 · Run",
+    "clone.s4note": "sequential, one account at a time",
+    "clone.hint": "Select the target accounts in the table, then clone. A failed account is rolled back and the batch continues.",
+    "clone.loading": "Loading the source campaign package...",
+    "clone.mediaSummary": "Source media ({count})",
+    "clone.mappings": "Page, pixel and catalog mapping",
+    "clone.targetsHint": "{n} of {total} accounts selected",
+    "clone.targetsNone": "No active ad accounts found.",
+
+    "stat.adsets": "ad sets",
+    "stat.ads": "ads",
+    "stat.creatives": "creatives",
+    "stat.media": "media",
+    "stat.budget": "daily budget",
+    "stat.catalogs": "catalogs",
+
+    "btn.export": "Export",
+    "btn.import": "Import",
+    "btn.clone": "Clone",
+    "btn.cloneTo": "Clone to {n} accounts",
+    "btn.preview": "Preview mappings",
+    "btn.stop": "Stop",
+    "btn.retry": "Retry failed",
+    "btn.retryN": "Retry {n} failed",
+    "btn.reset": "Reset",
+
+    "opt.reuseExisting": "Reuse existing pixel",
+    "opt.noPixel": "Auto (reuse or create)",
+    "opt.notSelected": "Not selected",
+    "opt.createPixel": "Create a new pixel",
+
+    "chip.bm": "BM · {biz}",
+    "chip.personal": "personal",
+    "currency.auto": "auto rate",
+    "currency.convert": "{cur} · rate {rate}",
+
+    "run.progress": "progress",
+    "run.done": "done",
+    "run.rolled": "rolled back",
+    "run.queued": "queued",
+    "run.current": "current",
+    "run.running": "running…",
+    "run.hint": "Stop finishes the current account; nothing else is touched.",
+
+    "job.queued": "queued",
+    "job.running": "cloning…",
+    "job.success": "cloned",
+    "job.failed": "failed · rolled back",
+    "job.skipped": "skipped",
+    "job.cancelled": "cancelled",
+
+    "export.hint": "Export saves the campaign JSON and its media files.",
+    "import.hint": "Import recreates the campaign in the selected account.",
+    "import.json": "Export JSON file",
+
+    "macros.title": "Name macros",
+    "macros.hint": "Use them in the campaign name template:",
+    "macros.source": "source campaign name",
+    "macros.account": "target account name",
+    "macros.accountId": "target account id",
+    "macros.currency": "target account currency",
+    "macros.mode": "clone mode (DRAFT / PAUSED / ACTIVE)",
+    "macros.date": "today, YYYY-MM-DD",
+
+    "risk.noBm": "no BM",
+    "risk.noPage": "page missing",
+    "risk.ok": "ready",
+
+    "logs.title": "Log",
+    "logs.download": "Download log",
+    "status.loading": "Looking for access_token…",
+    "status.ready": "Session ready",
+    "status.missing": "Session not loaded",
+    "status.busy": "operation in progress",
+  },
+
+  ru: {
+    "lang.ru": "Русский",
+    "lang.en": "English",
+    "ver": "сборка {version}",
+    "btn.service": "Сервис",
+    "btn.close": "Закрыть",
+    "menu.clearDrafts": "Очистить драфты",
+    "menu.prevVersion": "Загрузить предыдущую версию",
+    "tab.export": "Экспорт",
+    "tab.import": "Импорт",
+    "tab.clone": "Клон",
+
+    "field.account": "Рекламный кабинет",
+    "field.sourceAccount": "Кабинет-источник",
+    "field.campaign": "Кампания",
+    "field.sourceCampaign": "Кампания-источник",
+    "field.campaignName": "Название кампании",
+    "field.template": "Шаблон названия кампании",
+    "field.mode": "Режим клона",
+    "field.fanPage": "Страница Facebook",
+    "field.pixel": "Пиксель",
+    "field.catalog": "Каталог",
+    "field.currency": "Валюта",
+    "field.type": "Тип",
+    "field.file": "Файл",
+    "field.kind": "Тип",
+    "field.size": "Размер",
+    "field.budget": "Бюджет",
+    "field.risk": "Риск",
+
+    "clone.s1": "1 · Что клонируем",
+    "clone.s2": "2 · Куда клонируем",
+    "clone.s2note": "только активные кабинеты",
+    "clone.s3": "3 · Предпросмотр маппингов",
+    "clone.s3note": "ничего не создаётся",
+    "clone.s4": "4 · Выполнение",
+    "clone.s4note": "последовательно, по одному кабинету",
+    "clone.hint": "Отметьте кабинеты в таблице и запустите клон. Упавший кабинет откатывается, очередь продолжается.",
+    "clone.mediaSummary": "Медиа источника ({count})",
+    "clone.mappings": "Маппинг страниц, пикселей и каталогов",
+    "clone.targetsHint": "выбрано {n} из {total} кабинетов",
+    "clone.targetsNone": "Активных рекламных кабинетов не найдено.",
+
+    "stat.adsets": "адсетов",
+    "stat.ads": "объявлений",
+    "stat.creatives": "креативов",
+    "stat.media": "медиа",
+    "stat.budget": "дневной бюджет",
+    "stat.catalogs": "каталогов",
+
+    "btn.export": "Экспорт",
+    "btn.import": "Импорт",
+    "btn.clone": "Клонировать",
+    "btn.cloneTo": "Клонировать в {n} кабинетов",
+    "btn.preview": "Показать маппинги",
+    "btn.stop": "Стоп",
+    "btn.retry": "Повторить упавшие",
+    "btn.retryN": "Повторить упавшие ({n})",
+    "btn.reset": "Сбросить",
+
+    "opt.reuseExisting": "Переиспользовать пиксель",
+    "opt.noPixel": "Авто (переиспользовать/создать)",
+    "clone.loading": "Загружаем пакет кампании-источника...",
+    "opt.notSelected": "Не выбрано",
+    "opt.createPixel": "Создать новый пиксель",
+
+    "chip.bm": "БМ · {biz}",
+    "chip.personal": "личный",
+    "currency.auto": "курс автоматически",
+    "currency.convert": "{cur} · курс {rate}",
+
+    "run.done": "готово",
+    "run.rolled": "откатано",
+    "run.queued": "в очереди",
+    "run.current": "текущий",
+    "run.running": "выполняется…",
+    "run.hint": "Стоп завершит текущий кабинет, остальные не тронет.",
+
+    "job.queued": "в очереди",
+    "job.running": "клонируется…",
+    "job.success": "готово",
+    "job.failed": "ошибка · откатано",
+    "job.skipped": "пропущен",
+    "job.cancelled": "отменён",
+
+    "export.hint": "Экспорт сохраняет JSON кампании и её медиафайлы.",
+    "import.hint": "Импорт воссоздаёт кампанию в выбранном кабинете.",
+    "import.json": "JSON-файл экспорта",
+
+    "macros.title": "Макросы названия",
+    "macros.hint": "Используйте их в шаблоне названия кампании:",
+    "macros.source": "название кампании-источника",
+    "macros.account": "название целевого кабинета",
+    "macros.accountId": "id целевого кабинета",
+    "macros.currency": "валюта целевого кабинета",
+    "macros.mode": "режим клона (DRAFT / PAUSED / ACTIVE)",
+    "macros.date": "сегодняшняя дата, ГГГГ-ММ-ДД",
+
+    "risk.noBm": "нет БМ",
+    "risk.noPage": "нет страницы",
+    "risk.ok": "готов",
+
+    "logs.title": "Лог",
+    "logs.download": "Скачать лог",
+    "status.loading": "Ищем access_token…",
+    "status.ready": "Сессия готова",
+    "status.missing": "Сессия не загружена",
+    "status.busy": "выполняется операция",
+  },
+};
+
+export const FLAGS = {
+  ru: `<svg viewBox="0 0 60 36" width="18" height="11" aria-hidden="true"><rect width="60" height="12" fill="#fff"/><rect y="12" width="60" height="12" fill="#0039A6"/><rect y="24" width="60" height="12" fill="#D52B1E"/></svg>`,
+  en: `<svg viewBox="0 0 60 36" width="18" height="11" aria-hidden="true"><rect width="60" height="36" fill="#012169"/><path d="M0,0 60,36 M60,0 0,36" stroke="#fff" stroke-width="7"/><path d="M0,0 60,36 M60,0 0,36" stroke="#C8102E" stroke-width="3"/><path d="M30,0 V36 M0,18 H60" stroke="#fff" stroke-width="11"/><path d="M30,0 V36 M0,18 H60" stroke="#C8102E" stroke-width="6"/></svg>`,
+};
+
+let lang = "en";
+try {
+  const stored = localStorage.getItem(LANG_KEY);
+  if (stored === "ru" || stored === "en") lang = stored;
+} catch {
+  /* storage can be unavailable in a sandboxed frame */
+}
+
+export function getLang() {
+  return lang;
+}
+
+export function setLang(next) {
+  lang = next === "ru" ? "ru" : "en";
+  try {
+    localStorage.setItem(LANG_KEY, lang);
+  } catch {
+    /* ignore */
+  }
+  return lang;
+}
+
+export function t(key, vars) {
+  const value = DICT[lang]?.[key] ?? DICT.en[key] ?? key;
+  if (!vars) return value;
+  return value.replace(/\{(\w+)\}/g, (match, name) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match,
+  );
+}
+
+const RU_STAT_FORMS = {
+  "stat.adsets": ["группа объявлений", "группы объявлений", "групп объявлений"],
+  "stat.ads": ["объявление", "объявления", "объявлений"],
+  "stat.creatives": ["креатив", "креатива", "креативов"],
+  "stat.media": ["медиафайл", "медиафайла", "медиафайлов"],
+  "stat.catalogs": ["каталог", "каталога", "каталогов"],
+};
+
+/** Plural-aware label for the source summary tiles. */
+export function statLabel(key, count) {
+  if (lang !== "ru" || !RU_STAT_FORMS[key]) return t(key);
+  const n = Math.abs(Number(count) || 0) % 100;
+  const n1 = n % 10;
+  const forms = RU_STAT_FORMS[key];
+  if (n > 10 && n < 20) return forms[2];
+  if (n1 === 1) return forms[0];
+  if (n1 >= 2 && n1 <= 4) return forms[1];
+  return forms[2];
+}
+
+function ruForm(n, forms) {
+  const value = Math.abs(Number(n) || 0) % 100;
+  const last = value % 10;
+  if (value > 10 && value < 20) return forms[2];
+  if (last === 1) return forms[0];
+  if (last >= 2 && last <= 4) return forms[1];
+  return forms[2];
+}
+
+/** "Clone to 3 accounts" with correct Russian plural. */
+export function cloneToLabel(count) {
+  if (lang === "ru") {
+    return `Клонировать в ${count} ${ruForm(count, [
+      "кабинет",
+      "кабинета",
+      "кабинетов",
+    ])}`;
+  }
+  return `Clone to ${count} account${Number(count) === 1 ? "" : "s"}`;
+}

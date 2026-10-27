@@ -338,7 +338,6 @@ export class MappingsView {
 
   renderCloneMappings() {
     const { state, dom } = this.dependencies;
-    const { renderCloneCampaignSummary } = this.dependencies.packageRenderer;
     const {
       renderMappingsPanel,
       renderSectionLoading,
@@ -349,11 +348,6 @@ export class MappingsView {
       dom.cloneMappings.innerHTML = renderSectionLoading(
         "Loading source campaign structure, pages, pixels, and mappings...",
       );
-      if (dom.clonePackageSummary) {
-        dom.clonePackageSummary.innerHTML = renderSectionLoading(
-          "Loading source campaign package...",
-        );
-      }
       return;
     }
     dom.cloneMappings.innerHTML =
@@ -379,11 +373,6 @@ export class MappingsView {
         mediaSubtitle: "Creatives — Media Files",
         mediaEmptyText: "Media will be copied automatically from source.",
       }) + renderManualCloneCatalogSelector();
-    if (dom.clonePackageSummary) {
-      dom.clonePackageSummary.innerHTML = state.clonePackage
-        ? renderCloneCampaignSummary(state.clonePackage)
-        : "";
-    }
   }
 
   renderManualCloneCatalogSelector() {

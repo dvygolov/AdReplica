@@ -1,21 +1,25 @@
-/** Binds the mass-clone tab: target selection, per-account pixel, run and stop. */
+/** Binds the clone tab: target selection, per-account pixel, preview, run, reset. */
 export class MassCloneController {
   constructor(dependencies) {
     this.dependencies = dependencies;
     this.bind = this.bind.bind(this);
     this.ensureTargetsLoaded = this.ensureTargetsLoaded.bind(this);
     this.runMassClone = this.runMassClone.bind(this);
+    this.retryFailed = this.retryFailed.bind(this);
     this.stopMassClone = this.stopMassClone.bind(this);
+    this.resetRun = this.resetRun.bind(this);
+    this.togglePreview = this.togglePreview.bind(this);
   }
 
-  /** Loads the pixel list of every account once, so each row can offer a choice. */
+  /** Loads the pixel list of every active account once, so each row can offer a choice. */
   async ensureTargetsLoaded() {
     const { state } = this.dependencies;
     const { graphGetAll } = this.dependencies.graphClient;
     const { log } = this.dependencies.logging;
     if (!state.accounts?.length) return;
     state.massPixels ||= {};
-    for (const account of state.accounts) {
+    const accounts = this.dependencies.massCloneView.targetAccounts();
+    for (const account of accounts) {
       const accountId = String(account.id);
       if (state.massPixels[accountId]) continue;
       try {
@@ -44,7 +48,7 @@ export class MassCloneController {
     return this.dependencies.massCloneWorkflow.run();
   }
 
-  /** Re-runs exactly the accounts that failed in the previous mass run. */
+  /** Re-runs exactly the accounts that failed in the previous run. */
   async retryFailed() {
     const { state } = this.dependencies;
     const { log } = this.dependencies.logging;
@@ -86,13 +90,42 @@ export class MassCloneController {
     this.dependencies.massCloneView.render();
   }
 
+  /** Clears the previous run so the tab returns to selection. */
+  resetRun() {
+    const { state } = this.dependencies;
+    if (state.massRunning) return;
+    state.massResults = [];
+    state.massActiveAccountId = "";
+    state.clonePreviewOpen = false;
+    this.dependencies.massCloneView.render();
+  }
+
+  togglePreview() {
+    const { state } = this.dependencies;
+    state.clonePreviewOpen = !state.clonePreviewOpen;
+    this.dependencies.massCloneView.render();
+  }
+
+  setAllTargets(selected) {
+    const { state } = this.dependencies;
+    state.massTargets ||= {};
+    for (const account of this.dependencies.massCloneView.targetAccounts()) {
+      const accountId = String(account.id);
+      state.massTargets[accountId] = {
+        ...(state.massTargets[accountId] || {}),
+        selected,
+      };
+    }
+    this.dependencies.massCloneView.render();
+  }
+
   bind(root) {
     const { state, dom } = this.dependencies;
     const appId = this.dependencies.appId;
     if (!root) return;
     if (this.boundRoot === root) return;
     this.boundRoot = root;
-    const list = dom.massCloneList;
+    const list = dom.cloneTargetsBody;
     if (list) {
       list.addEventListener("change", (event) => {
         const input = event.target;
@@ -118,34 +151,38 @@ export class MassCloneController {
             ...(state.massTargets[pixelAccountId] || {}),
             pixelId: input.value,
           };
+          this.dependencies.massCloneView.render();
         }
       });
     }
-    const modeSelect = root.querySelector(`#${appId}-mass-mode`);
+    if (dom.cloneMaster) {
+      dom.cloneMaster.addEventListener("change", () => {
+        this.setAllTargets(dom.cloneMaster.checked);
+      });
+    }
+    const modeSelect = root.querySelector(`#${appId}-clone-mode`);
     if (modeSelect) {
       modeSelect.addEventListener("change", (event) => {
         state.massMode = event.target.value;
       });
     }
-    const nameInput = root.querySelector(`#${appId}-mass-name`);
+    const nameInput = root.querySelector(`#${appId}-clone-campaign-name`);
     if (nameInput) {
       nameInput.addEventListener("input", (event) => {
         state.massNameTemplate = event.target.value;
       });
     }
-    const rateInput = root.querySelector(`#${appId}-mass-rate`);
-    if (rateInput) {
-      rateInput.addEventListener("input", (event) => {
-        state.massRateOverride = event.target.value.trim();
-      });
-    }
-    dom.massRunButton = root.querySelector(`#${appId}-mass-run`);
+    dom.cloneRunButton = root.querySelector(`#${appId}-clone`);
     dom.massStopButton = root.querySelector(`#${appId}-mass-stop`);
     dom.massRetryButton = root.querySelector(`#${appId}-mass-retry`);
+    dom.massResetButton = root.querySelector(`#${appId}-mass-reset`);
     if (dom.massRetryButton) {
       dom.massRetryButton.addEventListener("click", () => {
         this.retryFailed();
       });
+    }
+    if (dom.massResetButton) {
+      dom.massResetButton.addEventListener("click", () => this.resetRun());
     }
     if (dom.massRunButton) {
       dom.massRunButton.addEventListener("click", () => {

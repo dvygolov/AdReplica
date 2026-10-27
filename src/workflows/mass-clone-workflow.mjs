@@ -35,12 +35,24 @@ export class MassCloneWorkflow {
       }));
   }
 
-  buildCampaignName(template, sourceName, account) {
+  /** Renders the campaign name template. Unknown macros stay untouched. */
+  buildCampaignName(template, sourceName, account, context = {}) {
     const fallback = sourceName || "Cloned campaign";
     const raw = String(template || "").trim() || `${fallback} — {account}`;
+    const vars = {
+      source: fallback,
+      account: account?.name || account?.accountId || "",
+      account_id: String(account?.accountId || account?.id || ""),
+      currency: context.currency || "",
+      mode: context.mode || "",
+      date: context.date || new Date().toISOString().slice(0, 10),
+    };
     const rendered = raw
-      .replace(/\{account\}/gi, account.name || account.accountId)
-      .replace(/\{source\}/gi, fallback)
+      .replace(/\{(\w+)\}/g, (match, key) =>
+        Object.prototype.hasOwnProperty.call(vars, key)
+          ? String(vars[key] ?? "")
+          : match,
+      )
       .trim();
     return rendered || fallback;
   }
@@ -90,6 +102,8 @@ export class MassCloneWorkflow {
     const manual = Number(state.massRateOverride);
     if (Number.isFinite(manual) && manual > 0) {
       state.cloneCurrencyRate = manual;
+      state.massRates ||= {};
+      state.massRates[target.accountId] = manual;
       state.massCurrencyNote = `${from} → ${to} at manual rate ${manual}`;
       log("info", `Mass clone: using manual ${from}→${to} rate ${manual}.`);
       return { ok: true, rate: manual, from, to };
@@ -109,6 +123,8 @@ export class MassCloneWorkflow {
       };
     }
     state.cloneCurrencyRate = result.rate;
+    state.massRates ||= {};
+    state.massRates[target.accountId] = result.rate;
     state.massCurrencyNote = `${from} → ${to} at ${result.rate} (${result.source})`;
     log(
       "info",
@@ -224,9 +240,13 @@ export class MassCloneWorkflow {
       state.massMode !== "PAUSED" && state.massMode !== "ACTIVE";
     state.cloneStatus = state.cloneAsDraft ? "PAUSED" : state.massMode;
     state.cloneCampaignName = this.buildCampaignName(
-      state.massNameTemplate,
+      state.massNameTemplate || state.cloneCampaignName,
       sourceName,
       target,
+      {
+        currency: this.accountCurrency(target.accountId),
+        mode: state.massMode,
+      },
     );
     log(
       "info",
