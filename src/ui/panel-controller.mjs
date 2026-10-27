@@ -22,8 +22,7 @@ export class PanelController {
     const { getSharedMediaOverrideKey } = this.dependencies.mediaSlots;
     const { renderButtons, renderUI } = this.dependencies.panelView;
     const { downloadLogs } = this.dependencies.logView;
-    const { renderImportMappings, renderCloneMappings } =
-      this.dependencies.mappingsView;
+    const { renderImportMappings } = this.dependencies.mappingsView;
     const { destroy, injectStyles } = this;
     const { initializeSession } = this.dependencies.sessionService;
     const {
@@ -167,10 +166,6 @@ export class PanelController {
                 </label>
               </div>
               <div class="sk-stats" id="${APP_ID}-clone-package-summary"></div>
-              <details class="sk-mappings" id="${APP_ID}-clone-media-box">
-                <summary id="${APP_ID}-clone-media-toggle"></summary>
-                <div id="${APP_ID}-clone-media" class="sk-media-list"></div>
-              </details>
               <div class="sk-row">
                 <label class="sk-field sk-grow">
                   <span>${t("field.template")}
@@ -211,34 +206,13 @@ export class PanelController {
                       <th class="sk-chk"><input type="checkbox" id="${APP_ID}-clone-master" data-always-enabled /></th>
                       <th>${t("field.account")}</th>
                       <th>${t("field.type")}</th>
+                      <th>${t("field.fanPage")}</th>
                       <th>${t("field.pixel")}</th>
+                      <th class="sk-hidden" id="${APP_ID}-clone-th-catalog">${t("field.catalog")}</th>
                       <th>${t("field.currency")}</th>
                     </tr>
                   </thead>
                   <tbody id="${APP_ID}-clone-targets-body"></tbody>
-                </table>
-              </div>
-              <details class="sk-mappings">
-                <summary>${t("clone.mappings")}</summary>
-                <div id="${APP_ID}-clone-mappings"></div>
-              </details>
-            </section>
-
-            <section class="sk-card sk-hidden" id="${APP_ID}-clone-preview-card">
-              <h3 class="sk-sec">${t("clone.s3")} <span class="sk-count">${t("clone.s3note")}</span></h3>
-              <div class="sk-scroll">
-                <table class="sk-tbl sk-tbl-preview">
-                  <thead>
-                    <tr>
-                      <th>${t("field.account")}</th>
-                      <th>${t("field.fanPage")}</th>
-                      <th>${t("field.pixel")}</th>
-                      <th>${t("field.mode")}</th>
-                      <th>${t("field.budget")}</th>
-                      <th>${t("field.risk")}</th>
-                    </tr>
-                  </thead>
-                  <tbody id="${APP_ID}-clone-preview-body"></tbody>
                 </table>
               </div>
             </section>
@@ -266,7 +240,6 @@ export class PanelController {
         <div class="sk-footer sk-hidden" id="${APP_ID}-clone-footer">
           <div class="sk-hint" id="${APP_ID}-clone-hint">${t("clone.hint")}</div>
           <div class="sk-bar-right">
-            <button id="${APP_ID}-clone-preview" class="sk-secondary">${t("btn.preview")}</button>
             <button data-role="busy-lock" id="${APP_ID}-clone" class="sk-primary">${t("btn.clone")}</button>
           </div>
         </div>
@@ -308,15 +281,12 @@ export class PanelController {
       `#${APP_ID}-clone-campaign-name`,
     );
     dom.cloneModeSelect = root.querySelector(`#${APP_ID}-clone-mode`);
-    dom.cloneMappings = root.querySelector(`#${APP_ID}-clone-mappings`);
+    dom.cloneCatalogHead = root.querySelector(`#${APP_ID}-clone-th-catalog`);
     dom.cloneTargetsBody = root.querySelector(`#${APP_ID}-clone-targets-body`);
     dom.cloneMaster = root.querySelector(`#${APP_ID}-clone-master`);
     dom.cloneTargetsCount = root.querySelector(
       `#${APP_ID}-clone-targets-count`,
     );
-    dom.clonePreviewButton = root.querySelector(`#${APP_ID}-clone-preview`);
-    dom.clonePreviewCard = root.querySelector(`#${APP_ID}-clone-preview-card`);
-    dom.clonePreviewBody = root.querySelector(`#${APP_ID}-clone-preview-body`);
     dom.cloneRunCard = root.querySelector(`#${APP_ID}-clone-run-card`);
     dom.cloneFooter = root.querySelector(`#${APP_ID}-clone-footer`);
     dom.cloneSourceBody = root.querySelector(`#${APP_ID}-clone-source-body`);
@@ -325,9 +295,6 @@ export class PanelController {
     dom.cloneProgressBar = root.querySelector(`#${APP_ID}-clone-progress`);
     dom.cloneCounters = root.querySelector(`#${APP_ID}-clone-counters`);
     dom.cloneConsole = root.querySelector(`#${APP_ID}-clone-console`);
-    dom.cloneMediaBox = root.querySelector(`#${APP_ID}-clone-media-box`);
-    dom.cloneMediaToggle = root.querySelector(`#${APP_ID}-clone-media-toggle`);
-    dom.cloneMedia = root.querySelector(`#${APP_ID}-clone-media`);
     dom.macrosButton = root.querySelector(`#${APP_ID}-clone-macros`);
     dom.macrosPop = root.querySelector(`#${APP_ID}-clone-macros-pop`);
     dom.massCloneProgress = root.querySelector(`#${APP_ID}-mass-progress`);
@@ -429,11 +396,6 @@ export class PanelController {
       dom.cloneCollapseButton.addEventListener("click", () => {
         state.cloneSourceCollapsed = !state.cloneSourceCollapsed;
         renderUI();
-      });
-    }
-    if (dom.clonePreviewButton) {
-      dom.clonePreviewButton.addEventListener("click", () => {
-        massCloneController.togglePreview();
       });
     }
     dom.downloadLogs.addEventListener("click", (event) => {
@@ -593,40 +555,9 @@ export class PanelController {
         renderImportMappings();
       }
     });
-    dom.cloneMappings.addEventListener("change", (event) => {
-      const target = event.target;
-      if (!(
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLSelectElement
-      ))
-        return;
-      if (target.dataset.action === "clone-page-map") {
-        state.clonePageMappings[target.dataset.sourcePageId] = target.value;
-      }
-      if (target.dataset.action === "clone-pixel-map") {
-        state.clonePixelMappings[target.dataset.sourcePixelId] = target.value;
-      }
-      if (target.dataset.action === "clone-manual-source-catalog") {
-        if (state.cloneManualSourceCatalogId) {
-          delete state.cloneCatalogMappings[state.cloneManualSourceCatalogId];
-        }
-        state.cloneManualSourceCatalogId = target.value;
-        if (state.cloneManualSourceCatalogId) {
-          state.cloneCatalogMappings[state.cloneManualSourceCatalogId] = state
-            .cloneTargetBusiness?.id
-            ? "__copy__"
-            : "";
-        }
-      }
-      if (target.dataset.action === "clone-catalog-map") {
-        state.cloneCatalogMappings[target.dataset.sourceCatalogId] =
-          target.value;
-      }
-      renderCloneMappings();
-    });
-
     state.uiReady = true;
     renderUI();
+    if (state.activeTab === "clone") massCloneController.ensureTargetsLoaded();
     log("info", "UI ready. Connecting session...");
     if (!window.__ADREPLICA_QA_SUPPRESS_AUTO_INIT__) {
       initializeSession().catch(() => {});

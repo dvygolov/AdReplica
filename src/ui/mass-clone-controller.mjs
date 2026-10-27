@@ -1,4 +1,4 @@
-/** Binds the clone tab: target selection, per-account pixel, preview, run, reset. */
+/** Binds the clone tab: target selection, per-account page/pixel/catalog, run, reset. */
 export class MassCloneController {
   constructor(dependencies) {
     this.dependencies = dependencies;
@@ -8,38 +8,136 @@ export class MassCloneController {
     this.retryFailed = this.retryFailed.bind(this);
     this.stopMassClone = this.stopMassClone.bind(this);
     this.resetRun = this.resetRun.bind(this);
-    this.togglePreview = this.togglePreview.bind(this);
   }
 
-  /** Loads the pixel list of every active account once, so each row can offer a choice. */
+  /**
+   * Loads the pages, pixels and catalogs that each target account can actually
+   * use, so a row never offers a page the account cannot publish to.
+   */
   async ensureTargetsLoaded() {
+    try {
+      await this.loadAllTargetContexts();
+    } catch (error) {
+      this.dependencies.logging.log(
+        "warn",
+        "Target context lookup failed; the table keeps the automatic choices.",
+        String(error && error.message ? error.message : error),
+      );
+    }
+  }
+
+  async loadAllTargetContexts() {
     const { state } = this.dependencies;
     const { graphGetAll } = this.dependencies.graphClient;
     const { log } = this.dependencies.logging;
-    if (!state.accounts?.length) return;
+    if (!state.accounts?.length) {
+      // The tab can be opened before the session finishes loading accounts.
+      if (!this.accountsRetry) {
+        this.accountsRetry = setInterval(() => {
+          if (!state.accounts?.length) return;
+          clearInterval(this.accountsRetry);
+          this.accountsRetry = null;
+          this.ensureTargetsLoaded();
+        }, 2000);
+      }
+      return;
+    }
     state.massPixels ||= {};
+    state.massPages ||= {};
+    state.massCatalogs ||= {};
+    state.massCatalogBusiness ||= {};
     const accounts = this.dependencies.massCloneView.targetAccounts();
     for (const account of accounts) {
       const accountId = String(account.id);
-      if (state.massPixels[accountId]) continue;
-      try {
-        const pixels = await graphGetAll(`act_${accountId}/adspixels`, {
-          fields: "id,name",
-        });
-        state.massPixels[accountId] = pixels.map((pixel) => ({
-          id: String(pixel.id),
-          name: pixel.name || String(pixel.id),
-        }));
-      } catch (error) {
-        state.massPixels[accountId] = [];
-        log(
-          "warn",
-          `Pixel lookup failed for act_${accountId}; the clone will create or reuse one automatically.`,
-          String(error),
-        );
+      const context = await this.loadAccountContext(accountId);
+      if (!state.massPixels[accountId]) {
+        if (context?.pixels?.length) {
+          state.massPixels[accountId] = context.pixels;
+        } else {
+          try {
+            const pixels = await graphGetAll(`act_${accountId}/adspixels`, {
+              fields: "id,name",
+            });
+            state.massPixels[accountId] = pixels.map((pixel) => ({
+              id: String(pixel.id),
+              name: pixel.name || String(pixel.id),
+            }));
+          } catch (error) {
+            state.massPixels[accountId] = [];
+            log(
+              "warn",
+              `Pixel lookup failed for act_${accountId}; the clone will create or reuse one automatically.`,
+              String(error),
+            );
+          }
+        }
       }
+      state.massPages[accountId] = await this.loadAccountPages(
+        accountId,
+        context,
+      );
+      state.massCatalogs[accountId] = (context?.catalogs || []).map(
+        (catalog) => ({
+          id: String(catalog.id),
+          name: catalog.name || String(catalog.id),
+        }),
+      );
+      state.massCatalogBusiness[accountId] = context?.business || null;
     }
     this.dependencies.massCloneView.render();
+  }
+
+  /** The shared account context is cached, so opening the tab stays cheap. */
+  async loadAccountContext(accountId) {
+    const service = this.dependencies.accountContextService;
+    if (!service?.fetchAccountContext) return null;
+    try {
+      return await service.fetchAccountContext(accountId);
+    } catch (error) {
+      this.dependencies.logging.log(
+        "warn",
+        `Account context lookup failed for act_${accountId}.`,
+        String(error),
+      );
+      return null;
+    }
+  }
+
+  /** Pages the ad account is allowed to promote; the global page list is the fallback. */
+  async loadAccountPages(accountId, context) {
+    const { state } = this.dependencies;
+    const { graphGetAll } = this.dependencies.graphClient;
+    const { log } = this.dependencies.logging;
+    state.massPagesCache ||= {};
+    if (state.massPagesCache[accountId]) return state.massPagesCache[accountId];
+    const normalize = (page) => ({
+      id: String(page.id),
+      name: page.name || String(page.id),
+      picture: page.picture?.data?.url || page.picture || "",
+    });
+    const accessible = (context?.pages || state.accessiblePagesCache || []).map(
+      normalize,
+    );
+    let promotable = [];
+    try {
+      const pages = await graphGetAll(`act_${accountId}/promote_pages`, {
+        fields: "id,name,picture{url}",
+      });
+      promotable = pages.map(normalize);
+    } catch (error) {
+      log(
+        "info",
+        `act_${accountId}/promote_pages is unavailable; using the accessible page list.`,
+        String(error),
+      );
+    }
+    // promote_pages omits pages shared with the profile, so the two lists are merged.
+    const merged = new Map();
+    for (const page of [...promotable, ...accessible]) {
+      if (page.id && !merged.has(page.id)) merged.set(page.id, page);
+    }
+    state.massPagesCache[accountId] = [...merged.values()];
+    return state.massPagesCache[accountId];
   }
 
   async runMassClone() {
@@ -97,13 +195,6 @@ export class MassCloneController {
     state.massResults = [];
     state.massActiveAccountId = "";
     state.massSequence = 0;
-    state.clonePreviewOpen = false;
-    this.dependencies.massCloneView.render();
-  }
-
-  togglePreview() {
-    const { state } = this.dependencies;
-    state.clonePreviewOpen = !state.clonePreviewOpen;
     this.dependencies.massCloneView.render();
   }
 
@@ -120,6 +211,16 @@ export class MassCloneController {
     this.dependencies.massCloneView.render();
   }
 
+  pickFor(accountId, patch) {
+    const { state } = this.dependencies;
+    state.massTargets ||= {};
+    state.massTargets[accountId] = {
+      ...(state.massTargets[accountId] || {}),
+      ...patch,
+    };
+    this.dependencies.massCloneView.render();
+  }
+
   bind(root) {
     const { state, dom } = this.dependencies;
     const appId = this.dependencies.appId;
@@ -130,29 +231,45 @@ export class MassCloneController {
     if (list) {
       list.addEventListener("change", (event) => {
         const input = event.target;
-        if (
-          !(input instanceof HTMLInputElement) &&
-          !(input instanceof HTMLSelectElement)
-        )
-          return;
+        if (!(input instanceof HTMLSelectElement)) return;
         const accountId = input.dataset.massAccount;
         if (accountId) {
-          state.massTargets ||= {};
-          state.massTargets[accountId] = {
-            ...(state.massTargets[accountId] || {}),
-            selected: input.checked,
-          };
-          this.dependencies.massCloneView.render();
+          this.pickFor(accountId, { selected: false });
           return;
         }
         const pixelAccountId = input.dataset.massPixel;
         if (pixelAccountId) {
-          state.massTargets ||= {};
-          state.massTargets[pixelAccountId] = {
-            ...(state.massTargets[pixelAccountId] || {}),
-            pixelId: input.value,
-          };
+          this.pickFor(pixelAccountId, { pixelId: input.value });
+          return;
+        }
+        const catalogAccountId = input.dataset.massCatalog;
+        if (catalogAccountId) {
+          this.pickFor(catalogAccountId, { catalogId: input.value });
+        }
+      });
+      list.addEventListener("change", (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement)) return;
+        const accountId = input.dataset.massAccount;
+        if (!accountId) return;
+        this.pickFor(accountId, { selected: input.checked });
+      });
+      // Page pickers are listboxes, not native selects: the page avatar matters.
+      list.addEventListener("click", (event) => {
+        const toggle = event.target.closest("[data-mass-page-toggle]");
+        if (toggle) {
+          const accountId = toggle.dataset.massPageToggle;
+          state.massOpenPageMenu =
+            String(state.massOpenPageMenu || "") === accountId ? "" : accountId;
           this.dependencies.massCloneView.render();
+          return;
+        }
+        const pick = event.target.closest("[data-mass-page-pick]");
+        if (pick) {
+          state.massOpenPageMenu = "";
+          this.pickFor(pick.dataset.massPagePick, {
+            pageId: pick.dataset.pageId || "",
+          });
         }
       });
     }
@@ -185,11 +302,7 @@ export class MassCloneController {
     if (dom.massResetButton) {
       dom.massResetButton.addEventListener("click", () => this.resetRun());
     }
-    if (dom.massRunButton) {
-      dom.massRunButton.addEventListener("click", () => {
-        this.runMassClone();
-      });
-    }
+    // The run button is bound by the panel controller next to the other actions.
     if (dom.massStopButton) {
       dom.massStopButton.addEventListener("click", () => this.stopMassClone());
     }

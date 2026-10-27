@@ -11,13 +11,12 @@ const JOB_LABELS = {
   cancelled: "job.cancelled",
 };
 
-/** Renders the clone tab: target table, mapping preview and the run screen. */
+/** Renders the clone tab: target table with per-account page/pixel/catalog and the run screen. */
 export class MassCloneView {
   constructor(dependencies) {
     this.dependencies = dependencies;
     this.render = this.render.bind(this);
     this.renderTargets = this.renderTargets.bind(this);
-    this.renderPreview = this.renderPreview.bind(this);
     this.renderProgress = this.renderProgress.bind(this);
     this.renderSource = this.renderSource.bind(this);
   }
@@ -54,6 +53,12 @@ export class MassCloneView {
     );
   }
 
+  /** The catalog column only makes sense for a campaign that sells from a catalog. */
+  showsCatalogColumn() {
+    const { state } = this.dependencies;
+    return Boolean(state.clonePackage?.catalogs?.length);
+  }
+
   pixelOptions(accountId, selectedPixelId) {
     const { state } = this.dependencies;
     const pixels = state.massPixels?.[accountId] || [];
@@ -71,6 +76,85 @@ export class MassCloneView {
         )
         .join("")
     );
+  }
+
+  catalogOptions(accountId, selectedCatalogId) {
+    const { state, dom } = this.dependencies;
+    const catalogs = state.massCatalogs?.[accountId] || [];
+    const business = state.massCatalogBusiness?.[accountId];
+    const head = `<option value="" ${selectedCatalogId ? "" : "selected"}>${escapeHtml(
+      t("opt.noCatalog"),
+    )}</option>`;
+    const copy = business?.id
+      ? `<option value="__copy__" ${
+          selectedCatalogId === "__copy__" ? "selected" : ""
+        }>${escapeHtml(t("opt.copyCatalog", { bm: business.name || business.id }))}</option>`
+      : "";
+    void dom;
+    return (
+      head +
+      copy +
+      catalogs
+        .map(
+          (catalog) =>
+            `<option value="${escapeHtml(catalog.id)}" ${
+              catalog.id === selectedCatalogId ? "selected" : ""
+            }>${escapeHtml(catalog.name || catalog.id)}</option>`,
+        )
+        .join("")
+    );
+  }
+
+  /** Page picker: a native select cannot show the page avatar, so it is a listbox. */
+  pageCell(accountId, picked) {
+    const { state } = this.dependencies;
+    const pages = state.massPages?.[accountId] || [];
+    const open = String(state.massOpenPageMenu || "") === accountId;
+    const selected = pages.find(
+      (page) => String(page.id) === String(picked.pageId || ""),
+    );
+    const initial = (selected?.name || "FP").trim().charAt(0).toUpperCase();
+    const face = selected?.picture
+      ? `<img src="${escapeHtml(selected.picture)}" alt="" loading="lazy" />`
+      : `<span>${escapeHtml(initial)}</span>`;
+    const items = [
+      `<button type="button" class="sk-fp-item" data-mass-page-pick="${escapeHtml(
+        accountId,
+      )}" data-page-id="">
+        <span class="sk-fp-ico sk-fp-auto">${escapeHtml(t("opt.autoPageShort"))}</span>
+        <span class="sk-fp-name">${escapeHtml(t("opt.autoPage"))}</span>
+      </button>`,
+      ...pages.map((page) => {
+        const mark =
+          String(page.id) === String(picked.pageId || "") ? " sk-on" : "";
+        return `<button type="button" class="sk-fp-item${mark}" data-mass-page-pick="${escapeHtml(
+          accountId,
+        )}" data-page-id="${escapeHtml(page.id)}">
+          <span class="sk-fp-ico">${
+            page.picture
+              ? `<img src="${escapeHtml(page.picture)}" alt="" loading="lazy" />`
+              : `<span>${escapeHtml((page.name || "F").charAt(0).toUpperCase())}</span>`
+          }</span>
+          <span class="sk-fp-name">${escapeHtml(page.name || page.id)}</span>
+        </button>`;
+      }),
+    ].join("");
+    return `<td class="sk-fp-cell" data-fp-cell="${escapeHtml(accountId)}">
+      <button type="button" class="sk-fp-btn" data-mass-page-toggle="${escapeHtml(
+        accountId,
+      )}" ${state.massRunning ? "disabled" : ""} title="${escapeHtml(
+        selected?.name || t("opt.autoPage"),
+      )}">
+        <span class="sk-fp-ico">${face}</span>
+        <span class="sk-fp-name">${escapeHtml(
+          selected?.name || t("opt.autoPageShort"),
+        )}</span>
+        <span class="sk-caret">▾</span>
+      </button>
+      <div class="sk-fp-pop${open ? "" : " sk-hidden"}" data-mass-page-pop="${escapeHtml(
+        accountId,
+      )}">${items}</div>
+    </td>`;
   }
 
   renderSource() {
@@ -135,24 +219,6 @@ export class MassCloneView {
       ].filter(Boolean);
       dom.cloneSummary.textContent = parts.join(" · ");
     }
-    if (dom.cloneMediaToggle) {
-      dom.cloneMediaToggle.textContent = t("clone.mediaSummary", {
-        count: media.length,
-      });
-    }
-    if (dom.cloneMediaBox) {
-      dom.cloneMediaBox.classList.toggle("sk-hidden", !media.length);
-    }
-    if (dom.cloneMedia) {
-      dom.cloneMedia.innerHTML = media
-        .map(
-          (file) =>
-            `<div class="sk-media-row"><span>${escapeHtml(
-              file.fileName || file.name || "—",
-            )}</span><span>${escapeHtml(file.kind || "")}</span></div>`,
-        )
-        .join("");
-    }
   }
 
   renderTargets() {
@@ -160,8 +226,13 @@ export class MassCloneView {
     const body = dom.cloneTargetsBody;
     if (!body) return;
     const accounts = this.targetAccounts();
+    const catalogColumn = this.showsCatalogColumn();
+    if (dom.cloneCatalogHead) {
+      dom.cloneCatalogHead.classList.toggle("sk-hidden", !catalogColumn);
+    }
+    const columns = 5 + (catalogColumn ? 1 : 0);
     if (!accounts.length) {
-      body.innerHTML = `<tr><td colspan="5" class="sk-empty">${escapeHtml(
+      body.innerHTML = `<tr><td colspan="${columns}" class="sk-empty">${escapeHtml(
         t("clone.targetsNone"),
       )}</td></tr>`;
       return;
@@ -175,17 +246,23 @@ export class MassCloneView {
         const picked = selection[accountId] || {};
         const currency = this.accountCurrency(account);
         const rate = rates[accountId];
-        const currencyChip =
-          sourceCurrency && currency && currency !== sourceCurrency
-            ? `<span class="sk-chip sk-warn">${escapeHtml(
-                t("currency.convert", {
-                  cur: currency,
-                  rate: Number.isFinite(Number(rate))
-                    ? `×${rate}`
-                    : t("currency.auto"),
-                }),
-              )}</span>`
-            : `<span class="sk-chip">${escapeHtml(currency || "—")}</span>`;
+        const converts =
+          sourceCurrency && currency && currency !== sourceCurrency;
+        const knownRate = Number.isFinite(Number(rate)) && Number(rate) > 0;
+        const rateText = knownRate ? `×${rate}` : t("currency.auto");
+        const currencyChip = converts
+          ? `<span class="sk-chip sk-warn" title="${escapeHtml(
+              t(knownRate ? "currency.tooltipRate" : "currency.tooltip", {
+                from: sourceCurrency,
+                to: currency,
+                rate: rateText,
+              }),
+            )}">${escapeHtml(
+              t("currency.convert", { cur: currency, rate: rateText }),
+            )}</span>`
+          : `<span class="sk-chip" title="${escapeHtml(
+              t("currency.same", { cur: currency || "—" }),
+            )}">${escapeHtml(currency || "—")}</span>`;
         const isSource =
           String(accountId) === String(state.cloneSourceAccountId || "");
         const typeChip = this.isBusinessAccount(account)
@@ -198,6 +275,14 @@ export class MassCloneView {
               }),
             )}</span>`
           : `<span class="sk-chip">${escapeHtml(t("chip.personal"))}</span>`;
+        const catalogCell = catalogColumn
+          ? `<td><select class="sk-cat" data-mass-catalog="${escapeHtml(
+              accountId,
+            )}" ${state.massRunning ? "disabled" : ""}>${this.catalogOptions(
+              accountId,
+              String(picked.catalogId || ""),
+            )}</select></td>`
+          : "";
         return `<tr data-account-row="${escapeHtml(accountId)}"${
           picked.selected ? ' class="sk-sel"' : ""
         }>
@@ -214,76 +299,12 @@ export class MassCloneView {
               ? ` <span class="sk-chip">${escapeHtml(t("chip.source"))}</span>`
               : ""
           }</td>
+          ${this.pageCell(accountId, picked)}
           <td><select class="sk-pix" data-mass-pixel="${escapeHtml(accountId)}" ${
             state.massRunning ? "disabled" : ""
           }>${this.pixelOptions(accountId, String(picked.pixelId || ""))}</select></td>
-          <td>${currencyChip}</td>
-        </tr>`;
-      })
-      .join("");
-  }
-
-  renderPreview() {
-    const { state, dom } = this.dependencies;
-    const body = dom.clonePreviewBody;
-    if (!dom.clonePreviewCard) return;
-    const selected = this.targetAccounts().filter(
-      (account) => state.massTargets?.[String(account.id)]?.selected,
-    );
-    const visible =
-      Boolean(state.clonePreviewOpen) &&
-      selected.length > 0 &&
-      !state.massRunning &&
-      !state.massResults?.length;
-    dom.clonePreviewCard.classList.toggle("sk-hidden", !visible);
-    if (!visible || !body) return;
-    const accounts = this.targetAccounts().filter(
-      (account) => state.massTargets?.[String(account.id)]?.selected,
-    );
-    const data = state.clonePackage;
-    const adsets = Array.isArray(data?.adsets) ? data.adsets : [];
-    const budget = adsets.reduce(
-      (sum, adset) => sum + Number(adset?.daily_budget || 0),
-      0,
-    );
-    const currency = this.sourceCurrency();
-    const sourcePage = String(
-      data?.campaign?.page_id || data?.adsets?.[0]?.page_id || "",
-    );
-    const pageName = (state.clonePages || []).find(
-      (page) =>
-        String(page.id) === String(state.clonePageMappings?.[sourcePage]),
-    )?.name;
-    const hasCatalogColumn = Boolean(data?.catalogs?.length);
-    body.innerHTML = accounts
-      .map((account) => {
-        const accountId = String(account.id);
-        const rate = Number(state.massRates?.[accountId] || 1);
-        const rowCurrency = this.accountCurrency(account) || currency;
-        const picked = state.massTargets?.[accountId]?.pixelId;
-        const catalog = Object.values(state.cloneCatalogMappings || {}).find(
-          (value) =>
-            value && value !== "__copy_into__" && value !== "__create__",
-        );
-        const needsPage = Boolean(sourcePage);
-        const risk =
-          !this.isBusinessAccount(account) && data?.catalogs?.length
-            ? `<span class="sk-chip sk-warn">${escapeHtml(t("risk.noBm"))}</span>`
-            : needsPage && !pageName
-              ? `<span class="sk-chip sk-warn">${escapeHtml(
-                  t("risk.noPage"),
-                )}</span>`
-              : `<span class="sk-chip sk-ok">${escapeHtml(t("risk.ok"))}</span>`;
-        return `<tr>
-          <td>${escapeHtml(account.name || accountId)}</td>
-          <td>${escapeHtml(pageName || "—")}</td>
-          <td>${escapeHtml(picked || t("opt.noPixel"))}</td>
-          ${hasCatalogColumn ? `<td>${escapeHtml(catalog ? String(catalog) : "—")}</td>` : ""}
-          <td>${escapeHtml(state.cloneAsDraft ? "DRAFT" : state.cloneStatus)}</td>
-          <td>${escapeHtml(
-            `${rowCurrency} ${((budget * (Number.isFinite(rate) ? rate : 1)) / 100).toFixed(2)}`,
-          )}</td>
-          <td>${risk}</td>
+          ${catalogCell}
+          <td class="sk-cur">${currencyChip}</td>
         </tr>`;
       })
       .join("");
@@ -361,7 +382,6 @@ export class MassCloneView {
     if (!state.uiReady || !dom.root) return;
     this.renderSource();
     this.renderTargets();
-    this.renderPreview();
     this.renderProgress();
     const total = this.targetAccounts().length;
     const count = Object.values(state.massTargets || {}).filter(
@@ -376,9 +396,6 @@ export class MassCloneView {
       dom.cloneMaster.checked = total > 0 && count === total;
       dom.cloneMaster.indeterminate = count > 0 && count < total;
       dom.cloneMaster.disabled = !total || state.massRunning;
-    }
-    if (dom.clonePreviewButton) {
-      dom.clonePreviewButton.disabled = state.massRunning || !count;
     }
     if (dom.cloneRunButton) {
       dom.cloneRunButton.textContent = state.massRunning

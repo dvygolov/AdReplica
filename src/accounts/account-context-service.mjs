@@ -211,7 +211,7 @@ export class AccountContextService {
       try {
         const allPages = await graphPageGetAll("me/accounts", {
           type: "page",
-          fields: "id,name,is_published,access_token",
+          fields: "id,name,is_published,access_token,picture{url}",
         });
         const pageMap = new Map();
         for (const page of allPages) {
@@ -220,6 +220,7 @@ export class AccountContextService {
             id: pageId,
             name: page.name || pageId,
             instagramId: "",
+            picture: page.picture?.data?.url || "",
             accessToken: page.access_token || "",
           });
         }

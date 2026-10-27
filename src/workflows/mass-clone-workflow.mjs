@@ -2,7 +2,11 @@ import {
   assessAccountHealth,
   isTransientFragmentFailure,
 } from "../accounts/account-health.mjs";
-import { getSourcePixelsFromPackage } from "../domain/package.mjs";
+import {
+  getSourceCatalogsFromPackage,
+  getSourcePagesFromPackage,
+  getSourcePixelsFromPackage,
+} from "../domain/package.mjs";
 import { normalizeCurrency } from "../domain/currency.mjs";
 import { sleep } from "../utils/object.mjs";
 
@@ -32,6 +36,8 @@ export class MassCloneWorkflow {
         accountId: String(account.id),
         name: account.name || String(account.id),
         pixelId: String(selection[account.id]?.pixelId || ""),
+        pageId: String(selection[account.id]?.pageId || ""),
+        catalogId: String(selection[account.id]?.catalogId || ""),
       }));
   }
 
@@ -76,6 +82,28 @@ export class MassCloneWorkflow {
     const mapping = { ...(state.clonePixelMappings || {}) };
     for (const id of sourceIds) mapping[id] = pixelId;
     state.clonePixelMappings = mapping;
+  }
+
+  /** Pins every source page in the package to the fan page chosen for this target. */
+  applyPageChoice(packageData, pageId) {
+    const { state } = this.dependencies;
+    if (!pageId) return;
+    const mapping = { ...(state.clonePageMappings || {}) };
+    for (const page of getSourcePagesFromPackage(packageData)) {
+      mapping[page.id] = pageId;
+    }
+    state.clonePageMappings = mapping;
+  }
+
+  /** Pins every source catalog to the catalog chosen for this target. */
+  applyCatalogChoice(packageData, catalogId) {
+    const { state } = this.dependencies;
+    if (!catalogId) return;
+    const mapping = { ...(state.cloneCatalogMappings || {}) };
+    for (const catalog of getSourceCatalogsFromPackage(packageData)) {
+      mapping[catalog.id] = catalogId;
+    }
+    state.cloneCatalogMappings = mapping;
   }
 
   accountCurrency(accountId) {
@@ -243,6 +271,8 @@ export class MassCloneWorkflow {
       return false;
     }
     this.applyPixelChoice(packageData, target.pixelId);
+    this.applyPageChoice(packageData, target.pageId);
+    this.applyCatalogChoice(packageData, target.catalogId);
     state.cloneTargetAccountId = target.accountId;
     state.cloneAsDraft =
       state.massMode !== "PAUSED" && state.massMode !== "ACTIVE";

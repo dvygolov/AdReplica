@@ -869,6 +869,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       get graphClient() {
         return services.graphClient;
       },
+      get accountContextService() {
+        return services.accountContextService;
+      },
       get massCloneView() {
         return services.massCloneView;
       },

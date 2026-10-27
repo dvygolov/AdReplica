@@ -69,6 +69,13 @@ const DICT = {
 
     "opt.reuseExisting": "Reuse existing pixel",
     "opt.noPixel": "Auto (reuse or create)",
+    "opt.noCatalog": "Auto (source catalog)",
+    "opt.copyCatalog": "Copy to BM {bm}",
+    "opt.autoPage": "Auto (page from source)",
+    "opt.autoPageShort": "Auto",
+    "currency.tooltip":
+      "Currency differs from the source ({from} → {to}). The budget is converted at {rate}.",
+    "currency.same": "Same currency as the source ({cur}): no conversion.",
     "opt.notSelected": "Not selected",
     "opt.createPixel": "Create a new pixel",
 
@@ -196,6 +203,14 @@ const DICT = {
 
     "opt.reuseExisting": "Переиспользовать пиксель",
     "opt.noPixel": "Авто (переиспользовать/создать)",
+    "opt.noCatalog": "Авто (каталог из источника)",
+    "opt.copyCatalog": "Копировать в BM {bm}",
+    "opt.autoPage": "Авто (страница из источника)",
+    "opt.autoPageShort": "Авто",
+    "currency.tooltip":
+      "Валюта отличается от источника ({from} → {to}). Бюджет будет пересчитан по курсу {rate}.",
+    "currency.same":
+      "Валюта совпадает с источником ({cur}): пересчёта не будет.",
     "log.empty": "Журнал операций появится здесь после первого запуска.",
     "clone.collapse": "Свернуть или развернуть блок источника",
     "clone.loading": "Загружаем пакет кампании-источника...",

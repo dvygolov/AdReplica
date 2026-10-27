@@ -47,6 +47,10 @@ function createHarness({
     campaign: { name: "Source Campaign" },
     adsets: [{ promoted_object: { pixel_id: "src-px" } }],
     ads: [{}],
+    creatives: [
+      { id: "cr-1", raw: { object_story_spec: { page_id: "111222333" } } },
+    ],
+    catalogs: [{ id: "123456789", name: "Src cat" }],
   };
   const runOperation = async (kind) => {
     const accountId = state.cloneTargetAccountId;
@@ -144,6 +148,36 @@ test("campaign names use the template with the target account", async () => {
   const { workflow, calls } = createHarness();
   await workflow.run();
   assert.equal(calls[0].name, "Source Campaign — Good A");
+});
+
+test("a chosen fan page and catalog are pinned for that target only", async () => {
+  const { workflow, state } = createHarness();
+  state.clonePageMappings = { 111222333: "111222333" };
+  state.cloneCatalogMappings = { 123456789: "" };
+  state.massTargets[111] = {
+    selected: true,
+    pixelId: "px-111",
+    pageId: "page-a",
+    catalogId: "cat-a",
+  };
+  await workflow.run();
+  assert.equal(state.clonePageMappings["111222333"], "page-a");
+  assert.equal(state.cloneCatalogMappings["123456789"], "cat-a");
+});
+
+test("an untargeted custom page or catalog keeps the automatic mapping", async () => {
+  const { workflow, state } = createHarness();
+  state.clonePageMappings = { 111222333: "111222333" };
+  state.cloneCatalogMappings = { 123456789: "" };
+  state.massTargets[111] = {
+    selected: true,
+    pixelId: "",
+    pageId: "",
+    catalogId: "",
+  };
+  await workflow.run();
+  assert.equal(state.clonePageMappings["111222333"], "111222333");
+  assert.equal(state.cloneCatalogMappings["123456789"], "");
 });
 
 test("the {n} macro numbers targets and keeps counting after a failure", async () => {
