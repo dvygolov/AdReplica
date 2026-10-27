@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MassCloneWorkflow } from "../src/workflows/mass-clone-workflow.mjs";
+import { MassCloneView } from "../src/ui/mass-clone-view.mjs";
 
 const ACCOUNTS = [
   { id: "111", name: "Good A", raw: { account_status: 1, currency: "USD" } },
@@ -296,7 +297,7 @@ test("an unavailable rate refuses the target instead of copying a wrong budget",
   assert.equal(result, false);
   assert.equal(calls.length, 0, "nothing was cloned");
   assert.equal(state.massResults[0].status, "failed");
-  assert.match(state.massResults[0].message, /No USD→EUR exchange rate/);
+  assert.match(state.massResults[0].message, /No USD→EUR rate available/);
   assert.equal(state.cloneCurrencyRate, 1);
 });
 
@@ -437,4 +438,28 @@ test("a permission error is not retried", async () => {
   }
   assert.equal(byAccount.get("111"), 1, "each target ran exactly once");
   assert.equal(state.massResults[0].status, "failed");
+});
+
+test("cabinets without a payment method are hidden from the target table", () => {
+  const state = {
+    accounts: [
+      {
+        id: "111",
+        name: "Paid",
+        raw: {
+          account_status: 1,
+          funding_source_details: { id: "1", type: 1 },
+        },
+      },
+      { id: "222", name: "Unpaid", raw: { account_status: 1 } },
+      { id: "333", name: "Disabled", raw: { account_status: 2 } },
+    ],
+    massTargets: {},
+  };
+  const view = new MassCloneView({ state, dom: {} });
+  assert.deepEqual(
+    view.targetAccounts().map((account) => account.id),
+    ["111"],
+  );
+  assert.equal(view.hiddenNoPayment(), 1);
 });

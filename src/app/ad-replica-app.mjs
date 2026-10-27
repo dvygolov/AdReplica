@@ -24,6 +24,7 @@ export class AdReplicaApp {
     this.reportView = new ReportView({
       dom: this.dom,
       services: this.services,
+      state: this.state,
     });
     this.coordinator = new OperationCoordinator({
       state: this.state,
@@ -41,6 +42,8 @@ export class AdReplicaApp {
       this.coordinator.run("export");
     // Each target of a mass clone is a full clone operation, so it runs through
     // the coordinator and gets its own operation report.
+    this.services.massCloneWorkflow.dependencies.onMassFinished = () =>
+      this.reportView.showMassSummary(this.state);
     this.services.massCloneWorkflow.dependencies.runOperation = (
       kind,
       options,

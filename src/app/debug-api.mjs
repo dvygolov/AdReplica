@@ -25,7 +25,9 @@ export function createDebugApi(services, state) {
       services.cloneWorkflow.cloneCampaignToAccount(options),
     runImport: (options = {}) => services.importWorkflow.importPackage(options),
     runMassClone: () => services.massCloneWorkflow.run(),
+    currencyRate: (from, to) => services.currencyRateService.rate(from, to),
     massResults: () => state.massResults,
+    massSummary: () => services.massCloneWorkflow.dependencies.onMassFinished?.(),
     repairDraftIdentity: (accountId, draftId) =>
       services.draftValidation.ensureDraftInstagramIdentityParity(
         accountId,

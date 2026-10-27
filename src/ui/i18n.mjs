@@ -136,6 +136,14 @@ const DICT = {
     "report.reload": "Open in Ads Manager",
     "report.ok": "OK",
     "report.close": "Close",
+    "report.mass.title": "Mass clone",
+    "report.mass.counters":
+      "cloned {cloned} · failed {failed} · skipped {skipped}",
+    "targets.noPayment":
+      "{n} cabinet(s) hidden: no payment method, Meta refuses ads there",
+    "rate.manual": "rate",
+    "rate.autoHint": "Meta rate: {rate}",
+    "currency.none": "нет курса",
     "status.loading": "Looking for access_token…",
     "status.ready": "Session ready",
     "status.missing": "Session not loaded",
@@ -277,6 +285,13 @@ const DICT = {
     "report.reload": "Открыть в Ads Manager",
     "report.ok": "Ок",
     "report.close": "Закрыть",
+    "report.mass.title": "Массовое клонирование",
+    "report.mass.counters":
+      "склонировано {cloned} · с ошибкой {failed} · пропущено {skipped}",
+    "targets.noPayment": "скрыто кабинетов без платёжного метода: {n}",
+    "rate.manual": "курс",
+    "rate.autoHint": "Курс из Meta: {rate}",
+    "currency.none": "нет курса",
     "status.loading": "Ищем access_token…",
     "status.ready": "Сессия готова",
     "status.missing": "Сессия не загружена",

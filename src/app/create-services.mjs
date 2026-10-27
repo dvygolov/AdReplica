@@ -822,7 +822,12 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       },
     });
   services.currencyRateService =
-    overrides.currencyRateService || new CurrencyRateService({});
+    overrides.currencyRateService ||
+    new CurrencyRateService({
+      // Straight from the page this request dies on Meta's CSP; the bridge is not.
+      fetchImpl: (input, init) =>
+        services.browserTransport.adReplicaFetch(input, init),
+    });
   services.massCloneView =
     overrides.massCloneView ||
     new MassCloneView({

@@ -21,12 +21,29 @@ export class MassCloneView {
     this.renderSource = this.renderSource.bind(this);
   }
 
-  /** Only usable accounts are listed: an unsettled cabinet cannot host ads. */
+  /** Meta refuses ad creation without a funding source, drafts included. */
+  hasPaymentMethod(account) {
+    return Boolean(account?.raw?.funding_source_details);
+  }
+
+  /** Only usable accounts are listed: unsettled or unpaid cabinets cannot host ads. */
   targetAccounts() {
     const { state } = this.dependencies;
     return (state.accounts || []).filter(
-      (account) => assessAccountHealth(state.accounts, account.id).ok,
+      (account) =>
+        assessAccountHealth(state.accounts, account.id).ok &&
+        this.hasPaymentMethod(account),
     );
+  }
+
+  /** Accounts dropped because the cabinet has no payment method. */
+  hiddenNoPayment() {
+    const { state } = this.dependencies;
+    return (state.accounts || []).filter(
+      (account) =>
+        assessAccountHealth(state.accounts, account.id).ok &&
+        !this.hasPaymentMethod(account),
+    ).length;
   }
 
   accountCurrency(account) {
@@ -239,17 +256,25 @@ export class MassCloneView {
     const selection = state.massTargets || {};
     const sourceCurrency = this.sourceCurrency();
     const rates = state.massRates || {};
+    const autoRates = state.massAutoRates || {};
     body.innerHTML = accounts
       .map((account) => {
         const accountId = String(account.id);
         const picked = selection[accountId] || {};
         const currency = this.accountCurrency(account);
         const rate = rates[accountId];
+        const autoRate = autoRates[accountId];
         const converts =
           sourceCurrency && currency && currency !== sourceCurrency;
         const knownRate = Number.isFinite(Number(rate)) && Number(rate) > 0;
-        const rateText = knownRate ? `×${rate}` : t("currency.auto");
-        // Narrow column: only the code, the conversion story lives in the tooltip.
+        const knownAuto =
+          Number.isFinite(Number(autoRate)) && Number(autoRate) > 0;
+        const rateText = knownRate
+          ? `×${rate}`
+          : knownAuto
+            ? `×${autoRate}`
+            : t("currency.none");
+        // Narrow column: the code, an optional rate box and the whole story in a tooltip.
         const currencyChip = converts
           ? `<span class="sk-chip sk-warn" title="${escapeHtml(
               t(knownRate ? "currency.tooltipRate" : "currency.tooltip", {
@@ -257,7 +282,16 @@ export class MassCloneView {
                 to: currency,
                 rate: rateText,
               }),
-            )}">${escapeHtml(currency)}</span>`
+            )}">${escapeHtml(currency)}</span>
+            <input type="number" step="0.0001" min="0" class="sk-rate" data-mass-rate="${escapeHtml(
+              accountId,
+            )}" placeholder="${escapeHtml(
+              knownAuto ? `${autoRate}` : "—",
+            )}" title="${escapeHtml(
+              t("rate.autoHint", { rate: rateText }),
+            )}" value="${knownRate ? escapeHtml(String(rate)) : ""}" ${
+              state.massRunning ? "disabled" : ""
+            } />`
           : `<span class="sk-chip" title="${escapeHtml(
               t("currency.same", { cur: currency || "—" }),
             )}">${escapeHtml(currency || "—")}</span>`;
@@ -390,9 +424,12 @@ export class MassCloneView {
       (item) => item.selected,
     ).length;
     if (dom.cloneTargetsCount) {
+      const hidden = this.hiddenNoPayment();
       dom.cloneTargetsCount.textContent = total
-        ? t("clone.targetsHint", { n: count, total })
-        : "";
+        ? `${t("clone.targetsHint", { n: count, total })}${
+            hidden ? ` · ${t("targets.noPayment", { n: hidden })}` : ""
+          }`
+        : t("targets.noPayment", { n: hidden });
     }
     if (dom.cloneMaster) {
       dom.cloneMaster.checked = total > 0 && count === total;

@@ -135,7 +135,9 @@ export class MassCloneWorkflow {
         : "source currency unknown: no conversion";
       return { ok: true, rate: 1, from, to };
     }
-    const manual = Number(state.massRateOverride);
+    const manual = Number(
+      state.massRates?.[target.accountId] || state.massRateOverride,
+    );
     if (Number.isFinite(manual) && manual > 0) {
       state.cloneCurrencyRate = manual;
       state.massRates ||= {};
@@ -153,14 +155,14 @@ export class MassCloneWorkflow {
         from,
         to,
         message:
-          `No ${from}→${to} exchange rate (${result?.reason || "unknown reason"}). ` +
-          "Set a manual rate in the Mass clone tab to convert budgets, or pick " +
-          "an account with the same currency.",
+          `No ${from}→${to} rate available (${result?.reason || "unknown reason"}). ` +
+          "Type the rate in the currency column for this cabinet, or use a " +
+          "cabinet with the same currency.",
       };
     }
     state.cloneCurrencyRate = result.rate;
-    state.massRates ||= {};
-    state.massRates[target.accountId] = result.rate;
+    state.massAutoRates ||= {};
+    state.massAutoRates[target.accountId] = result.rate;
     state.massCurrencyNote = `${from} → ${to} at ${result.rate} (${result.source})`;
     log(
       "info",
@@ -419,6 +421,7 @@ export class MassCloneWorkflow {
       state.massRunning = false;
       state.massActiveAccountId = "";
       this.dependencies.renderMassClone?.();
+      this.dependencies.onMassFinished?.();
     }
   }
 }

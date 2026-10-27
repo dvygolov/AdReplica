@@ -11,12 +11,14 @@ const STATUS_KEYS = {
 
 /** Result of a finished operation: modal, so the verdict cannot be missed. */
 export class ReportView {
-  constructor({ dom, services }) {
-    Object.assign(this, { dom, services });
+  constructor({ dom, services, state }) {
+    Object.assign(this, { dom, services, state });
     this.element = null;
   }
 
   show(report) {
+    // A mass clone reports once at the end; per-account modals would block the batch.
+    if (this.suppressed()) return;
     this.destroy();
     if (!this.dom.root) return;
     const data = report.toJSON();
@@ -82,6 +84,71 @@ export class ReportView {
     (this.dom.root.querySelector(".sk-shell") || this.dom.root).append(overlay);
     this.element = overlay;
   }
+  suppressed() {
+    return Boolean(this.state?.massRunning);
+  }
+
+  /** One modal for the whole batch: counters plus a row per cabinet. */
+  showMassSummary(massState) {
+    if (!this.dom.root) return;
+    const rows = Array.isArray(massState?.massResults)
+      ? massState.massResults
+      : [];
+    if (!rows.length) return;
+    this.destroy();
+    const count = (status) =>
+      rows.filter((row) => row.status === status).length;
+    const cloned = count("success");
+    const failed = count("failed");
+    const skipped = count("skipped");
+    const cancelled = count("cancelled");
+    const overlay = document.createElement("div");
+    overlay.className = "sk-overlay";
+    overlay.dataset.reportKind = "clone";
+    const card = document.createElement("section");
+    card.className = "sk-card sk-report-card";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.dataset.reportKind = "clone";
+    const statusWord = failed
+      ? t("report.status.partial")
+      : cancelled || skipped
+        ? t("report.status.partial")
+        : t("report.status.success");
+    card.innerHTML = `<div class="sk-report-head">
+        <h3>${escapeHtml(t("report.mass.title"))}: ${escapeHtml(statusWord)}</h3>
+        <button type="button" class="sk-icon" data-action="close" aria-label="${escapeHtml(t("report.close"))}">✕</button>
+      </div>
+      <div class="sk-report-meta">${escapeHtml(
+        t("report.mass.counters", {
+          cloned,
+          failed,
+          skipped: skipped + cancelled,
+        }),
+      )}</div>
+      <div class="sk-mass-list">${rows
+        .map(
+          (row) =>
+            `<div class="sk-mass-row sk-${escapeHtml(row.status)}">
+              <b>${escapeHtml(row.name || row.accountId)}</b>
+              <span>${escapeHtml(t(`job.${row.status}`) || row.status)}</span>
+            </div>`,
+        )
+        .join("")}</div>
+      <div class="sk-actions">
+        <button data-action="close" class="sk-primary">${escapeHtml(t("report.ok"))}</button>
+      </div>`;
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("button[data-action='close']")) this.destroy();
+    });
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) this.destroy();
+    });
+    overlay.append(card);
+    (this.dom.root.querySelector(".sk-shell") || this.dom.root).append(overlay);
+    this.element = overlay;
+  }
+
   destroy() {
     this.element?.remove();
     this.element = null;

@@ -250,6 +250,15 @@ export class MassCloneController {
       list.addEventListener("change", (event) => {
         const input = event.target;
         if (!(input instanceof HTMLInputElement)) return;
+        const rateAccountId = input.dataset.massRate;
+        if (rateAccountId) {
+          const value = Number(input.value);
+          state.massRates ||= {};
+          if (value > 0) state.massRates[rateAccountId] = value;
+          else delete state.massRates[rateAccountId];
+          this.dependencies.massCloneView.render();
+          return;
+        }
         const accountId = input.dataset.massAccount;
         if (!accountId) return;
         this.pickFor(accountId, { selected: input.checked });

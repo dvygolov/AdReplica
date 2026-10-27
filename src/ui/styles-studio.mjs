@@ -137,7 +137,34 @@ export function buildStudioStyles(appId) {
       #${appId} .sk-tbl td { padding: 7px 8px; border-bottom: 1px solid #2e2e2e; vertical-align: middle; }
       #${appId} .sk-tbl tr:last-child td { border-bottom: 0; }
       #${appId} .sk-tbl tr.sk-sel td { background: #242113; }
-      #${appId} .sk-chk { width: 28px; text-align: center; }
+      #${appId} .sk-chk { width: 38px; text-align: center; cursor: pointer; }
+      /* One control height for the whole target table: page, pixel, catalog, rate. */
+      #${appId} .sk-tbl .sk-pix,
+      #${appId} .sk-tbl .sk-cat,
+      #${appId} .sk-tbl .sk-fp-btn,
+      #${appId} .sk-tbl .sk-rate {
+        box-sizing: border-box;
+        height: 40px;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      #${appId} .sk-tbl .sk-pix,
+      #${appId} .sk-tbl .sk-cat {
+        padding: 0 10px;
+        background: #232323;
+        color: #eee;
+        border: 1px solid #4a4a4a;
+      }
+      #${appId} .sk-tbl .sk-fp-btn { padding: 0 10px; }
+      /* Checkboxes must stay clickable at a glance. */
+      #${appId} .sk-chk input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        accent-color: #ffd400;
+        cursor: pointer;
+        vertical-align: middle;
+      }
       #${appId} .sk-who { display: flex; flex-direction: column; gap: 1px; }
       #${appId} .sk-id { font-size: 10px; color: #7d7d7d; font-family: "Consolas", monospace; }
       #${appId} .sk-chip {
@@ -448,8 +475,8 @@ export function buildStudioStyles(appId) {
         gap: 8px;
         width: 100%;
         max-width: 168px;
-        height: 30px;
-        padding: 0 8px;
+        height: 40px;
+        padding: 0 10px;
         border: 1px solid #4a4a4a;
         border-radius: 6px;
         background: #232323;
@@ -518,13 +545,40 @@ export function buildStudioStyles(appId) {
         white-space: nowrap;
         text-overflow: ellipsis;
       }
-      #${appId} .sk-pix { width: 104px; }
+      #${appId} .sk-pix { width: 112px; }
       #${appId} .sk-cat { width: 142px; }
       #${appId} .sk-tbl td select { max-width: 100%; }
       #${appId} .sk-cur { white-space: nowrap; }
       #${appId} .sk-cur .sk-chip { padding: 2px 6px; font-size: 11px; }
       #${appId} .sk-tbl th, #${appId} .sk-tbl td { padding: 6px 6px; }
       #${appId} .sk-cur .sk-chip { cursor: help; }
+      #${appId} .sk-rate {
+        width: 66px;
+        margin-left: 4px;
+        height: 24px;
+        padding: 0 4px;
+        border: 1px solid #4a4a4a;
+        border-radius: 5px;
+        background: #232323;
+        color: #eee;
+        font-size: 11px;
+      }
+      #${appId} .sk-mass-list {
+        max-height: 240px;
+        overflow: auto;
+        margin: 8px 0;
+        font-size: 12px;
+      }
+      #${appId} .sk-mass-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 4px 2px;
+        border-bottom: 1px solid #2a2a2a;
+      }
+      #${appId} .sk-mass-row span { color: #bdbdbd; }
+      #${appId} .sk-mass-row.sk-success span { color: #7ee08c; }
+      #${appId} .sk-mass-row.sk-failed span { color: #ff9a9a; }
       @media (max-width: 800px) {
         #${appId} { inset: 10px; }
         #${appId} .sk-shell { max-height: calc(100vh - 20px); }
