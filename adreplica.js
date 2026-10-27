@@ -646,8 +646,9 @@ ${o.error}`:"";return`[${s}] ${o.kind} ${o.method}${d}${l}${c} ${o.url}${g}${p}`
         white-space: nowrap;
         text-overflow: ellipsis;
       }
-      #${a} .sk-pix { max-width: 150px; }
-      #${a} .sk-cat { max-width: 200px; }
+      #${a} .sk-pix { width: 140px; }
+      #${a} .sk-cat { width: 180px; }
+      #${a} .sk-tbl td select { max-width: 100%; }
       #${a} .sk-cur { white-space: nowrap; }
       #${a} .sk-cur .sk-chip { cursor: help; }
       @media (max-width: 800px) {
