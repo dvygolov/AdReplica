@@ -788,6 +788,51 @@ export function buildAdReplicaStyles(appId) {
       #${appId} details.sk-logs:not([open]) .sk-log-area { display: none; }
       #${appId} details.sk-logs > summary { list-style: none; }
       #${appId} details.sk-logs > summary::-webkit-details-marker { display: none; }
+      /* compact rhythm + readable secondary text */
+      #${appId} .sk-card { padding: 10px 12px 12px; margin-bottom: 10px; }
+      #${appId} .sk-stat { padding: 6px 8px; }
+      #${appId} .sk-stat b { font-size: 13px; }
+      #${appId} .sk-stat span { font-size: 9.5px; color: #a0a0a0; }
+      #${appId} .sk-hint,
+      #${appId} .sk-build,
+      #${appId} .sk-count,
+      #${appId} .sk-tbl th,
+      #${appId} .sk-job-ph,
+      #${appId} .sk-id { color: #a0a0a0; }
+      #${appId} .sk-body::-webkit-scrollbar,
+      #${appId} .sk-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+      #${appId} .sk-body::-webkit-scrollbar-thumb,
+      #${appId} .sk-scroll::-webkit-scrollbar-thumb {
+        background: #4a4a4a;
+        border-radius: 6px;
+      }
+      #${appId} .sk-body::-webkit-scrollbar-track,
+      #${appId} .sk-scroll::-webkit-scrollbar-track { background: #171717; }
+      #${appId} .sk-row > .sk-field { min-width: 0; }
+      #${appId} .sk-row > .sk-field:last-child { flex: 0 0 170px; }
+      #${appId} .sk-sec { margin-bottom: 8px; }
+      #${appId} .sk-summary {
+        font-size: 12px;
+        color: #cfcfcf;
+        padding: 6px 8px;
+        border: 1px dashed #3d3d3d;
+        border-radius: 8px;
+        background: #1b1b1b;
+      }
+      #${appId} button.sk-secondary {
+        background: #2a2a2a;
+        border: 1px solid #4a4a4a;
+        color: #e8e8e8;
+      }
+      #${appId} .sk-tbl tr.sk-sel td { background: #2f2c14; }
+      #${appId} .sk-tbl tr.sk-sel td:first-child {
+        box-shadow: inset 3px 0 0 #ffd400;
+      }
+      #${appId} .sk-scroll {
+        box-shadow: inset 0 -14px 14px -14px rgba(0, 0, 0, 0.8);
+      }
+      #${appId} details.sk-logs { background: #191919; }
+      #${appId} details.sk-logs > summary { padding: 7px 16px; }
       @media (max-width: 800px) {
         #${appId} { inset: 10px; }
         #${appId} .sk-shell { max-height: calc(100vh - 20px); }

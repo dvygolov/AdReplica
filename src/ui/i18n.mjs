@@ -41,6 +41,8 @@ const DICT = {
     "clone.s4": "4 · Run",
     "clone.s4note": "sequential, one account at a time",
     "clone.hint": "Select the target accounts in the table, then clone. A failed account is rolled back and the batch continues.",
+    "log.empty": "The operation log will appear here after the first run.",
+    "clone.collapse": "Collapse or expand the source block",
     "clone.loading": "Loading the source campaign package...",
     "clone.mediaSummary": "Source media ({count})",
     "clone.mappings": "Page, pixel and catalog mapping",
@@ -70,6 +72,7 @@ const DICT = {
     "opt.createPixel": "Create a new pixel",
 
     "chip.bm": "BM · {biz}",
+    "chip.source": "source",
     "chip.personal": "personal",
     "currency.auto": "auto rate",
     "currency.convert": "{cur} · rate {rate}",
@@ -176,11 +179,14 @@ const DICT = {
 
     "opt.reuseExisting": "Переиспользовать пиксель",
     "opt.noPixel": "Авто (переиспользовать/создать)",
+    "log.empty": "Журнал операций появится здесь после первого запуска.",
+    "clone.collapse": "Свернуть или развернуть блок источника",
     "clone.loading": "Загружаем пакет кампании-источника...",
     "opt.notSelected": "Не выбрано",
     "opt.createPixel": "Создать новый пиксель",
 
     "chip.bm": "БМ · {biz}",
+    "chip.source": "источник",
     "chip.personal": "личный",
     "currency.auto": "курс автоматически",
     "currency.convert": "{cur} · курс {rate}",
@@ -299,4 +305,19 @@ export function cloneToLabel(count) {
     ])}`;
   }
   return `Clone to ${count} account${Number(count) === 1 ? "" : "s"}`;
+}
+
+/** Compact plural form for the collapsed summary line. */
+export function smallLabel(key, count) {
+  const n = Number(count) || 0;
+  if (lang === "ru") return statLabel(key, n);
+  const english = {
+    "stat.adsets": ["ad set", "ad sets"],
+    "stat.ads": ["ad", "ads"],
+    "stat.creatives": ["creative", "creatives"],
+    "stat.media": ["media file", "media files"],
+    "stat.catalogs": ["catalog", "catalogs"],
+  }[key];
+  if (!english) return t(key);
+  return n === 1 ? english[0] : english[1];
 }

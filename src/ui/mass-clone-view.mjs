@@ -1,5 +1,5 @@
 import { assessAccountHealth } from "../accounts/account-health.mjs";
-import { cloneToLabel, statLabel, t } from "./i18n.mjs";
+import { cloneToLabel, smallLabel, statLabel, t } from "./i18n.mjs";
 import { escapeHtml } from "../utils/string.mjs";
 
 const JOB_LABELS = {
@@ -114,6 +114,21 @@ export class MassCloneView {
       stat(catalogs.length, statLabel("stat.catalogs", catalogs.length)),
     ].join("");
 
+    if (dom.cloneSummary) {
+      const campaignName =
+        data.campaign?.name || state.cloneCampaignName || data.fileNameMap || "";
+      const parts = [
+        state.accounts?.find(
+          (account) =>
+            String(account.id) === String(state.cloneSourceAccountId || ""),
+        )?.name,
+        campaignName,
+        `${adsets.length} ${smallLabel("stat.adsets", adsets.length)}`,
+        `${ads.length} ${smallLabel("stat.ads", ads.length)}`,
+        `${currency ? `${currency} ` : ""}${(budget / 100).toFixed(2)}`,
+      ].filter(Boolean);
+      dom.cloneSummary.textContent = parts.join(" · ");
+    }
     if (dom.cloneMediaToggle) {
       dom.cloneMediaToggle.textContent = t("clone.mediaSummary", {
         count: media.length,
@@ -165,6 +180,8 @@ export class MassCloneView {
                 }),
               )}</span>`
             : `<span class="sk-chip">${escapeHtml(currency || "—")}</span>`;
+        const isSource =
+          String(accountId) === String(state.cloneSourceAccountId || "");
         const typeChip = this.isBusinessAccount(account)
           ? `<span class="sk-chip sk-warn">${escapeHtml(
               t("chip.bm", {
@@ -186,7 +203,11 @@ export class MassCloneView {
           <td><span class="sk-who">${escapeHtml(
             account.name || accountId,
           )}<span class="sk-id">${escapeHtml(accountId)}</span></span></td>
-          <td>${typeChip}</td>
+          <td>${typeChip}${
+            isSource
+              ? ` <span class="sk-chip">${escapeHtml(t("chip.source"))}</span>`
+              : ""
+          }</td>
           <td><select class="sk-pix" data-mass-pixel="${escapeHtml(accountId)}" ${
             state.massRunning ? "disabled" : ""
           }>${this.pixelOptions(accountId, String(picked.pixelId || ""))}</select></td>
@@ -345,6 +366,7 @@ export class MassCloneView {
     }
     if (dom.cloneMaster) {
       dom.cloneMaster.checked = total > 0 && count === total;
+      dom.cloneMaster.indeterminate = count > 0 && count < total;
       dom.cloneMaster.disabled = !total || state.massRunning;
     }
     if (dom.clonePreviewButton) {

@@ -110,6 +110,21 @@ export class PanelView {
         );
       });
       dom.cloneFooter?.classList.toggle("sk-hidden", active !== "clone");
+      if (state.cloneSourceCollapsed === null && state.clonePackage) {
+        state.cloneSourceCollapsed = true;
+      }
+      if (dom.cloneSourceBody) {
+        dom.cloneSourceBody.classList.toggle(
+          "sk-hidden",
+          Boolean(state.cloneSourceCollapsed),
+        );
+      }
+      if (dom.cloneSummary) {
+        dom.cloneSummary.classList.toggle(
+          "sk-hidden",
+          !state.cloneSourceCollapsed,
+        );
+      }
     }
     if (dom.loadingOverlay) {
       dom.loadingOverlay.style.display =

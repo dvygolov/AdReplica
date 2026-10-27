@@ -150,7 +150,12 @@ export class PanelController {
 
           <div class="sk-tab-panel sk-hidden" id="${APP_ID}-panel-clone">
             <section class="sk-card">
-              <h3 class="sk-sec">${t("clone.s1")}</h3>
+              <h3 class="sk-sec">
+                ${t("clone.s1")}
+                <button type="button" class="sk-info" id="${APP_ID}-clone-collapse" data-always-enabled title="${t("clone.collapse")}">±</button>
+              </h3>
+              <div class="sk-summary sk-hidden" id="${APP_ID}-clone-summary"></div>
+              <div id="${APP_ID}-clone-source-body">
               <div class="sk-row">
                 <label class="sk-field">
                   <span>${t("field.sourceAccount")}</span>
@@ -192,6 +197,7 @@ export class PanelController {
                   <li><code>{mode}</code><span>${t("macros.mode")}</span></li>
                   <li><code>{date}</code><span>${t("macros.date")}</span></li>
                 </ul>
+              </div>
               </div>
             </section>
 
@@ -268,7 +274,7 @@ export class PanelController {
             <span>${t("logs.title")}</span>
             <button type="button" class="sk-secondary sk-log-dl" id="${APP_ID}-download-logs">${t("logs.download")}</button>
           </summary>
-          <textarea id="${APP_ID}-logs" class="sk-log-area" readonly></textarea>
+          <textarea id="${APP_ID}-logs" class="sk-log-area" readonly placeholder="${t("log.empty")}"></textarea>
         </details>
       </div>
     `;
@@ -314,6 +320,9 @@ export class PanelController {
     dom.clonePreviewBody = root.querySelector(`#${APP_ID}-clone-preview-body`);
     dom.cloneRunCard = root.querySelector(`#${APP_ID}-clone-run-card`);
     dom.cloneFooter = root.querySelector(`#${APP_ID}-clone-footer`);
+    dom.cloneSourceBody = root.querySelector(`#${APP_ID}-clone-source-body`);
+    dom.cloneSummary = root.querySelector(`#${APP_ID}-clone-summary`);
+    dom.cloneCollapseButton = root.querySelector(`#${APP_ID}-clone-collapse`);
     dom.cloneProgressBar = root.querySelector(`#${APP_ID}-clone-progress`);
     dom.cloneCounters = root.querySelector(`#${APP_ID}-clone-counters`);
     dom.cloneConsole = root.querySelector(`#${APP_ID}-clone-console`);
@@ -413,6 +422,12 @@ export class PanelController {
       dom.macrosPop.addEventListener("click", (event) => event.stopPropagation());
       document.addEventListener("click", () => {
         dom.macrosPop?.classList.add("sk-hidden");
+      });
+    }
+    if (dom.cloneCollapseButton) {
+      dom.cloneCollapseButton.addEventListener("click", () => {
+        state.cloneSourceCollapsed = !state.cloneSourceCollapsed;
+        renderUI();
       });
     }
     if (dom.clonePreviewButton) {
