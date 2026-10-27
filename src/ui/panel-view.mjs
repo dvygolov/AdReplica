@@ -176,6 +176,10 @@ export class PanelView {
         : state.cloneStatus;
     }
     const templateValue = state.massNameTemplate || state.cloneCampaignName;
+    if (dom.downloadLogs) {
+      dom.downloadLogs.disabled =
+        !Array.isArray(state.logs) || state.logs.length === 0;
+    }
     if (dom.cloneCampaignName && dom.cloneCampaignName.value !== templateValue) {
       dom.cloneCampaignName.value = templateValue;
     }
