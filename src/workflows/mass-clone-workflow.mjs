@@ -35,6 +35,13 @@ export class MassCloneWorkflow {
       }));
   }
 
+  /** Monotonic counter behind the {n} macro: grows with every processed target. */
+  nextSequence() {
+    const { state } = this.dependencies;
+    state.massSequence = (Number(state.massSequence) || 0) + 1;
+    return state.massSequence;
+  }
+
   /** Renders the campaign name template. Unknown macros stay untouched. */
   buildCampaignName(template, sourceName, account, context = {}) {
     const fallback = sourceName || "Cloned campaign";
@@ -45,6 +52,7 @@ export class MassCloneWorkflow {
       account_id: String(account?.accountId || account?.id || ""),
       currency: context.currency || "",
       mode: context.mode || "",
+      n: context.index ? String(context.index) : "",
       date: context.date || new Date().toISOString().slice(0, 10),
     };
     const rendered = raw
@@ -246,6 +254,9 @@ export class MassCloneWorkflow {
       {
         currency: this.accountCurrency(target.accountId),
         mode: state.massMode,
+        // Monotonic across the whole batch and across retries: a failed cabinet
+        // still consumes its number, so names are never reused.
+        index: this.nextSequence(),
       },
     );
     log(

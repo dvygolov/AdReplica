@@ -6,7 +6,7 @@ const DICT = {
   en: {
     "lang.ru": "Русский",
     "lang.en": "English",
-    "ver": "build {version}",
+    ver: "build {version}",
     "btn.service": "Service",
     "btn.close": "Close",
     "menu.clearDrafts": "Clear Drafts",
@@ -21,6 +21,7 @@ const DICT = {
     "field.sourceCampaign": "Source campaign",
     "field.campaignName": "Campaign name",
     "field.template": "Campaign name template",
+    "field.importMode": "Import mode",
     "field.mode": "Clone mode",
     "field.fanPage": "Facebook page",
     "field.pixel": "Pixel",
@@ -40,7 +41,8 @@ const DICT = {
     "clone.s3note": "nothing is created",
     "clone.s4": "4 · Run",
     "clone.s4note": "sequential, one account at a time",
-    "clone.hint": "Select the target accounts in the table, then clone. A failed account is rolled back and the batch continues.",
+    "clone.hint":
+      "Select the target accounts in the table, then clone. A failed account is rolled back and the batch continues.",
     "log.empty": "The operation log will appear here after the first run.",
     "clone.collapse": "Collapse or expand the source block",
     "clone.loading": "Loading the source campaign package...",
@@ -102,6 +104,7 @@ const DICT = {
     "macros.accountId": "target account id",
     "macros.currency": "target account currency",
     "macros.mode": "clone mode (DRAFT / PAUSED / ACTIVE)",
+    "macros.index": "sequence number of the target (1, 2, 3 …)",
     "macros.date": "today, YYYY-MM-DD",
 
     "risk.noBm": "no BM",
@@ -119,7 +122,7 @@ const DICT = {
   ru: {
     "lang.ru": "Русский",
     "lang.en": "English",
-    "ver": "сборка {version}",
+    ver: "сборка {version}",
     "btn.service": "Сервис",
     "btn.close": "Закрыть",
     "menu.clearDrafts": "Очистить драфты",
@@ -134,6 +137,7 @@ const DICT = {
     "field.sourceCampaign": "Кампания-источник",
     "field.campaignName": "Название кампании",
     "field.template": "Шаблон названия кампании",
+    "field.importMode": "Режим импорта",
     "field.mode": "Режим клона",
     "field.fanPage": "Страница Facebook",
     "field.pixel": "Пиксель",
@@ -153,7 +157,8 @@ const DICT = {
     "clone.s3note": "ничего не создаётся",
     "clone.s4": "4 · Выполнение",
     "clone.s4note": "последовательно, по одному кабинету",
-    "clone.hint": "Отметьте кабинеты в таблице и запустите клонирование. Упавший кабинет откатывается, очередь продолжается.",
+    "clone.hint":
+      "Отметьте кабинеты в таблице и запустите клонирование. Упавший кабинет откатывается, очередь продолжается.",
     "clone.mediaSummary": "Медиа источника ({count})",
     "clone.mappings": "Маппинг страниц, пикселей и каталогов",
     "clone.targetsHint": "выбрано {n} из {total} кабинетов",
@@ -215,6 +220,7 @@ const DICT = {
     "macros.accountId": "id целевого кабинета",
     "macros.currency": "валюта целевого кабинета",
     "macros.mode": "режим клона (DRAFT / PAUSED / ACTIVE)",
+    "macros.index": "порядковый номер кабинета (1, 2, 3 …)",
     "macros.date": "сегодняшняя дата, ГГГГ-ММ-ДД",
 
     "risk.noBm": "нет БМ",
@@ -261,7 +267,9 @@ export function t(key, vars) {
   const value = DICT[lang]?.[key] ?? DICT.en[key] ?? key;
   if (!vars) return value;
   return value.replace(/\{(\w+)\}/g, (match, name) =>
-    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : match,
+    Object.prototype.hasOwnProperty.call(vars, name)
+      ? String(vars[name])
+      : match,
   );
 }
 

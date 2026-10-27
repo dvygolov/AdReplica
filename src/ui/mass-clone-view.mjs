@@ -39,7 +39,8 @@ export class MassCloneView {
   sourceCurrency() {
     const { state } = this.dependencies;
     const source = (state.accounts || []).find(
-      (account) => String(account.id) === String(state.cloneSourceAccountId || ""),
+      (account) =>
+        String(account.id) === String(state.cloneSourceAccountId || ""),
     );
     return this.accountCurrency(source);
   }
@@ -47,9 +48,9 @@ export class MassCloneView {
   isBusinessAccount(account) {
     return Boolean(
       account?.raw?.business?.id ||
-        account?.raw?.business ||
-        account?.businessId ||
-        account?.raw?.owner_business,
+      account?.raw?.business ||
+      account?.businessId ||
+      account?.raw?.owner_business,
     );
   }
 
@@ -87,7 +88,9 @@ export class MassCloneView {
     const ads = Array.isArray(data.ads) ? data.ads : [];
     const media = Array.isArray(data._downloadQueue) ? data._downloadQueue : [];
     const creatives = new Set(
-      ads.map((ad) => ad?.creative?.id || ad?.creative_id || "").filter(Boolean),
+      ads
+        .map((ad) => ad?.creative?.id || ad?.creative_id || "")
+        .filter(Boolean),
     );
     const catalogs = Array.isArray(data.catalogs) ? data.catalogs : [];
     const currency = this.sourceCurrency();
@@ -116,7 +119,10 @@ export class MassCloneView {
 
     if (dom.cloneSummary) {
       const campaignName =
-        data.campaign?.name || state.cloneCampaignName || data.fileNameMap || "";
+        data.campaign?.name ||
+        state.cloneCampaignName ||
+        data.fileNameMap ||
+        "";
       const parts = [
         state.accounts?.find(
           (account) =>
@@ -260,13 +266,14 @@ export class MassCloneView {
             value && value !== "__copy_into__" && value !== "__create__",
         );
         const needsPage = Boolean(sourcePage);
-        const risk = !this.isBusinessAccount(account) && data?.catalogs?.length
-          ? `<span class="sk-chip sk-warn">${escapeHtml(t("risk.noBm"))}</span>`
-          : needsPage && !pageName
-            ? `<span class="sk-chip sk-warn">${escapeHtml(
-                t("risk.noPage"),
-              )}</span>`
-            : `<span class="sk-chip sk-ok">${escapeHtml(t("risk.ok"))}</span>`;
+        const risk =
+          !this.isBusinessAccount(account) && data?.catalogs?.length
+            ? `<span class="sk-chip sk-warn">${escapeHtml(t("risk.noBm"))}</span>`
+            : needsPage && !pageName
+              ? `<span class="sk-chip sk-warn">${escapeHtml(
+                  t("risk.noPage"),
+                )}</span>`
+              : `<span class="sk-chip sk-ok">${escapeHtml(t("risk.ok"))}</span>`;
         return `<tr>
           <td>${escapeHtml(account.name || accountId)}</td>
           <td>${escapeHtml(pageName || "—")}</td>
@@ -315,7 +322,8 @@ export class MassCloneView {
       dom.cloneProgressBar.style.width = `${Math.round((finished / results.length) * 100)}%`;
     }
     if (dom.cloneCounters) {
-      const active = results.find((row) => row.status === "running")?.name || "—";
+      const active =
+        results.find((row) => row.status === "running")?.name || "—";
       const finishedNow = results.length - counts.queued - counts.running;
       dom.cloneCounters.innerHTML = [
         `<span>${escapeHtml(t("run.progress"))} <b>${finishedNow}/${results.length}</b></span>`,

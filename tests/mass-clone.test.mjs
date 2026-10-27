@@ -146,6 +146,26 @@ test("campaign names use the template with the target account", async () => {
   assert.equal(calls[0].name, "Source Campaign — Good A");
 });
 
+test("the {n} macro numbers targets and keeps counting after a failure", async () => {
+  const { workflow, state, calls } = createHarness({ failFor: ["222"] });
+  state.massNameTemplate = "Clone {n} — {account}";
+  await workflow.run();
+  assert.deepEqual(
+    calls.map((call) => call.name),
+    ["Clone 1 — Good A", "Clone 2 — Good B"],
+    "the failed target still consumed its number",
+  );
+
+  // a retry continues the sequence instead of reusing numbers
+  state.massResults[1].status = "failed";
+  state.massTargets = {
+    111: { selected: false },
+    222: { selected: true },
+  };
+  await workflow.run();
+  assert.equal(calls.at(-1).name, "Clone 3 — Good B");
+});
+
 test("a failed target is rolled back and the batch continues", async () => {
   const { workflow, state, calls, deleted } = createHarness({
     failFor: ["111"],

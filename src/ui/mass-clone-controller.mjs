@@ -96,6 +96,7 @@ export class MassCloneController {
     if (state.massRunning) return;
     state.massResults = [];
     state.massActiveAccountId = "";
+    state.massSequence = 0;
     state.clonePreviewOpen = false;
     this.dependencies.massCloneView.render();
   }

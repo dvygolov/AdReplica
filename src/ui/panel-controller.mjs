@@ -127,7 +127,7 @@ export class PanelController {
                   <input type="text" id="${APP_ID}-import-campaign-name" placeholder="${t("opt.notSelected")}" />
                 </label>
                 <label class="sk-field sk-narrow">
-                  <span>${t("field.mode")}</span>
+                  <span>${t("field.importMode")}</span>
                   <select id="${APP_ID}-import-mode">
                     <option value="DRAFT">DRAFT</option>
                     <option value="ACTIVE">ACTIVE</option>
@@ -156,8 +156,8 @@ export class PanelController {
               </h3>
               <div class="sk-summary sk-hidden" id="${APP_ID}-clone-summary"></div>
               <div id="${APP_ID}-clone-source-body">
-              <div class="sk-row">
-                <label class="sk-field">
+              <div class="sk-row sk-row-source">
+                <label class="sk-field sk-source-account">
                   <span>${t("field.sourceAccount")}</span>
                   <select id="${APP_ID}-clone-source-account"></select>
                 </label>
@@ -195,6 +195,7 @@ export class PanelController {
                   <li><code>{account_id}</code><span>${t("macros.accountId")}</span></li>
                   <li><code>{currency}</code><span>${t("macros.currency")}</span></li>
                   <li><code>{mode}</code><span>${t("macros.mode")}</span></li>
+                  <li><code>{n}</code><span>${t("macros.index")}</span></li>
                   <li><code>{date}</code><span>${t("macros.date")}</span></li>
                 </ul>
               </div>
@@ -271,7 +272,7 @@ export class PanelController {
         </div>
         <details class="sk-logs">
           <summary class="sk-log-head">
-            <span>${t("logs.title")}</span>
+            <span class="sk-log-t"><svg class="sk-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${t("logs.title")}</span>
             <button type="button" class="sk-secondary sk-log-dl" id="${APP_ID}-download-logs">${t("logs.download")}</button>
           </summary>
           <textarea id="${APP_ID}-logs" class="sk-log-area" readonly placeholder="${t("log.empty")}"></textarea>
@@ -313,9 +314,7 @@ export class PanelController {
     dom.cloneTargetsCount = root.querySelector(
       `#${APP_ID}-clone-targets-count`,
     );
-    dom.clonePreviewButton = root.querySelector(
-      `#${APP_ID}-clone-preview`,
-    );
+    dom.clonePreviewButton = root.querySelector(`#${APP_ID}-clone-preview`);
     dom.clonePreviewCard = root.querySelector(`#${APP_ID}-clone-preview-card`);
     dom.clonePreviewBody = root.querySelector(`#${APP_ID}-clone-preview-body`);
     dom.cloneRunCard = root.querySelector(`#${APP_ID}-clone-run-card`);
@@ -419,7 +418,9 @@ export class PanelController {
         event.stopPropagation();
         dom.macrosPop.classList.toggle("sk-hidden");
       });
-      dom.macrosPop.addEventListener("click", (event) => event.stopPropagation());
+      dom.macrosPop.addEventListener("click", (event) =>
+        event.stopPropagation(),
+      );
       document.addEventListener("click", () => {
         dom.macrosPop?.classList.add("sk-hidden");
       });

@@ -67,6 +67,7 @@ export class AdReplicaState {
     this.activeTab = "export";
     this.cloneSourceCollapsed = null;
     this.massRates = {};
+    this.massSequence = 0;
     this.clonePreviewOpen = false;
     this.massActiveAccountId = "";
     this.pageIdentityHints = null;

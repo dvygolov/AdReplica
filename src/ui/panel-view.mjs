@@ -98,10 +98,7 @@ export class PanelView {
         ? state.activeTab
         : "export";
       dom.root.querySelectorAll(".sk-tab").forEach((button) => {
-        button.classList.toggle(
-          "sk-tab-active",
-          button.dataset.tab === active,
-        );
+        button.classList.toggle("sk-tab-active", button.dataset.tab === active);
       });
       dom.root.querySelectorAll(".sk-tab-panel").forEach((panel) => {
         panel.classList.toggle(
@@ -110,6 +107,9 @@ export class PanelView {
         );
       });
       dom.cloneFooter?.classList.toggle("sk-hidden", active !== "clone");
+      dom.root.querySelectorAll("[data-report-kind]").forEach((card) => {
+        card.classList.toggle("sk-hidden", card.dataset.reportKind !== active);
+      });
       if (state.cloneSourceCollapsed === null && state.clonePackage) {
         state.cloneSourceCollapsed = true;
       }
@@ -180,7 +180,10 @@ export class PanelView {
       dom.downloadLogs.disabled =
         !Array.isArray(state.logs) || state.logs.length === 0;
     }
-    if (dom.cloneCampaignName && dom.cloneCampaignName.value !== templateValue) {
+    if (
+      dom.cloneCampaignName &&
+      dom.cloneCampaignName.value !== templateValue
+    ) {
       dom.cloneCampaignName.value = templateValue;
     }
     renderLogs();

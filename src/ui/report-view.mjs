@@ -25,7 +25,11 @@ export class ReportView {
     const operation =
       { export: "Export", import: "Import", clone: "Clone" }[data.kind] ||
       "Operation";
-    node.innerHTML = `<h3>${operation}: ${escapeHtml(LABELS[data.status] || data.status)}</h3>
+    node.dataset.reportKind = data.kind;
+    node.innerHTML = `<div class="sk-report-head">
+        <h3>${operation}: ${escapeHtml(LABELS[data.status] || data.status)}</h3>
+        <button type="button" class="sk-icon" data-action="close" aria-label="close">✕</button>
+      </div>
       <div>${escapeHtml(data.campaignName)} — account ${escapeHtml(data.accountId)}${data.kind === "export" ? "" : ` (${escapeHtml(data.mode)})`}</div>
       <p>${["campaign", "adset", "ad"].map((type) => `${type}: ${data.counts[type]}/${data.expected[type]}`).join(" · ")}</p>
       <details><summary>Details and remaining objects</summary><pre></pre></details>
@@ -35,8 +39,12 @@ export class ReportView {
     node.querySelector("pre").style.cssText =
       "white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto;";
     node.addEventListener("click", (event) => {
-      const action = event.target.closest("button[data-action]")?.dataset
-        .action;
+      const button = event.target.closest("button[data-action]");
+      const action = button?.dataset.action;
+      if (action === "close") {
+        this.destroy();
+        return;
+      }
       if (action === "reload")
         this.services.dialogs.askToReloadResult(
           "Reload Ads Manager to show the result?",
@@ -51,6 +59,13 @@ export class ReportView {
             type: action === "json" ? "application/json" : "text/plain",
           }),
         );
+        const label = button.textContent;
+        button.textContent = `✓ ${action === "json" ? "JSON" : "report"}`;
+        button.classList.add("sk-done");
+        setTimeout(() => {
+          button.textContent = label;
+          button.classList.remove("sk-done");
+        }, 1600);
       }
     });
     this.dom.root.querySelector(".sk-logs")?.before(node);

@@ -803,8 +803,6 @@ export function buildAdReplicaStyles(appId) {
       }
       #${appId} .sk-body::-webkit-scrollbar-track,
       #${appId} .sk-scroll::-webkit-scrollbar-track { background: #171717; }
-      #${appId} .sk-row > .sk-field { min-width: 0; }
-      #${appId} .sk-row > .sk-field:last-child { flex: 0 0 170px; }
       #${appId} .sk-sec { margin-bottom: 8px; }
       #${appId} .sk-summary {
         font-size: 12px;
@@ -823,6 +821,48 @@ export function buildAdReplicaStyles(appId) {
       }
       #${appId} details.sk-logs { background: #191919; }
       #${appId} details.sk-logs > summary { padding: 7px 16px; }
+      /* row fields share the width evenly; only explicit .sk-narrow stays fixed */
+      #${appId} .sk-row { align-items: flex-end; gap: 12px; }
+      #${appId} .sk-row > .sk-field { flex: 1 1 0; min-width: 0; margin-bottom: 0; }
+      #${appId} .sk-row > .sk-field.sk-narrow { flex: 0 0 200px; }
+      #${appId} .sk-row > .sk-field.sk-source-account { flex: 0 0 260px; }
+      #${appId} .sk-field > select,
+      #${appId} .sk-field > input[type="text"],
+      #${appId} .sk-field > input[type="file"] {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      #${appId} .sk-bar .sk-primary,
+      #${appId} .sk-bar .sk-secondary {
+        min-width: 220px;
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+      #${appId} .sk-log-head { cursor: pointer; }
+      #${appId} .sk-log-t {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #${appId} .sk-chev {
+        display: block;
+        color: #cfcfcf;
+        transition: transform 0.15s ease;
+      }
+      #${appId} details.sk-logs[open] .sk-chev { transform: rotate(90deg); }
+      #${appId} .sk-report-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      #${appId} .sk-report-head h3 { margin: 0; font-size: 13px; color: #ffd400; }
+      #${appId} button.sk-done {
+        border-color: #2f6b35;
+        color: #7ee08c;
+        background: #16251a;
+      }
       @media (max-width: 800px) {
         #${appId} { inset: 10px; }
         #${appId} .sk-shell { max-height: calc(100vh - 20px); }
