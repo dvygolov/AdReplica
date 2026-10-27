@@ -830,7 +830,28 @@ export function buildAdReplicaStyles(appId) {
       #${appId} .sk-field > input[type="text"],
       #${appId} .sk-field > input[type="file"] {
         width: 100%;
+        height: 40px;
         box-sizing: border-box;
+        padding: 0 10px;
+        font-size: 13px;
+      }
+      #${appId} .sk-field > input[type="file"] {
+        padding: 5px 10px;
+        color: #c8c8c8;
+      }
+      #${appId} .sk-field > input[type="file"]::file-selector-button {
+        height: 28px;
+        margin-right: 10px;
+        padding: 0 12px;
+        border: 1px solid #4a4a4a;
+        border-radius: 6px;
+        background: #2a2a2a;
+        color: #e8e8e8;
+        font: inherit;
+        cursor: pointer;
+      }
+      #${appId} .sk-field > input[type="file"]::file-selector-button:hover {
+        background: #343434;
       }
       #${appId} .sk-bar .sk-primary,
       #${appId} .sk-bar .sk-secondary {
@@ -863,6 +884,56 @@ export function buildAdReplicaStyles(appId) {
         color: #7ee08c;
         background: #16251a;
       }
+      /* the finished-operation verdict takes over the panel until it is closed */
+      #${appId} .sk-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 70;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.68);
+        backdrop-filter: blur(1.5px);
+      }
+      #${appId} .sk-overlay button {
+        min-width: 0;
+      }
+      #${appId} .sk-report-card {
+        width: min(440px, 100%);
+        max-height: calc(100% - 16px);
+        overflow: auto;
+        margin: 0;
+        border: 1px solid #5a5a5a;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
+      }
+      #${appId} .sk-report-card .sk-report-meta {
+        color: #cfcfcf;
+        line-height: 1.45;
+        margin-bottom: 6px;
+      }
+      #${appId} .sk-report-card .sk-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      #${appId} .sk-report-card .sk-actions button {
+        background: #2a2a2a;
+        color: #e8e8e8;
+        border: 1px solid #4a4a4a;
+        font-weight: 600;
+      }
+      #${appId} .sk-report-card .sk-actions button:hover { background: #343434; }
+      #${appId} .sk-report-card .sk-actions button.sk-primary {
+        margin-left: auto;
+        background: #ffd400;
+        color: #141400;
+        border-color: #ffd400;
+      }
+      #${appId} .sk-report-card .sk-actions button.sk-primary:hover { background: #ffe033; }
       @media (max-width: 800px) {
         #${appId} { inset: 10px; }
         #${appId} .sk-shell { max-height: calc(100vh - 20px); }

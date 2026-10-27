@@ -1,14 +1,15 @@
 import { escapeHtml } from "../utils/string.mjs";
+import { t } from "./i18n.mjs";
 
-const LABELS = {
-  success: "Completed",
-  partial: "Partially completed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-  needs_review: "Needs verification",
+const STATUS_KEYS = {
+  success: "report.status.success",
+  partial: "report.status.partial",
+  failed: "report.status.failed",
+  cancelled: "report.status.cancelled",
+  needs_review: "report.status.needs_review",
 };
 
-/** Persistent result card; downloading a report never downloads session credentials. */
+/** Result of a finished operation: modal, so the verdict cannot be missed. */
 export class ReportView {
   constructor({ dom, services }) {
     Object.assign(this, { dom, services });
@@ -21,20 +22,21 @@ export class ReportView {
     const data = report.toJSON();
     const node = document.createElement("section");
     node.className = "sk-card sk-operation-report";
-    node.setAttribute("role", "status");
-    const operation =
-      { export: "Export", import: "Import", clone: "Clone" }[data.kind] ||
-      "Operation";
+    node.setAttribute("role", "dialog");
+    node.setAttribute("aria-modal", "true");
+    node.classList.add("sk-report-card");
+    const operation = t(`report.kind.${data.kind}`);
     node.dataset.reportKind = data.kind;
     node.innerHTML = `<div class="sk-report-head">
-        <h3>${operation}: ${escapeHtml(LABELS[data.status] || data.status)}</h3>
-        <button type="button" class="sk-icon" data-action="close" aria-label="close">✕</button>
+        <h3>${operation}: ${escapeHtml(t(STATUS_KEYS[data.status]) || data.status)}</h3>
+        <button type="button" class="sk-icon" data-action="close" aria-label="${escapeHtml(t("report.close"))}">✕</button>
       </div>
-      <div>${escapeHtml(data.campaignName)} — account ${escapeHtml(data.accountId)}${data.kind === "export" ? "" : ` (${escapeHtml(data.mode)})`}</div>
+      <div class="sk-report-meta">${escapeHtml(data.campaignName)}<br />${escapeHtml(t("report.account", { id: data.accountId }))}${data.kind === "export" ? "" : ` · ${escapeHtml(data.mode)}`}</div>
       <p>${["campaign", "adset", "ad"].map((type) => `${type}: ${data.counts[type]}/${data.expected[type]}`).join(" · ")}</p>
-      <details><summary>Details and remaining objects</summary><pre></pre></details>
-      <div class="sk-actions"><button data-action="text">Download report</button><button data-action="json">JSON</button>
-      ${data.kind === "export" ? "" : '<button data-action="reload">Open result in Ads Manager</button>'}</div>`;
+      <details><summary>${escapeHtml(t("report.details"))}</summary><pre></pre></details>
+      <div class="sk-actions"><button data-action="text">${escapeHtml(t("report.download"))}</button><button data-action="json">JSON</button>
+      ${data.kind === "export" ? "" : `<button data-action="reload">${escapeHtml(t("report.reload"))}</button>`}
+      <button data-action="close" class="sk-primary">${escapeHtml(t("report.ok"))}</button></div>`;
     node.querySelector("pre").textContent = report.toText();
     node.querySelector("pre").style.cssText =
       "white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto;";
@@ -68,8 +70,17 @@ export class ReportView {
         }, 1600);
       }
     });
-    this.dom.root.querySelector(".sk-logs")?.before(node);
-    this.element = node;
+    // The dimmed backdrop is a second way out of the modal.
+    const overlay = document.createElement("div");
+    overlay.className = "sk-overlay";
+    overlay.dataset.reportKind = data.kind;
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) this.destroy();
+    });
+    overlay.append(node);
+    // Dims only the AdReplica window, the surrounding Ads Manager stays usable.
+    (this.dom.root.querySelector(".sk-shell") || this.dom.root).append(overlay);
+    this.element = overlay;
   }
   destroy() {
     this.element?.remove();
