@@ -301,9 +301,9 @@ export function buildAdReplicaStyles(appId) {
         background: #ffca28;
       }
       #${appId} button.sk-secondary {
-        background: #333;
-        color: #ccc;
-        border: 1px solid #555;
+        background: #2a2a2a;
+        color: #e8e8e8;
+        border: 1px solid #4a4a4a;
       }
       #${appId} button:disabled {
         opacity: 0.45;
@@ -771,11 +771,6 @@ export function buildAdReplicaStyles(appId) {
         font-weight: 700;
       }
       #${appId} button.sk-primary:hover:not(:disabled) { background: #ffe14d; }
-      #${appId} button.sk-secondary {
-        background: #262626;
-        border: 1px solid #3d3d3d;
-        color: #d6d6d6;
-      }
       #${appId} button.sk-danger {
         background: #2a1717;
         border: 1px solid #6b2f2f;
@@ -818,11 +813,6 @@ export function buildAdReplicaStyles(appId) {
         border: 1px dashed #3d3d3d;
         border-radius: 8px;
         background: #1b1b1b;
-      }
-      #${appId} button.sk-secondary {
-        background: #2a2a2a;
-        border: 1px solid #4a4a4a;
-        color: #e8e8e8;
       }
       #${appId} .sk-tbl tr.sk-sel td { background: #2f2c14; }
       #${appId} .sk-tbl tr.sk-sel td:first-child {

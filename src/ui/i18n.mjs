@@ -59,7 +59,6 @@ const DICT = {
     "btn.export": "Export",
     "btn.import": "Import",
     "btn.clone": "Clone",
-    "btn.cloneTo": "Clone to {n} accounts",
     "btn.preview": "Preview mappings",
     "btn.stop": "Stop",
     "btn.retry": "Retry failed",
@@ -170,7 +169,6 @@ const DICT = {
     "btn.export": "Экспорт",
     "btn.import": "Импорт",
     "btn.clone": "Клонировать",
-    "btn.cloneTo": "Клонировать в {n} кабинетов",
     "btn.preview": "Сопоставления",
     "btn.stop": "Стоп",
     "btn.retry": "Повторить упавшие",
@@ -191,6 +189,7 @@ const DICT = {
     "currency.auto": "курс автоматически",
     "currency.convert": "{cur} · курс {rate}",
 
+    "run.progress": "прогресс",
     "run.done": "готово",
     "run.rolled": "откатано",
     "run.queued": "в очереди",
