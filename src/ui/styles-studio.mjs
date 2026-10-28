@@ -77,8 +77,8 @@ export function buildStudioStyles(appId) {
       #${appId} .sk-dock {
         pointer-events: auto;
         align-self: stretch;
-        flex: 0 0 420px;
-        width: 420px;
+        flex: 0 0 560px;
+        width: 560px;
         max-width: calc(100vw - 40px);
         max-height: calc(100vh - 36px);
         display: flex;
@@ -120,6 +120,11 @@ export function buildStudioStyles(appId) {
         border-radius: 0;
         background: #141414;
         resize: none;
+        /* Long log lines wrap instead of forcing a sideways scroll. */
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        overflow-x: hidden;
       }
       #${appId} .sk-head { position: relative; }
       /* Service menu: a proper card hanging under the gear, never outside the panel. */

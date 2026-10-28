@@ -278,12 +278,6 @@ export class MassCloneView {
         const accountId = String(account.id);
         const picked = selection[accountId] || {};
         const currency = this.accountCurrency(account);
-        // A funding source without a masked label is either a fresh card or a
-        // detached instrument: Meta cannot tell them apart, so flag it.
-        const cardUnconfirmed = Boolean(
-          account?.raw?.funding_source_details?.id &&
-          !account?.raw?.funding_source_details?.display_string,
-        );
         const rate = rates[accountId];
         const autoRate = autoRates[accountId];
         const converts =
@@ -353,12 +347,6 @@ export class MassCloneView {
           )}<span class="sk-id">${escapeHtml(accountId)}</span></span>${
             isSource
               ? `<span class="sk-chip">${escapeHtml(t("chip.source"))}</span>`
-              : ""
-          }${
-            cardUnconfirmed
-              ? `<span class="sk-chip sk-warn" title="${escapeHtml(
-                  t("chip.cardUnconfirmedHint"),
-                )}">${escapeHtml(t("chip.cardUnconfirmed"))}</span>`
               : ""
           }</span></td>
           ${this.pageCell(accountId, picked)}
