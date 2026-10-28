@@ -146,7 +146,13 @@ export class MassCloneWorkflow {
       log("info", `Mass clone: using manual ${from}→${to} rate ${manual}.`);
       return { ok: true, rate: manual, from, to };
     }
-    const result = await this.dependencies.currencyRateService.rate(from, to);
+    const service = this.dependencies.currencyRateService;
+    const metaRate =
+      (await service?.metaRate?.(
+        state.cloneSourceAccountId,
+        target.accountId,
+      )) || (await service?.rate?.(from, to));
+    const result = metaRate;
     if (!result?.ok) {
       state.cloneCurrencyRate = 1;
       state.massCurrencyNote = `${from} → ${to}: rate unavailable`;

@@ -287,6 +287,18 @@ export class MassCloneController {
         this.setAllTargets(dom.cloneMaster.checked);
       });
     }
+    if (dom.cloneSearch) {
+      dom.cloneSearch.addEventListener("input", (event) => {
+        state.massSearch = event.target.value;
+        this.dependencies.massCloneView.render();
+        // Re-focus keeps typing smooth after the table re-render.
+        const next = document.querySelector(`#${appId}-clone-search`);
+        if (next && next !== document.activeElement) {
+          next.focus();
+          next.setSelectionRange(next.value.length, next.value.length);
+        }
+      });
+    }
     const modeSelect = root.querySelector(`#${appId}-clone-mode`);
     if (modeSelect) {
       modeSelect.addEventListener("change", (event) => {

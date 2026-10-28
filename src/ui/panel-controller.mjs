@@ -49,6 +49,7 @@ export class PanelController {
     const root = document.createElement("div");
     root.id = APP_ID;
     root.innerHTML = `
+      <button type="button" id="${APP_ID}-mini" class="sk-mini" data-always-enabled title="${t("btn.restore")}" aria-label="${t("btn.restore")}">${APP_MARK_SVG}</button>
       <div class="sk-shell">
         <div class="sk-loading" id="${APP_ID}-loading">
           <div class="sk-spinner"></div>
@@ -69,6 +70,7 @@ export class PanelController {
               <button type="button" data-lang="en" data-always-enabled title="${t("lang.en")}" aria-pressed="true">${FLAGS.en}</button>
             </div>
             <button id="${APP_ID}-service" class="sk-icon" data-always-enabled title="${t("btn.service")}" aria-label="${t("btn.service")}" aria-expanded="false">&#9881;</button>
+            <button id="${APP_ID}-minimize" class="sk-icon sk-minimize" data-always-enabled title="${t("btn.minimize")}" aria-label="${t("btn.minimize")}">&#x2013;</button>
             <button id="${APP_ID}-close" class="sk-icon sk-close" data-always-enabled title="${t("btn.close")}" aria-label="${t("btn.close")}">&#x2715;</button>
             <div id="${APP_ID}-service-menu" class="sk-menu sk-hidden">
               <button data-role="busy-lock" id="${APP_ID}-clear-drafts" type="button">${t("menu.clearDrafts")}</button>
@@ -198,14 +200,16 @@ export class PanelController {
             </section>
 
             <section class="sk-card">
-              <h3 class="sk-sec">${t("clone.s2")} <span class="sk-count" id="${APP_ID}-clone-targets-count"></span></h3>
+              <h3 class="sk-sec">${t("clone.s2")}
+                <input type="search" class="sk-search" id="${APP_ID}-clone-search" placeholder="${t("clone.search")}" aria-label="${t("clone.search")}" />
+                <span class="sk-count" id="${APP_ID}-clone-targets-count"></span>
+              </h3>
               <div class="sk-scroll">
                 <table class="sk-tbl sk-tbl-targets">
                   <thead>
                     <tr>
                       <th class="sk-chk"><input type="checkbox" id="${APP_ID}-clone-master" data-always-enabled /></th>
                       <th>${t("field.account")}</th>
-                      <th>${t("field.type")}</th>
                       <th>${t("field.fanPage")}</th>
                       <th>${t("field.pixel")}</th>
                       <th class="sk-hidden" id="${APP_ID}-clone-th-catalog">${t("field.catalog")}</th>
@@ -284,6 +288,7 @@ export class PanelController {
     dom.cloneCatalogHead = root.querySelector(`#${APP_ID}-clone-th-catalog`);
     dom.cloneTargetsBody = root.querySelector(`#${APP_ID}-clone-targets-body`);
     dom.cloneMaster = root.querySelector(`#${APP_ID}-clone-master`);
+    dom.cloneSearch = root.querySelector(`#${APP_ID}-clone-search`);
     dom.cloneTargetsCount = root.querySelector(
       `#${APP_ID}-clone-targets-count`,
     );
@@ -327,6 +332,35 @@ export class PanelController {
     });
     dom.serviceOutsideClick = hideServiceMenu;
     document.addEventListener("click", dom.serviceOutsideClick);
+    // Collapse morphs the whole window into the mark pinned to the corner.
+    const minimizeButton = root.querySelector(`#${APP_ID}-minimize`);
+    const setCollapsed = (collapsed) => {
+      root.classList.toggle("sk-min", collapsed);
+      if (minimizeButton) {
+        const label = t(collapsed ? "btn.restore" : "btn.minimize");
+        minimizeButton.title = label;
+        minimizeButton.setAttribute("aria-label", label);
+      }
+    };
+    // Delegated on purpose: the head markup is rebuilt on re-render, so a
+    // listener hung on the button itself would be lost with the old node.
+    root.addEventListener("click", (event) => {
+      if (event.target?.closest?.(`#${APP_ID}-mini`)) {
+        event.preventDefault();
+        setCollapsed(false);
+        return;
+      }
+      const target = event.target?.closest?.(`#${APP_ID}-minimize`);
+      if (target) {
+        event.preventDefault();
+        setCollapsed(!root.classList.contains("sk-min"));
+        return;
+      }
+      if (root.classList.contains("sk-min")) {
+        event.stopPropagation();
+        setCollapsed(false);
+      }
+    });
     root.querySelector(`#${APP_ID}-close`).addEventListener("click", destroy);
     root.querySelectorAll(".sk-tab").forEach((btn) => {
       btn.addEventListener("click", () => {

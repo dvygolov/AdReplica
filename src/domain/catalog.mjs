@@ -29,6 +29,17 @@ export function isSyntheticProductSetName(value) {
   return false;
 }
 
+/**
+ * Meta creates an "All Products" set for every catalog by itself and rebuilds
+ * it on its own, so such a set never needs a target mapping: dropping
+ * product_set_id from the payload makes the ad use the whole target catalog.
+ */
+export function isAutogenProductSet(item) {
+  if (!item) return false;
+  if (item.is_autogen_product_set) return true;
+  return /^all\s*products$/i.test(String(item.name || "").trim());
+}
+
 export function rankProductSetMeta(item) {
   if (!item || typeof item !== "object") {
     return -1;

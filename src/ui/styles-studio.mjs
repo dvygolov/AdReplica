@@ -579,6 +579,66 @@ export function buildStudioStyles(appId) {
       #${appId} .sk-mass-row span { color: #bdbdbd; }
       #${appId} .sk-mass-row.sk-success span { color: #7ee08c; }
       #${appId} .sk-mass-row.sk-failed span { color: #ff9a9a; }
+      /* ---- collapsed: the window morphs into the mark pinned to the corner ---- */
+      #${appId} .sk-shell { transition: opacity .16s ease, transform .16s ease; }
+      #${appId} .sk-mini {
+        display: none;
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 54px;
+        height: 54px;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid #4a4a4a;
+        border-radius: 14px;
+        background: #1b1b1b;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+        cursor: pointer;
+        pointer-events: auto;
+      }
+      #${appId} .sk-mini:hover { border-color: #ffd400; }
+      #${appId} .sk-mini .sk-mark { width: 32px; height: 32px; }
+      #${appId}.sk-min .sk-mini { display: inline-flex; }
+      #${appId}.sk-min .sk-shell {
+        opacity: 0;
+        visibility: hidden;
+        transform: scale(0.86);
+        pointer-events: none;
+      }
+      #${appId} .sk-minimize { font-weight: 700; line-height: 1; padding-bottom: 3px; }
+      /* ---- account search in the target section header ---- */
+      #${appId} .sk-search {
+        width: 190px;
+        height: 28px;
+        margin-left: 10px;
+        padding: 0 9px;
+        border: 1px solid #3c3c3c;
+        border-radius: 7px;
+        background: #202020;
+        color: #eee;
+        font-size: 12px;
+        font-family: inherit;
+      }
+      #${appId} .sk-search::placeholder { color: #7d7d7d; }
+      #${appId} .sk-search:focus { outline: none; border-color: #ffd400; }
+      /* ---- account type as an icon with a tooltip ---- */
+      #${appId} .sk-acc { display: inline-flex; align-items: center; gap: 8px; }
+      #${appId} .sk-acc-ico {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 700;
+        cursor: help;
+      }
+      #${appId} .sk-acc-ico.sk-bm { background: #2b3a2b; color: #8fe08f; border: 1px solid #3f5a3f; }
+      #${appId} .sk-acc-ico.sk-personal { background: #2a2a2a; color: #9a9a9a; border: 1px solid #3c3c3c; }
       @media (max-width: 800px) {
         #${appId} { inset: 10px; }
         #${appId} .sk-shell { max-height: calc(100vh - 20px); }

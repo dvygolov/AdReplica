@@ -21,19 +21,32 @@ export class MassCloneView {
     this.renderSource = this.renderSource.bind(this);
   }
 
-  /** Meta refuses ad creation without a funding source, drafts included. */
+  /**
+   * Meta refuses ad creation without a working funding source, drafts included
+   * (error 1359188). `funding_source_details` alone is not enough: a cabinet can
+   * carry an empty funding shell, so only a real instrument with a display
+   * string ("VISA *2116") counts.
+   */
   hasPaymentMethod(account) {
-    return Boolean(account?.raw?.funding_source_details);
+    return Boolean(account?.raw?.funding_source_details?.display_string);
   }
 
   /** Only usable accounts are listed: unsettled or unpaid cabinets cannot host ads. */
   targetAccounts() {
     const { state } = this.dependencies;
-    return (state.accounts || []).filter(
-      (account) =>
-        assessAccountHealth(state.accounts, account.id).ok &&
-        this.hasPaymentMethod(account),
-    );
+    const query = String(state.massSearch || "")
+      .trim()
+      .toLowerCase();
+    return (state.accounts || []).filter((account) => {
+      if (!assessAccountHealth(state.accounts, account.id).ok) return false;
+      if (!this.hasPaymentMethod(account)) return false;
+      if (!query) return true;
+      return (
+        String(account.name || "")
+          .toLowerCase()
+          .includes(query) || String(account.id).includes(query)
+      );
+    });
   }
 
   /** Accounts dropped because the cabinet has no payment method. */
@@ -246,7 +259,7 @@ export class MassCloneView {
     if (dom.cloneCatalogHead) {
       dom.cloneCatalogHead.classList.toggle("sk-hidden", !catalogColumn);
     }
-    const columns = 5 + (catalogColumn ? 1 : 0);
+    const columns = 4 + (catalogColumn ? 1 : 0);
     if (!accounts.length) {
       body.innerHTML = `<tr><td colspan="${columns}" class="sk-empty">${escapeHtml(
         t("clone.targetsNone"),
@@ -297,16 +310,17 @@ export class MassCloneView {
             )}">${escapeHtml(currency || "—")}</span>`;
         const isSource =
           String(accountId) === String(state.cloneSourceAccountId || "");
-        const typeChip = this.isBusinessAccount(account)
-          ? `<span class="sk-chip sk-warn">${escapeHtml(
-              t("chip.bm", {
-                biz:
-                  account.raw?.business?.name ||
-                  account.raw?.owner_business?.name ||
-                  "BM",
-              }),
-            )}</span>`
-          : `<span class="sk-chip">${escapeHtml(t("chip.personal"))}</span>`;
+        const businessName =
+          account.raw?.business?.name ||
+          account.raw?.owner_business?.name ||
+          "BM";
+        const typeIcon = this.isBusinessAccount(account)
+          ? `<span class="sk-acc-ico sk-bm" title="${escapeHtml(
+              t("chip.bm", { biz: businessName }),
+            )}" aria-label="${escapeHtml(t("chip.bm", { biz: businessName }))}">BM</span>`
+          : `<span class="sk-acc-ico sk-personal" title="${escapeHtml(
+              t("chip.personal"),
+            )}" aria-label="${escapeHtml(t("chip.personal"))}">&#9679;</span>`;
         const catalogCell = catalogColumn
           ? `<td><select class="sk-cat" title="${escapeHtml(
               t("opt.noCatalogHint"),
@@ -325,14 +339,13 @@ export class MassCloneView {
           )}" ${picked.selected ? "checked" : ""} ${
             state.massRunning ? "disabled" : ""
           } /></td>
-          <td><span class="sk-who">${escapeHtml(
+          <td><span class="sk-acc">${typeIcon}<span class="sk-who">${escapeHtml(
             account.name || accountId,
-          )}<span class="sk-id">${escapeHtml(accountId)}</span></span></td>
-          <td>${typeChip}${
+          )}<span class="sk-id">${escapeHtml(accountId)}</span></span>${
             isSource
-              ? ` <span class="sk-chip">${escapeHtml(t("chip.source"))}</span>`
+              ? `<span class="sk-chip">${escapeHtml(t("chip.source"))}</span>`
               : ""
-          }</td>
+          }</span></td>
           ${this.pageCell(accountId, picked)}
           <td><select class="sk-pix" title="${escapeHtml(
             t("opt.noPixelHint"),

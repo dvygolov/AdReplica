@@ -120,6 +120,26 @@ export function collectCatalogRefs(node, refs, path = "", sourceName = "") {
   }
 }
 
+/** Product sets that creatives/ad sets actually point at: the rest are dead weight. */
+export function getReferencedProductSetIds(packageData) {
+  const refs = { catalogs: new Map(), productSets: new Map() };
+  if (!packageData) return new Set();
+  for (const creative of packageData.creatives || []) {
+    collectCatalogRefs(
+      creative.raw || creative,
+      refs,
+      `creative:${creative.id}`,
+    );
+  }
+  for (const ad of packageData.ads || []) {
+    collectCatalogRefs(ad, refs, `ad:${ad.id}`);
+  }
+  for (const adset of packageData.adsets || []) {
+    collectCatalogRefs(adset, refs, `adset:${adset.id}`);
+  }
+  return new Set([...refs.productSets.keys()].map(String));
+}
+
 export function getCatalogRefsFromPackage(packageData) {
   const refs = {
     catalogs: new Map(),
@@ -267,12 +287,16 @@ export function replaceMappedCatalogReferences(
     }
     if (PRODUCT_SET_ID_KEYS.has(key) && value !== undefined && value !== null) {
       if (Array.isArray(value)) {
-        node[key] = value.map(
-          (item) => productSetMappings[String(item)] || item,
-        );
+        node[key] = value
+          .filter((item) => productSetMappings[String(item)] !== "")
+          .map((item) => productSetMappings[String(item)] || item);
         continue;
       }
       const mapped = productSetMappings[String(value)];
+      if (mapped === "") {
+        delete node[key];
+        continue;
+      }
       if (mapped) {
         node[key] = mapped;
         continue;

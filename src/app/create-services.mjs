@@ -827,6 +827,10 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       // Straight from the page this request dies on Meta's CSP; the bridge is not.
       fetchImpl: (input, init) =>
         services.browserTransport.adReplicaFetch(input, init),
+      // Meta's own ad-account ratio is the primary source for budgets.
+      get graphClient() {
+        return services.graphClient;
+      },
     });
   services.massCloneView =
     overrides.massCloneView ||

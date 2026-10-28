@@ -448,10 +448,22 @@ test("cabinets without a payment method are hidden from the target table", () =>
         name: "Paid",
         raw: {
           account_status: 1,
-          funding_source_details: { id: "1", type: 1 },
+          funding_source_details: {
+            id: "1",
+            type: 1,
+            display_string: "VISA *1",
+          },
         },
       },
       { id: "222", name: "Unpaid", raw: { account_status: 1 } },
+      {
+        id: "444",
+        name: "Empty funding shell",
+        raw: {
+          account_status: 1,
+          funding_source_details: { id: "9", type: 1 },
+        },
+      },
       { id: "333", name: "Disabled", raw: { account_status: 2 } },
     ],
     massTargets: {},
@@ -461,5 +473,5 @@ test("cabinets without a payment method are hidden from the target table", () =>
     view.targetAccounts().map((account) => account.id),
     ["111"],
   );
-  assert.equal(view.hiddenNoPayment(), 1);
+  assert.equal(view.hiddenNoPayment(), 2);
 });

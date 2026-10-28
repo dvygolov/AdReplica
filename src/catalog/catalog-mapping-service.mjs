@@ -1,10 +1,14 @@
 import {
+  getReferencedProductSetIds,
   getPackageProductSetById,
   getSourceCatalogsFromPackage,
   getSourceProductSetsFromPackage,
   resolveSourceProductSetCatalogId,
 } from "../domain/package.mjs";
-import { pickFallbackTargetProductSet } from "../domain/catalog.mjs";
+import {
+  isAutogenProductSet,
+  pickFallbackTargetProductSet,
+} from "../domain/catalog.mjs";
 
 /** CatalogMappingService. Dependencies are supplied by the application composition root. */
 export class CatalogMappingService {
@@ -38,6 +42,7 @@ export class CatalogMappingService {
       (targetContext?.catalogs || []).map((item) => String(item.id)),
     );
     const productSets = getSourceProductSetsFromPackage(packageData);
+    const referencedSets = getReferencedProductSetIds(packageData);
     for (const catalog of sourceCatalogs) {
       const sourceId = String(catalog.id);
       const selectedId = String(catalogMappings?.[sourceId] || "");
@@ -65,8 +70,11 @@ export class CatalogMappingService {
         productSets.length &&
         productSets.some(
           (item) =>
+            !isAutogenProductSet(item) &&
+            referencedSets.has(String(item.id)) &&
             resolveSourceProductSetCatalogId(packageData, item.id) ===
-              sourceId && !productSetMappings[String(item.id)],
+              sourceId &&
+            !productSetMappings[String(item.id)],
         )
       ) {
         const productSetSuffix = productSets.length
@@ -129,6 +137,16 @@ export class CatalogMappingService {
         sourceProductSetId,
       );
       if (!sourceCatalogId) {
+        continue;
+      }
+      if (isAutogenProductSet(sourceProductSet)) {
+        // Meta rebuilds "All Products" in every catalog, so drop the reference
+        // and let the ad target the whole target catalog.
+        nextProductSetMappings[sourceProductSetId] = "";
+        log(
+          "info",
+          `Product set ${sourceProductSetId} (${sourceProductSet.name || "All Products"}) is auto-generated: dropping it so the ad uses the whole target catalog.`,
+        );
         continue;
       }
       const targetCatalogId = String(
@@ -225,7 +243,10 @@ export class CatalogMappingService {
     for (const item of plan.filter(
       (item) => item.mode === "reuse" && item.sourceId !== item.targetId,
     )) {
+      const referencedSets = getReferencedProductSetIds(packageData);
       for (const set of getSourceProductSetsFromPackage(packageData)) {
+        if (isAutogenProductSet(set)) continue;
+        if (!referencedSets.has(String(set.id))) continue;
         if (
           resolveSourceProductSetCatalogId(packageData, set.id) ===
             item.sourceId &&

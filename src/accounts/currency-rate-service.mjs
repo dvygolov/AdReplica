@@ -4,7 +4,13 @@ const ECB_ENDPOINT = "https://api.frankfurter.app/latest";
 const FALLBACK_ENDPOINT = "https://open.er-api.com/v6/latest";
 
 /**
- * Reference exchange rates, cached per pair. A manual rate always wins.
+ * Exchange rates, cached per pair. A manual rate always wins.
+ *
+ * Meta exposes an internal `account_currency_ratio_to_usd` on AdAccount: the
+ * number of account-currency units per 1 USD. It is reachable only with an Ads
+ * Manager token, which is exactly what the payload holds, and it is the rate
+ * Meta itself applies to budgets - so it is the primary source. A pair is
+ * converted as ratio(target) / ratio(source).
  *
  * Ads Manager runs under a strict Content-Security-Policy, so a plain `fetch`
  * from the page is blocked - that is the "NetworkError" the operator saw. Every
@@ -15,8 +21,51 @@ export class CurrencyRateService {
   constructor(dependencies = {}) {
     this.dependencies = dependencies;
     this.cache = new Map();
+    this.ratios = new Map();
     this.rate = this.rate.bind(this);
     this.request = this.request.bind(this);
+  }
+
+  /** Account-currency units per 1 USD, straight from the ad account. */
+  async ratioToUsd(accountId) {
+    const id = String(accountId || "").replace(/^act_/, "");
+    if (!id) return null;
+    if (this.ratios.has(id)) return this.ratios.get(id);
+    const client = this.dependencies.graphClient;
+    if (!client?.graphFetch) return null;
+    let row = null;
+    try {
+      row = await client.graphFetch(`act_${id}`, {
+        query: { fields: "currency,account_currency_ratio_to_usd" },
+      });
+    } catch {
+      this.ratios.set(id, null);
+      return null;
+    }
+    if (Array.isArray(row)) row = row[0] || null;
+    const ratio = Number(row?.account_currency_ratio_to_usd);
+    const value =
+      Number.isFinite(ratio) && ratio > 0
+        ? { ratio, currency: normalizeCurrency(row?.currency) || "" }
+        : null;
+    this.ratios.set(id, value);
+    return value;
+  }
+
+  /** Rate between two ad accounts, taken from Meta's own conversion. */
+  async metaRate(sourceAccountId, targetAccountId) {
+    if (!sourceAccountId || !targetAccountId) return null;
+    const [source, target] = await Promise.all([
+      this.ratioToUsd(sourceAccountId),
+      this.ratioToUsd(targetAccountId),
+    ]);
+    if (!source?.ratio || !target?.ratio) return null;
+    const rate = target.ratio / source.ratio;
+    if (!Number.isFinite(rate) || rate <= 0) return null;
+    return {
+      rate,
+      source: `Meta ${source.currency || "?"}→${target.currency || "?"}`,
+    };
   }
 
   request(url) {
