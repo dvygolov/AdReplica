@@ -181,6 +181,12 @@ export class MassCloneController {
   async runMassClone() {
     const { state } = this.dependencies;
     if (state.massRunning) return false;
+    // The package may finish loading after the table was built, so the catalog
+    // default is resolved here, once both sides are known.
+    for (const account of this.dependencies.massCloneView.targetAccounts()) {
+      this.ensureCatalogChoice(String(account.id));
+    }
+    this.dependencies.massCloneView.render();
     return this.dependencies.massCloneWorkflow.run();
   }
 
