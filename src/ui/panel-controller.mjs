@@ -414,6 +414,16 @@ export class PanelController {
         minimizeButton.setAttribute("aria-label", label);
       }
     };
+    // Small round "i"/"±" buttons highlight only under the pointer. The class is
+    // driven by real pointer events, so a re-render can never leave them lit.
+    root.addEventListener("mouseover", (event) => {
+      const badge = event.target?.closest?.(".sk-info");
+      if (badge) badge.classList.add("sk-info-on");
+    });
+    root.addEventListener("mouseout", (event) => {
+      const badge = event.target?.closest?.(".sk-info");
+      if (badge) badge.classList.remove("sk-info-on");
+    });
     // Delegated on purpose: the head markup is rebuilt on re-render, so a
     // listener hung on the button itself would be lost with the old node.
     root.addEventListener("click", (event) => {

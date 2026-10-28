@@ -193,7 +193,7 @@ export function buildStudioStyles(appId) {
       }
       #${appId} .sk-bar-right { display: flex; gap: 6px; }
       #${appId} .sk-hint { font-size: 11px; color: #8f8f8f; }
-      #${appId} .sk-info {
+      #${appId} button.sk-info {
         width: 16px;
         height: 16px;
         padding: 0;
@@ -205,6 +205,20 @@ export function buildStudioStyles(appId) {
         font-weight: 700;
         line-height: 1;
         cursor: pointer;
+      }
+      /* The global "button:hover turns yellow" rule made the glyph invisible:
+         keep the idle look on hover and paint the highlight ourselves. */
+      #${appId} button.sk-info:hover,
+      #${appId} button.sk-info:focus {
+        background: #262626;
+        color: #ffd400;
+        outline: none;
+      }
+      #${appId} button.sk-info.sk-info-on,
+      #${appId} button.sk-info.sk-info-on:hover {
+        background: #ffd400;
+        border-color: #ffd400;
+        color: #111;
       }
       #${appId} .sk-macros-pop {
         position: relative;
