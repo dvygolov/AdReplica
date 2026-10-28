@@ -83,8 +83,46 @@ export class MassCloneController {
         }),
       );
       state.massCatalogBusiness[accountId] = context?.business || null;
+      this.ensureCatalogChoice(accountId);
     }
     this.dependencies.massCloneView.render();
+  }
+
+  /**
+   * A catalog campaign cannot be cloned without naming the target catalog, and
+   * "auto" is not a choice Meta accepts ("Select an accessible target
+   * catalog"). Preselect a sensible one so the run is not blocked: an exact
+   * name match from the source package first, otherwise the account's first
+   * catalog. The value stays editable in the catalog column.
+   */
+  ensureCatalogChoice(accountId) {
+    const { state } = this.dependencies;
+    if (!state.clonePackage?.catalogs?.length) return;
+    const current = state.massTargets?.[accountId] || {};
+    if (current.catalogId) return;
+    const catalogs = state.massCatalogs?.[accountId] || [];
+    if (!catalogs.length) return;
+    const wanted = new Set(
+      (state.clonePackage.catalogs || [])
+        .map((catalog) =>
+          String(catalog.name || "")
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
+    );
+    const match = catalogs.find((catalog) =>
+      wanted.has(
+        String(catalog.name || "")
+          .trim()
+          .toLowerCase(),
+      ),
+    );
+    state.massTargets ||= {};
+    state.massTargets[accountId] = {
+      ...current,
+      catalogId: String(match?.id || catalogs[0].id),
+    };
   }
 
   /** The shared account context is cached, so opening the tab stays cheap. */

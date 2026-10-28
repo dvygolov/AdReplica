@@ -65,6 +65,47 @@ export function buildStudioStyles(appId) {
         cursor: pointer;
       }
       #${appId} .sk-icon:hover { background: #2f2f2f; color: #ffd400; }
+      #${appId} .sk-head { position: relative; }
+      /* Service menu: a proper card hanging under the gear, never outside the panel. */
+      #${appId} .sk-menu {
+        position: absolute;
+        top: calc(100% - 2px);
+        right: 86px;
+        z-index: 200;
+        width: 320px;
+        max-width: calc(100% - 32px);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px;
+        border: 1px solid #3d3d3d;
+        border-radius: 10px;
+        background: #232323;
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
+        pointer-events: auto;
+      }
+      #${appId} .sk-menu.sk-hidden { display: none !important; }
+      #${appId} .sk-menu button {
+        width: 100%;
+        text-align: left;
+        padding: 9px 12px;
+        border: 1px solid #3a3a3a;
+        border-radius: 8px;
+        background: #2b2b2b;
+        color: #eaeaea;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      #${appId} .sk-menu button:hover:not(:disabled) {
+        background: #343434;
+        color: #ffd400;
+      }
+      #${appId} .sk-menu [role="status"] {
+        padding: 0 4px;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #9a9a9a;
+      }
       #${appId} .sk-tabs {
         display: flex;
         gap: 4px;

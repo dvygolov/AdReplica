@@ -448,9 +448,10 @@ test("cabinets without a payment method are hidden from the target table", () =>
     accounts: [
       {
         id: "111",
-        name: "Paid",
+        name: "Billed card",
         raw: {
           account_status: 1,
+          funding_source: "1",
           funding_source_details: {
             id: "1",
             type: 1,
@@ -458,13 +459,24 @@ test("cabinets without a payment method are hidden from the target table", () =>
           },
         },
       },
-      { id: "222", name: "Unpaid", raw: { account_status: 1 } },
       {
+        // Freshly attached card: Meta exposes the id but no masked label yet.
         id: "444",
+        name: "Fresh card",
+        raw: {
+          account_status: 1,
+          funding_source: "9",
+          funding_source_details: { id: "9", type: 1 },
+        },
+      },
+      { id: "222", name: "No funding at all", raw: { account_status: 1 } },
+      {
+        id: "555",
         name: "Empty funding shell",
         raw: {
           account_status: 1,
-          funding_source_details: { id: "9", type: 1 },
+          funding_source: "",
+          funding_source_details: {},
         },
       },
       { id: "333", name: "Disabled", raw: { account_status: 2 } },
@@ -474,7 +486,7 @@ test("cabinets without a payment method are hidden from the target table", () =>
   const view = new MassCloneView({ state, dom: {} });
   assert.deepEqual(
     view.targetAccounts().map((account) => account.id),
-    ["111"],
+    ["111", "444"],
   );
   assert.equal(view.hiddenNoPayment(), 2);
 });

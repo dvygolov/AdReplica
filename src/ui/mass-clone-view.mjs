@@ -23,12 +23,15 @@ export class MassCloneView {
 
   /**
    * Meta refuses ad creation without a working funding source, drafts included
-   * (error 1359188). `funding_source_details` alone is not enough: a cabinet can
-   * carry an empty funding shell, so only a real instrument with a display
-   * string ("VISA *2116") counts.
+   * (error 1359188). The reliable marker is a funding source that actually
+   * exists — `funding_source_details.id` (mirrored by `funding_source`) — not
+   * the masked card label: Meta only fills `display_string` once the card has
+   * been billed at least once, so a freshly attached card shows an id with no
+   * label. Empty shells carry no id at all.
    */
   hasPaymentMethod(account) {
-    return Boolean(account?.raw?.funding_source_details?.display_string);
+    const raw = account?.raw || {};
+    return Boolean(raw.funding_source_details?.id || raw.funding_source);
   }
 
   /** Only usable accounts are listed: unsettled or unpaid cabinets cannot host ads. */
