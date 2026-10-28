@@ -510,9 +510,10 @@ export function buildStudioStyles(appId) {
       #${appId} .sk-fp-ico img { width: 100%; height: 100%; object-fit: cover; display: block; }
       #${appId} .sk-fp-ico.sk-fp-auto { color: #bdbdbd; font-size: 9px; }
       #${appId} .sk-fp-pop {
-        position: absolute;
-        z-index: 40;
-        top: 100%;
+        /* fixed, not absolute: the kabinet table scrolls and would clip it */
+        position: fixed;
+        z-index: 2147483000;
+        top: 0;
         left: 0;
         margin-top: 4px;
         width: 260px;
@@ -595,9 +596,11 @@ export function buildStudioStyles(appId) {
         border-radius: 14px;
         background: #1b1b1b;
         box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
-        cursor: pointer;
+        cursor: grab;
+        touch-action: none;
         pointer-events: auto;
       }
+      #${appId} .sk-mini:active { cursor: grabbing; }
       #${appId} .sk-mini:hover { border-color: #ffd400; }
       #${appId} .sk-mini .sk-mark { width: 32px; height: 32px; }
       #${appId}.sk-min .sk-mini { display: inline-flex; }
@@ -623,6 +626,12 @@ export function buildStudioStyles(appId) {
       }
       #${appId} .sk-search::placeholder { color: #7d7d7d; }
       #${appId} .sk-search:focus { outline: none; border-color: #ffd400; }
+      #${appId} .sk-note {
+        margin-top: 8px;
+        color: #9d8a4a;
+        font-size: 11px;
+        line-height: 1.35;
+      }
       /* ---- account type as an icon with a tooltip ---- */
       #${appId} .sk-acc { display: inline-flex; align-items: center; gap: 8px; }
       #${appId} .sk-acc-ico {

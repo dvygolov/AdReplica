@@ -357,6 +357,44 @@ export class MassCloneView {
         </tr>`;
       })
       .join("");
+    this.positionPagePopups();
+  }
+
+  /** The page listbox is a fixed overlay: the table scroll would clip it. */
+  positionPagePopups() {
+    const { state, dom } = this.dependencies;
+    const openId = String(state.massOpenPageMenu || "");
+    if (!openId) return;
+    const pop = document.querySelector(
+      `[data-mass-page-pop="${CSS.escape(openId)}"]`,
+    );
+    const button = document.querySelector(
+      `[data-mass-page-toggle="${CSS.escape(openId)}"]`,
+    );
+    if (!pop || !button) return;
+    // Move the listbox to the panel root: inside the table it inherits the
+    // card's containing block and gets clipped by the scroll area.
+    const host = dom.root || document.getElementById("fb-sk-ad-replica");
+    if (host && pop.parentElement !== host) host.append(pop);
+    const anchor = button.getBoundingClientRect();
+    const width = Math.max(220, Math.round(anchor.width));
+    pop.style.position = "fixed";
+    pop.style.marginTop = "0";
+    pop.style.pointerEvents = "auto";
+    pop.style.width = `${width}px`;
+    // Flip above the button when there is no room below.
+    const popHeight = pop.offsetHeight || 240;
+    const below = window.innerHeight - anchor.bottom;
+    const top =
+      below < popHeight + 12 && anchor.top > popHeight + 12
+        ? anchor.top - popHeight - 4
+        : anchor.bottom + 4;
+    const left = Math.min(
+      Math.max(8, anchor.left),
+      window.innerWidth - width - 8,
+    );
+    pop.style.top = `${Math.round(top)}px`;
+    pop.style.left = `${Math.round(left)}px`;
   }
 
   renderProgress() {
@@ -436,13 +474,12 @@ export class MassCloneView {
     const count = Object.values(state.massTargets || {}).filter(
       (item) => item.selected,
     ).length;
-    if (dom.cloneTargetsCount) {
+    if (dom.cloneTargetsNote) {
       const hidden = this.hiddenNoPayment();
-      dom.cloneTargetsCount.textContent = total
-        ? `${t("clone.targetsHint", { n: count, total })}${
-            hidden ? ` · ${t("targets.noPayment", { n: hidden })}` : ""
-          }`
-        : t("targets.noPayment", { n: hidden });
+      dom.cloneTargetsNote.textContent = hidden
+        ? t("targets.noPayment", { n: hidden })
+        : "";
+      dom.cloneTargetsNote.classList.toggle("sk-hidden", !hidden);
     }
     if (dom.cloneMaster) {
       dom.cloneMaster.checked = total > 0 && count === total;

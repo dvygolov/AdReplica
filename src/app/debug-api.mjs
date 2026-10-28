@@ -25,7 +25,6 @@ export function createDebugApi(services, state) {
       services.cloneWorkflow.cloneCampaignToAccount(options),
     runImport: (options = {}) => services.importWorkflow.importPackage(options),
     runMassClone: () => services.massCloneWorkflow.run(),
-    currencyRate: (from, to) => services.currencyRateService.rate(from, to),
     currencyRatio: (accountId) =>
       services.currencyRateService.ratioToUsd(accountId),
     metaRate: (sourceId, targetId) =>

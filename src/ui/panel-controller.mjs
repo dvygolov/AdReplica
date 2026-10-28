@@ -3,6 +3,7 @@ import {
   APP_ID,
   APP_MARK_SVG,
   NATIVE_FETCH_FRAME_ID,
+  appMarkSvg,
 } from "../app/constants.mjs";
 import { buildAdReplicaStyles } from "./styles.mjs";
 import { FLAGS, getLang, setLang, t } from "./i18n.mjs";
@@ -49,7 +50,7 @@ export class PanelController {
     const root = document.createElement("div");
     root.id = APP_ID;
     root.innerHTML = `
-      <button type="button" id="${APP_ID}-mini" class="sk-mini" data-always-enabled title="${t("btn.restore")}" aria-label="${t("btn.restore")}">${APP_MARK_SVG}</button>
+      <button type="button" id="${APP_ID}-mini" class="sk-mini" data-always-enabled title="${t("btn.restore")}" aria-label="${t("btn.restore")}">${appMarkSvg("-mini")}</button>
       <div class="sk-shell">
         <div class="sk-loading" id="${APP_ID}-loading">
           <div class="sk-spinner"></div>
@@ -202,7 +203,6 @@ export class PanelController {
             <section class="sk-card">
               <h3 class="sk-sec">${t("clone.s2")}
                 <input type="search" class="sk-search" id="${APP_ID}-clone-search" placeholder="${t("clone.search")}" aria-label="${t("clone.search")}" />
-                <span class="sk-count" id="${APP_ID}-clone-targets-count"></span>
               </h3>
               <div class="sk-scroll">
                 <table class="sk-tbl sk-tbl-targets">
@@ -219,6 +219,7 @@ export class PanelController {
                   <tbody id="${APP_ID}-clone-targets-body"></tbody>
                 </table>
               </div>
+              <div class="sk-note sk-hidden" id="${APP_ID}-clone-targets-note"></div>
             </section>
 
             <section class="sk-card sk-hidden" id="${APP_ID}-clone-run-card">
@@ -289,9 +290,7 @@ export class PanelController {
     dom.cloneTargetsBody = root.querySelector(`#${APP_ID}-clone-targets-body`);
     dom.cloneMaster = root.querySelector(`#${APP_ID}-clone-master`);
     dom.cloneSearch = root.querySelector(`#${APP_ID}-clone-search`);
-    dom.cloneTargetsCount = root.querySelector(
-      `#${APP_ID}-clone-targets-count`,
-    );
+    dom.cloneTargetsNote = root.querySelector(`#${APP_ID}-clone-targets-note`);
     dom.cloneRunCard = root.querySelector(`#${APP_ID}-clone-run-card`);
     dom.cloneFooter = root.querySelector(`#${APP_ID}-clone-footer`);
     dom.cloneSourceBody = root.querySelector(`#${APP_ID}-clone-source-body`);
@@ -334,6 +333,79 @@ export class PanelController {
     document.addEventListener("click", dom.serviceOutsideClick);
     // Collapse morphs the whole window into the mark pinned to the corner.
     const minimizeButton = root.querySelector(`#${APP_ID}-minimize`);
+    // The collapsed mark can be dragged anywhere; the spot survives reloads.
+    const miniButton = root.querySelector(`#${APP_ID}-mini`);
+    const MINI_POS_KEY = "adreplica.panel.miniPos.v1";
+    let miniDragged = false;
+    const clamp = (value, max) => Math.max(0, Math.min(value, max));
+    const applyMiniPos = (left, top) => {
+      if (!miniButton) return;
+      miniButton.style.left = `${Math.round(left)}px`;
+      miniButton.style.top = `${Math.round(top)}px`;
+      miniButton.style.right = "auto";
+    };
+    try {
+      const saved = JSON.parse(localStorage.getItem(MINI_POS_KEY) || "null");
+      if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+        applyMiniPos(
+          clamp(saved.left, window.innerWidth - 54),
+          clamp(saved.top, window.innerHeight - 54),
+        );
+      }
+    } catch {
+      // A broken or blocked localStorage keeps the default corner position.
+    }
+    if (miniButton) {
+      let dragging = false;
+      let startX = 0;
+      let startY = 0;
+      let startLeft = 0;
+      let startTop = 0;
+      miniButton.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        const rect = miniButton.getBoundingClientRect();
+        dragging = true;
+        miniDragged = false;
+        startX = event.clientX;
+        startY = event.clientY;
+        startLeft = rect.left;
+        startTop = rect.top;
+        miniButton.setPointerCapture?.(event.pointerId);
+      });
+      miniButton.addEventListener("pointermove", (event) => {
+        if (!dragging) return;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        if (!miniDragged && Math.abs(dx) + Math.abs(dy) < 4) return;
+        miniDragged = true;
+        event.preventDefault();
+        applyMiniPos(
+          clamp(startLeft + dx, window.innerWidth - 54),
+          clamp(startTop + dy, window.innerHeight - 54),
+        );
+      });
+      const finishDrag = (event) => {
+        if (!dragging) return;
+        dragging = false;
+        try {
+          miniButton.releasePointerCapture?.(event.pointerId);
+        } catch {
+          // The browser already dropped the capture on its own.
+        }
+        if (!miniDragged) return;
+        try {
+          const rect = miniButton.getBoundingClientRect();
+          localStorage.setItem(
+            MINI_POS_KEY,
+            JSON.stringify({ left: rect.left, top: rect.top }),
+          );
+        } catch {
+          // Nothing to persist: dragging still works for this session.
+        }
+      };
+      miniButton.addEventListener("pointerup", finishDrag);
+      miniButton.addEventListener("pointercancel", finishDrag);
+    }
     const setCollapsed = (collapsed) => {
       root.classList.toggle("sk-min", collapsed);
       if (minimizeButton) {
@@ -347,6 +419,10 @@ export class PanelController {
     root.addEventListener("click", (event) => {
       if (event.target?.closest?.(`#${APP_ID}-mini`)) {
         event.preventDefault();
+        if (miniDragged) {
+          miniDragged = false;
+          return;
+        }
         setCollapsed(false);
         return;
       }

@@ -96,7 +96,10 @@ function createHarness({
         return { deletedCount: 3, failedCount: 0, draftFound: true };
       },
     },
-    currencyRateService: { rate: async () => rate },
+    currencyRateService: {
+      // Meta's ratio is the only rate source now.
+      metaRate: async () => rate,
+    },
     cloneWorkflow: { ensureClonePackageLoaded: async () => packageData },
     renderMassClone: () => {},
     runOperation,
@@ -291,13 +294,13 @@ test("a manual rate overrides the fetched one", async () => {
 
 test("an unavailable rate refuses the target instead of copying a wrong budget", async () => {
   const { workflow, state, calls } = euroHarness({
-    rate: { ok: false, reason: "network down" },
+    rate: null,
   });
   const result = await workflow.run();
   assert.equal(result, false);
   assert.equal(calls.length, 0, "nothing was cloned");
   assert.equal(state.massResults[0].status, "failed");
-  assert.match(state.massResults[0].message, /No USD→EUR rate available/);
+  assert.match(state.massResults[0].message, /Meta did not return a USD→EUR/);
   assert.equal(state.cloneCurrencyRate, 1);
 });
 

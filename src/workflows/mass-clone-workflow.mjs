@@ -161,9 +161,9 @@ export class MassCloneWorkflow {
         from,
         to,
         message:
-          `No ${from}→${to} rate available (${result?.reason || "unknown reason"}). ` +
-          "Type the rate in the currency column for this cabinet, or use a " +
-          "cabinet with the same currency.",
+          `Meta did not return a ${from}→${to} rate for this cabinet. ` +
+          "Type the rate in the currency column, or use a cabinet with the " +
+          "same currency.",
       };
     }
     state.cloneCurrencyRate = result.rate;
