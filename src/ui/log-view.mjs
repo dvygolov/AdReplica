@@ -69,10 +69,13 @@ export class LogView {
   renderLogs() {
     const { state, dom } = this.dependencies;
     const { formatLogEntry } = this;
-    if (!dom.logs) return;
     const text = state.logs.map(formatLogEntry).join("\n");
-    dom.logs.value = text;
-    dom.logs.scrollTop = dom.logs.scrollHeight;
+    // Two surfaces: the inline block inside the tabs and the side dock.
+    for (const area of [dom.logs, dom.logsDock]) {
+      if (!area) continue;
+      area.value = text;
+      area.scrollTop = area.scrollHeight;
+    }
   }
 
   downloadLogs() {

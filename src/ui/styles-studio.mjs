@@ -65,6 +65,61 @@ export function buildStudioStyles(appId) {
         cursor: pointer;
       }
       #${appId} .sk-icon:hover { background: #2f2f2f; color: #ffd400; }
+      /* Stage: the panel and the optional log dock are centred together, so
+         opening the dock pushes the panel's left edge further left. */
+      #${appId} .sk-stage {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 14px;
+        height: 100%;
+      }
+      #${appId} .sk-shell { flex: 0 1 760px; min-width: 0; margin: 0; }
+      #${appId} .sk-dock {
+        pointer-events: auto;
+        flex: 0 0 420px;
+        width: 420px;
+        max-width: calc(100vw - 40px);
+        max-height: calc(100vh - 36px);
+        display: flex;
+        flex-direction: column;
+        background: #1b1b1b;
+        border: 1px solid #3a3a3a;
+        border-radius: 12px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+        overflow: hidden;
+      }
+      #${appId} .sk-dock.sk-hidden { display: none !important; }
+      #${appId} .sk-dock-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid #333;
+        background: linear-gradient(180deg, #262600, #1e1e1e 70%);
+      }
+      #${appId} .sk-dock-head span {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #ffd400;
+      }
+      #${appId} .sk-dock button {
+        width: auto;
+        padding: 7px 12px;
+        font-size: 12px;
+      }
+      #${appId} .sk-dock .sk-log-area {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        border: 0;
+        border-radius: 0;
+        background: #141414;
+        resize: none;
+      }
       #${appId} .sk-head { position: relative; }
       /* Service menu: a proper card hanging under the gear, never outside the panel. */
       #${appId} .sk-menu {

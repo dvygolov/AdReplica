@@ -69,6 +69,7 @@ export class AdReplicaState {
     this.massRates = {};
     this.massAutoRates = {};
     this.massSearch = "";
+    this.logDockOpen = false;
     this.massSequence = 0;
     this.clonePreviewOpen = false;
     this.massActiveAccountId = "";

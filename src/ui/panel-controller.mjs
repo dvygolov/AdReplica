@@ -51,6 +51,7 @@ export class PanelController {
     root.id = APP_ID;
     root.innerHTML = `
       <button type="button" id="${APP_ID}-mini" class="sk-mini" data-always-enabled title="${t("btn.restore")}" aria-label="${t("btn.restore")}">${appMarkSvg("-mini")}</button>
+      <div class="sk-stage">
       <div class="sk-shell">
         <div class="sk-loading" id="${APP_ID}-loading">
           <div class="sk-spinner"></div>
@@ -70,6 +71,7 @@ export class PanelController {
               <button type="button" data-lang="ru" data-always-enabled title="${t("lang.ru")}" aria-pressed="false">${FLAGS.ru}</button>
               <button type="button" data-lang="en" data-always-enabled title="${t("lang.en")}" aria-pressed="true">${FLAGS.en}</button>
             </div>
+            <button id="${APP_ID}-log-toggle" class="sk-icon sk-log-toggle" data-always-enabled title="${t("btn.log")}" aria-label="${t("btn.log")}" aria-expanded="false">&#9776;</button>
             <button id="${APP_ID}-service" class="sk-icon" data-always-enabled title="${t("btn.service")}" aria-label="${t("btn.service")}" aria-expanded="false">&#9881;</button>
             <button id="${APP_ID}-minimize" class="sk-icon sk-minimize" data-always-enabled title="${t("btn.minimize")}" aria-label="${t("btn.minimize")}">&#x2013;</button>
             <button id="${APP_ID}-close" class="sk-icon sk-close" data-always-enabled title="${t("btn.close")}" aria-label="${t("btn.close")}">&#x2715;</button>
@@ -256,6 +258,14 @@ export class PanelController {
           <textarea id="${APP_ID}-logs" class="sk-log-area" readonly placeholder="${t("log.empty")}"></textarea>
         </details>
       </div>
+      <aside class="sk-dock sk-hidden" id="${APP_ID}-log-dock">
+        <div class="sk-dock-head">
+          <span>${t("logs.title")}</span>
+          <button type="button" class="sk-secondary" id="${APP_ID}-download-logs-dock" data-always-enabled>${t("logs.download")}</button>
+        </div>
+        <textarea id="${APP_ID}-logs-dock" class="sk-log-area" readonly placeholder="${t("logs.dockEmpty")}"></textarea>
+      </aside>
+      </div>
     `;
 
     document.body.appendChild(root);
@@ -305,6 +315,39 @@ export class PanelController {
     dom.massResetButton = root.querySelector(`#${APP_ID}-mass-reset`);
     dom.logs = root.querySelector(`#${APP_ID}-logs`);
     dom.downloadLogs = root.querySelector(`#${APP_ID}-download-logs`);
+    dom.logsDock = root.querySelector(`#${APP_ID}-logs-dock`);
+    dom.logDock = root.querySelector(`#${APP_ID}-log-dock`);
+    dom.downloadLogsDock = root.querySelector(`#${APP_ID}-download-logs-dock`);
+
+    // The log dock opens to the right of the panel; the stage re-centres both.
+    const LOG_DOCK_KEY = "adreplica.panel.logDock.v1";
+    const logToggle = root.querySelector(`#${APP_ID}-log-toggle`);
+    const applyLogDock = () => {
+      const open = Boolean(state.logDockOpen);
+      dom.logDock?.classList.toggle("sk-hidden", !open);
+      logToggle?.classList.toggle("sk-active", open);
+      logToggle?.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) this.dependencies.logView.renderLogs();
+    };
+    try {
+      state.logDockOpen = localStorage.getItem(LOG_DOCK_KEY) === "1";
+    } catch {
+      state.logDockOpen = false;
+    }
+    logToggle?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.logDockOpen = !state.logDockOpen;
+      try {
+        localStorage.setItem(LOG_DOCK_KEY, state.logDockOpen ? "1" : "0");
+      } catch {
+        /* private mode: the choice just does not survive a reload */
+      }
+      applyLogDock();
+    });
+    dom.downloadLogsDock?.addEventListener("click", () => {
+      this.dependencies.logView.downloadLogs();
+    });
+    applyLogDock();
 
     const serviceButton = root.querySelector(`#${APP_ID}-service`);
     const serviceMenu = root.querySelector(`#${APP_ID}-service-menu`);

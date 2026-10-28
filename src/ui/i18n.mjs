@@ -8,6 +8,7 @@ const DICT = {
     "lang.en": "English",
     ver: "build {version}",
     "btn.service": "Service",
+    "btn.log": "Log panel",
     "btn.close": "Close",
     "btn.minimize": "Collapse",
     "btn.restore": "Open AdReplica",
@@ -125,6 +126,7 @@ const DICT = {
 
     "logs.title": "Log",
     "logs.download": "Download log",
+    "logs.dockEmpty": "Nothing logged yet.",
     "report.kind.export": "Export",
     "report.kind.import": "Import",
     "report.kind.clone": "Clone",
@@ -158,6 +160,7 @@ const DICT = {
     "lang.en": "English",
     ver: "сборка {version}",
     "btn.service": "Сервис",
+    "btn.log": "Панель лога",
     "btn.close": "Закрыть",
     "btn.minimize": "Свернуть",
     "btn.restore": "Открыть AdReplica",
@@ -277,6 +280,7 @@ const DICT = {
 
     "logs.title": "Лог",
     "logs.download": "Скачать лог",
+    "logs.dockEmpty": "Пока пусто.",
     "report.kind.export": "Экспорт",
     "report.kind.import": "Импорт",
     "report.kind.clone": "Клонирование",
