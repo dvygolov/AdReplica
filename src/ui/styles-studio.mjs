@@ -648,6 +648,23 @@ export function buildStudioStyles(appId) {
       }
       #${appId} .sk-acc-ico.sk-bm { background: #2b3a2b; color: #8fe08f; border: 1px solid #3f5a3f; }
       #${appId} .sk-acc-ico.sk-personal { background: #2a2a2a; color: #9a9a9a; border: 1px solid #3c3c3c; }
+      /* loading: the whole window dims, only the wheel stays lit and centered */
+      #${appId} .sk-loading {
+        position: absolute;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(10, 10, 10, 0.72);
+        pointer-events: auto;
+      }
+      #${appId} .sk-loading.sk-hidden { display: none !important; }
+      #${appId} .sk-loading .sk-spinner {
+        width: 52px;
+        height: 52px;
+        border-width: 5px;
+      }
       @media (max-width: 800px) {
         #${appId} { inset: 10px; }
         #${appId} .sk-shell { max-height: calc(100vh - 20px); }
