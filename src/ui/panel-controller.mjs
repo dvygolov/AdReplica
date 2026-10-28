@@ -22,7 +22,6 @@ export class PanelController {
     const { log } = this.dependencies.logging;
     const { getSharedMediaOverrideKey } = this.dependencies.mediaSlots;
     const { renderButtons, renderUI } = this.dependencies.panelView;
-    const { downloadLogs } = this.dependencies.logView;
     const { renderImportMappings } = this.dependencies.mappingsView;
     const { destroy, injectStyles } = this;
     const { initializeSession } = this.dependencies.sessionService;
@@ -250,13 +249,6 @@ export class PanelController {
             <button data-role="busy-lock" id="${APP_ID}-clone" class="sk-primary">${t("btn.clone")}</button>
           </div>
         </div>
-        <details class="sk-logs">
-          <summary class="sk-log-head">
-            <span class="sk-log-t"><svg class="sk-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>${t("logs.title")}</span>
-            <button type="button" class="sk-secondary sk-log-dl" id="${APP_ID}-download-logs">${t("logs.download")}</button>
-          </summary>
-          <textarea id="${APP_ID}-logs" class="sk-log-area" readonly placeholder="${t("log.empty")}"></textarea>
-        </details>
       </div>
       <aside class="sk-dock sk-hidden" id="${APP_ID}-log-dock">
         <div class="sk-dock-head">
@@ -313,8 +305,6 @@ export class PanelController {
     dom.macrosPop = root.querySelector(`#${APP_ID}-clone-macros-pop`);
     dom.massCloneProgress = root.querySelector(`#${APP_ID}-mass-progress`);
     dom.massResetButton = root.querySelector(`#${APP_ID}-mass-reset`);
-    dom.logs = root.querySelector(`#${APP_ID}-logs`);
-    dom.downloadLogs = root.querySelector(`#${APP_ID}-download-logs`);
     dom.logsDock = root.querySelector(`#${APP_ID}-logs-dock`);
     dom.logDock = root.querySelector(`#${APP_ID}-log-dock`);
     dom.downloadLogsDock = root.querySelector(`#${APP_ID}-download-logs-dock`);
@@ -344,8 +334,9 @@ export class PanelController {
       }
       applyLogDock();
     });
+    const downloadLog = this.dependencies.logView.downloadLogs;
     dom.downloadLogsDock?.addEventListener("click", () => {
-      this.dependencies.logView.downloadLogs();
+      downloadLog();
     });
     applyLogDock();
 
@@ -561,11 +552,6 @@ export class PanelController {
         renderUI();
       });
     }
-    dom.downloadLogs.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      downloadLogs();
-    });
     root
       .querySelector(`#${APP_ID}-clear-drafts`)
       .addEventListener("click", async () => {

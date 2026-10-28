@@ -69,14 +69,14 @@ export function buildStudioStyles(appId) {
          opening the dock pushes the panel's left edge further left. */
       #${appId} .sk-stage {
         display: flex;
-        align-items: flex-start;
+        align-items: stretch;
         justify-content: center;
         gap: 14px;
-        height: 100%;
       }
       #${appId} .sk-shell { flex: 0 1 760px; min-width: 0; margin: 0; }
       #${appId} .sk-dock {
         pointer-events: auto;
+        align-self: stretch;
         flex: 0 0 420px;
         width: 420px;
         max-width: calc(100vw - 40px);
@@ -113,7 +113,8 @@ export function buildStudioStyles(appId) {
       }
       #${appId} .sk-dock .sk-log-area {
         flex: 1 1 auto;
-        min-height: 0;
+        min-height: 120px;
+        height: 0;
         width: 100%;
         border: 0;
         border-radius: 0;
@@ -714,6 +715,7 @@ export function buildStudioStyles(appId) {
       #${appId} .sk-mini:hover { border-color: #ffd400; }
       #${appId} .sk-mini .sk-mark { width: 32px; height: 32px; }
       #${appId}.sk-min .sk-mini { display: inline-flex; }
+      #${appId}.sk-min .sk-dock { display: none !important; }
       #${appId}.sk-min .sk-shell {
         opacity: 0;
         visibility: hidden;

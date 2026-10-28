@@ -87,6 +87,9 @@ const DICT = {
 
     "chip.bm": "BM · {biz}",
     "chip.source": "source",
+    "chip.cardUnconfirmed": "card?",
+    "chip.cardUnconfirmedHint":
+      "Meta reports a funding source but no masked card number — open billing for this cabinet and check the card before spending.",
     "chip.personal": "personal",
     "currency.auto": "auto rate",
     "currency.convert": "{cur} · rate {rate}",
@@ -241,6 +244,9 @@ const DICT = {
 
     "chip.bm": "БМ · {biz}",
     "chip.source": "источник",
+    "chip.cardUnconfirmed": "карта?",
+    "chip.cardUnconfirmedHint":
+      "Meta сообщает funding source, но не отдаёт маскированный номер карты — проверь платёжный метод в биллинге кабинета до запуска.",
     "chip.personal": "личный",
     "currency.auto": "курс автоматически",
     "currency.convert": "{cur} · курс {rate}",
