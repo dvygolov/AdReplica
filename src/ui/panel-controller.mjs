@@ -86,7 +86,6 @@ export class PanelController {
 
         <div class="sk-tabs">
           <button class="sk-tab sk-tab-active" data-tab="export">${t("tab.export")}</button>
-          <button class="sk-tab" data-tab="import">${t("tab.import")}</button>
           <button class="sk-tab" data-tab="clone">${t("tab.clone")}</button>
         </div>
 
@@ -206,6 +205,16 @@ export class PanelController {
               </div>
             </section>
 
+            <section class="sk-card sk-hidden" id="${APP_ID}-clone-media-card">
+              <h3 class="sk-sec">${t("media.title")} <span class="sk-count" id="${APP_ID}-clone-media-count"></span></h3>
+              <label class="sk-drop" id="${APP_ID}-clone-media-drop">
+                <input type="file" multiple accept="image/*,video/*" id="${APP_ID}-clone-media-input" />
+                <b>${t("media.drop")}</b>
+                <span>${t("media.hint")}</span>
+              </label>
+              <div id="${APP_ID}-clone-media-list"></div>
+            </section>
+
             <section class="sk-card">
               <h3 class="sk-sec">${t("clone.s2")}
                 <input type="search" class="sk-search" id="${APP_ID}-clone-search" placeholder="${t("clone.search")}" aria-label="${t("clone.search")}" />
@@ -283,6 +292,10 @@ export class PanelController {
     dom.cloneSourceCampaignSelect = root.querySelector(
       `#${APP_ID}-clone-source-campaign`,
     );
+    dom.cloneMediaCard = root.querySelector(`#${APP_ID}-clone-media-card`);
+    dom.cloneMediaCount = root.querySelector(`#${APP_ID}-clone-media-count`);
+    dom.cloneMediaInput = root.querySelector(`#${APP_ID}-clone-media-input`);
+    dom.cloneMediaList = root.querySelector(`#${APP_ID}-clone-media-list`);
     dom.cloneSourceSwitch = root.querySelector(
       `#${APP_ID}-clone-source-switch`,
     );
@@ -635,6 +648,40 @@ export class PanelController {
     };
 
     applyCloneSourceKind(state.cloneSourceKind);
+
+    // Creatives for a JSON package: the operator drops the files exported next
+    // to the package, and every media slot is matched by the expected name.
+    if (dom.cloneMediaInput) {
+      dom.cloneMediaInput.addEventListener("change", (event) => {
+        const files = [...(event.target.files || [])];
+        if (!files.length) return;
+        for (const file of files) {
+          state.cloneMediaFiles.set(file.name, file);
+        }
+        log(
+          "info",
+          `Creative files selected: ${files.length} (${files.map((file) => file.name).join(", ")}).`,
+        );
+        event.target.value = "";
+        renderUI();
+      });
+    }
+
+    if (dom.cloneMediaList) {
+      dom.cloneMediaList.addEventListener("change", (event) => {
+        const select = event.target.closest("[data-clone-media-key]");
+        if (!select) return;
+        const key = select.dataset.cloneMediaKey;
+        const fileName = select.value;
+        if (!fileName) {
+          state.cloneMediaOverrides.delete(key);
+        } else {
+          const file = state.cloneMediaFiles.get(fileName);
+          if (file) state.cloneMediaOverrides.set(key, file);
+        }
+        renderUI();
+      });
+    }
 
     if (dom.cloneSourceSwitch) {
       dom.cloneSourceSwitch.addEventListener("click", (event) => {

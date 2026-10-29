@@ -38,6 +38,9 @@ export class AdReplicaState {
     this.cloneSourceCampaignId = "";
     this.cloneSourceCampaigns = [];
     this.cloneSourceKind = "campaign";
+    this.cloneJsonFileName = "";
+    this.cloneMediaFiles = new Map();
+    this.cloneMediaOverrides = new Map();
     this.cloneTargetAccountId = "";
     this.clonePackage = null;
     this.clonePackageLoading = false;

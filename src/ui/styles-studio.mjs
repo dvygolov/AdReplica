@@ -857,3 +857,12 @@ export const SOURCE_SWITCH_STYLES = `
 .sk-drop b { color: #ececec; font-weight: 600; }
 .sk-drop input[type="file"] { display: none; }
 `;
+
+/** Media slot table for a JSON package: chips, expected names, per-slot pick. */
+export const MEDIA_SLOT_STYLES = `
+.sk-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 6px; background: #2a2a2a; color: #bdbdbd; font-size: 11px; }
+.sk-chip-ok { background: #16351f; color: #6ee7a8; }
+.sk-chip-warn { background: #3a2323; color: #ff9a9a; }
+.sk-file { font-family: ui-monospace, monospace; font-size: 11px; color: #bdbdbd; }
+#app .sk-tbl .sk-select { height: 30px; width: 100%; }
+`;

@@ -111,12 +111,18 @@ export class CloneWorkflow {
   }
 
   async buildMediaFilesFromPackage(packageData) {
+    const { state } = this.dependencies;
     const { log } = this.dependencies.logging;
     const { createRemoteMediaFile } = this.dependencies.downloadService;
     const files = new Map();
     for (const file of packageData?._downloadQueue || []) {
       log("info", `Preparing server-side media copy for ${file.fileName}...`);
       files.set(file.fileName, createRemoteMediaFile(file));
+    }
+    // Files the operator dropped in for a JSON package are used as they are;
+    // they win over a remote copy because they are the intended creative.
+    for (const [fileName, file] of state.cloneMediaFiles || []) {
+      files.set(fileName, file);
     }
     return files;
   }
@@ -161,10 +167,12 @@ export class CloneWorkflow {
     } = this;
     const { importPackage } = this.dependencies.importWorkflow;
     const cloneOptions = normalizeImportOptions(options);
+    const jsonSource = state.cloneSourceKind === "json";
     if (
-      !state.cloneSourceAccountId ||
-      !state.cloneSourceCampaignId ||
-      !state.cloneTargetAccountId
+      !state.cloneTargetAccountId ||
+      (jsonSource
+        ? !state.clonePackage
+        : !state.cloneSourceAccountId || !state.cloneSourceCampaignId)
     ) {
       log(
         "warn",
@@ -207,7 +215,7 @@ export class CloneWorkflow {
         pixelMappings: state.clonePixelMappings,
         catalogMappings: state.cloneCatalogMappings,
         mediaFiles,
-        mediaOverrides: new Map(),
+        mediaOverrides: new Map(state.cloneMediaOverrides || []),
         asDraft: state.cloneAsDraft,
         status: state.cloneAsDraft ? "PAUSED" : state.cloneStatus,
         preserveSchedule: true,

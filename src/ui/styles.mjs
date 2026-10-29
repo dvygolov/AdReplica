@@ -1,4 +1,8 @@
-import { SOURCE_SWITCH_STYLES, buildStudioStyles } from "./styles-studio.mjs";
+import {
+  MEDIA_SLOT_STYLES,
+  SOURCE_SWITCH_STYLES,
+  buildStudioStyles,
+} from "./styles-studio.mjs";
 
 export function buildAdReplicaStyles(appId) {
   return `
@@ -498,5 +502,6 @@ export function buildAdReplicaStyles(appId) {
       }
       ${buildStudioStyles(appId)}
       ${SOURCE_SWITCH_STYLES}
+      ${MEDIA_SLOT_STYLES}
     `;
 }

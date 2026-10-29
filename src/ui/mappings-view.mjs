@@ -5,6 +5,8 @@ import {
   getSourcePixelsFromPackage,
 } from "../domain/package.mjs";
 import { getAccountLabel } from "../domain/creative.mjs";
+import { t } from "./i18n.mjs";
+import { matchMediaSlots } from "../media/media-matching.mjs";
 
 /** MappingsView. Dependencies are supplied by the application composition root. */
 export class MappingsView {
@@ -19,6 +21,7 @@ export class MappingsView {
     this.renderSectionLoading = this.renderSectionLoading.bind(this);
     this.renderImportMappings = this.renderImportMappings.bind(this);
     this.renderCloneMappings = this.renderCloneMappings.bind(this);
+    this.renderCloneMedia = this.renderCloneMedia.bind(this);
     this.renderManualCloneCatalogSelector =
       this.renderManualCloneCatalogSelector.bind(this);
   }
@@ -334,6 +337,63 @@ export class MappingsView {
         ? "No media files: the selected package contains no ads."
         : "No separate media files in this package. Catalog and existing-post creatives may use media stored in Meta.",
     });
+  }
+
+  /** Media slots for a JSON package: drop files, match by the exported names. */
+  renderCloneMedia() {
+    const { state, dom } = this.dependencies;
+    if (!dom.cloneMediaCard) return;
+    const visible =
+      state.cloneSourceKind === "json" && Boolean(state.clonePackage);
+    dom.cloneMediaCard.classList.toggle("sk-hidden", !visible);
+    if (!visible) return;
+    const slots =
+      this.dependencies.mediaSlots.getMediaSlotsFromPackage(
+        state.clonePackage,
+      ) || [];
+    const result = matchMediaSlots({
+      slots,
+      files: state.cloneMediaFiles || new Map(),
+      overrides: state.cloneMediaOverrides || new Map(),
+    });
+    const rows = result.rows
+      .map(({ slot, chosen, status, optional }) => {
+        const options = [
+          `<option value="">${escapeHtml(t("media.none"))}</option>`,
+          ...result.names.map(
+            (name) =>
+              `<option value="${escapeHtml(name)}" ${
+                chosen && chosen.name === name ? "selected" : ""
+              }>${escapeHtml(name)}</option>`,
+          ),
+        ].join("");
+        const chip =
+          status === "matched"
+            ? '<span class="sk-chip sk-chip-ok">✓</span>'
+            : optional
+              ? `<span class="sk-chip">${escapeHtml(t("media.statusOptional"))}</span>`
+              : `<span class="sk-chip sk-chip-warn">${escapeHtml(t("media.statusMissing"))}</span>`;
+        return `<tr>
+          <td>${escapeHtml(slot.creativeName || slot.creativeId || "")}</td>
+          <td class="sk-hint">${escapeHtml(slot.slotLabel || slot.slotKind || "")}</td>
+          <td><code class="sk-file">${escapeHtml(slot.expectedFileName || "")}</code></td>
+          <td>${chip}</td>
+          <td><select class="sk-select" data-clone-media-key="${escapeHtml(slot.key)}">${options}</select></td>
+        </tr>`;
+      })
+      .join("");
+    if (dom.cloneMediaCount) {
+      dom.cloneMediaCount.textContent = result.missing
+        ? t("media.countMissing", {
+            total: result.total,
+            matched: result.matched,
+            missing: result.missing,
+          })
+        : t("media.count", { total: result.total, matched: result.matched });
+    }
+    dom.cloneMediaList.innerHTML = slots.length
+      ? `<table class="sk-tbl"><thead><tr><th>${escapeHtml(t("media.colCreative"))}</th><th>${escapeHtml(t("media.colSlot"))}</th><th>${escapeHtml(t("media.colExpected"))}</th><th>${escapeHtml(t("media.colStatus"))}</th><th>${escapeHtml(t("media.colFile"))}</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="sk-empty">${escapeHtml(t("media.empty"))}</div>`;
   }
 
   renderCloneMappings() {

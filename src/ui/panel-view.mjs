@@ -86,6 +86,7 @@ export class PanelView {
       renderCloneSourceCampaignOptions,
       renderImportMappings,
       renderCloneMappings,
+      renderCloneMedia,
     } = this.dependencies.mappingsView;
     const {
       importRequiresDraftOnly,
@@ -94,9 +95,14 @@ export class PanelView {
     } = this.dependencies.mappingController;
     if (!state.uiReady) return;
     if (state.activeTab && dom.root) {
-      const active = ["export", "import", "clone"].includes(state.activeTab)
-        ? state.activeTab
-        : "export";
+      // The JSON package now lives in the Clone tab, so Import is no longer a
+      // separate destination: a stored value falls back to Clone.
+      const active =
+        state.activeTab === "import"
+          ? "clone"
+          : ["export", "clone"].includes(state.activeTab)
+            ? state.activeTab
+            : "export";
       dom.root.querySelectorAll(".sk-tab").forEach((button) => {
         button.classList.toggle("sk-tab-active", button.dataset.tab === active);
       });
@@ -189,6 +195,7 @@ export class PanelView {
     renderLogs();
     renderImportMappings();
     renderCloneMappings();
+    renderCloneMedia();
     this.dependencies.massCloneView.render();
     renderButtons();
   }
