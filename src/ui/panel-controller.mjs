@@ -159,7 +159,7 @@ export class PanelController {
                 <button type="button" class="sk-info" id="${APP_ID}-clone-collapse" data-always-enabled title="${t("clone.collapse")}">▾</button>
               </h3>
               <div class="sk-summary sk-hidden" id="${APP_ID}-clone-summary"></div>
-              <div class="sk-srcswitch" id="${APP_ID}-clone-source-switch"><button type="button" class="sk-srcswitch-btn" data-source-kind="campaign">${t("source.campaign")}</button><button type="button" class="sk-srcswitch-btn" data-source-kind="json">${t("source.json")}</button></div>
+              <div class="sk-source-row" id="${APP_ID}-clone-source-switch" data-kind="campaign"><button type="button" class="sk-source-label" data-source-kind="campaign">${t("source.campaign")}</button><button type="button" class="sk-switch" data-source-toggle aria-label="${t("source.campaign")} / ${t("source.json")}"><span class="sk-switch-knob"></span></button><button type="button" class="sk-source-label" data-source-kind="json">${t("source.json")}</button></div>
               <div id="${APP_ID}-clone-source-body">
               
               <div class="sk-row sk-row-source">
@@ -629,6 +629,10 @@ export class PanelController {
               "is-on",
               button.dataset.sourceKind === state.cloneSourceKind,
             );
+            button.setAttribute(
+              "aria-pressed",
+              String(button.dataset.sourceKind === state.cloneSourceKind),
+            );
           });
       }
       dom.cloneSourceAccountSelect
@@ -686,6 +690,15 @@ export class PanelController {
 
     if (dom.cloneSourceSwitch) {
       dom.cloneSourceSwitch.addEventListener("click", (event) => {
+        // The middle control flips to the other side; the labels pick a side.
+        if (event.target.closest("[data-source-toggle]")) {
+          const next = state.cloneSourceKind === "json" ? "campaign" : "json";
+          applyCloneSourceKind(next, { reset: true });
+          state.cloneSourceCollapsed = false;
+          state.cloneJsonFileName = "";
+          renderUI();
+          return;
+        }
         const button = event.target.closest("[data-source-kind]");
         if (!button) return;
         const kind = button.dataset.sourceKind;
