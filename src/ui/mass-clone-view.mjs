@@ -126,17 +126,30 @@ export class MassCloneView {
           selectedCatalogId === "__copy__" ? "selected" : ""
         }>${escapeHtml(t("opt.copyCatalog", { bm: business.name || business.id }))}</option>`
       : "";
+    const reuse = catalogs
+      .map(
+        (catalog) =>
+          `<option value="${escapeHtml(catalog.id)}" ${
+            catalog.id === selectedCatalogId ? "selected" : ""
+          }>${escapeHtml(catalog.name || catalog.id)}</option>`,
+      )
+      .join("");
+    // Same-source data pushed into a catalog that already exists in the target.
+    const copyInto = catalogs
+      .map(
+        (catalog) =>
+          `<option value="__copy_into__:${escapeHtml(catalog.id)}" ${
+            selectedCatalogId === `__copy_into__:${catalog.id}`
+              ? "selected"
+              : ""
+          }>${escapeHtml(t("opt.copyInto", { name: catalog.name || catalog.id }))}</option>`,
+      )
+      .join("");
     return (
-      head +
-      copy +
-      catalogs
-        .map(
-          (catalog) =>
-            `<option value="${escapeHtml(catalog.id)}" ${
-              catalog.id === selectedCatalogId ? "selected" : ""
-            }>${escapeHtml(catalog.name || catalog.id)}</option>`,
-        )
-        .join("")
+      `<optgroup label="${escapeHtml(t("opt.catalogReuseGroup"))}">${head}${copy}${reuse}</optgroup>` +
+      (copyInto
+        ? `<optgroup label="${escapeHtml(t("opt.catalogCopyGroup"))}">${copyInto}</optgroup>`
+        : "")
     );
   }
 

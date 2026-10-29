@@ -81,6 +81,9 @@ const DICT = {
     "opt.noCatalogsHint":
       "This cabinet has no catalogs, so a catalog campaign cannot be cloned here: open a cabinet that can see the source catalog, or copy the catalog into its Business Manager first.",
     "opt.copyCatalog": "Copy to BM {bm}",
+    "opt.copyInto": "Copy data into: {name}",
+    "opt.catalogReuseGroup": "Use a catalog",
+    "opt.catalogCopyGroup": "Copy the source data into…",
     "opt.autoPage": "Auto (page from source)",
     "opt.autoPageShort": "Auto",
     "currency.tooltip":
@@ -235,6 +238,9 @@ const DICT = {
     "opt.noCatalogsHint":
       "В кабинете нет ни одного каталога, поэтому кампанию с каталогом сюда склонировать нельзя: нужен кабинет, который видит исходный каталог, либо сначала скопировать каталог в его Business Manager.",
     "opt.copyCatalog": "Копировать в BM {bm}",
+    "opt.copyInto": "Копировать данные в: {name}",
+    "opt.catalogReuseGroup": "Использовать каталог",
+    "opt.catalogCopyGroup": "Скопировать данные источника в…",
     "opt.autoPage": "Авто (страница из источника)",
     "opt.autoPageShort": "Авто",
     "currency.tooltip":
