@@ -69,7 +69,8 @@ export class AdReplicaState {
     this.massStop = false;
     this.massResults = [];
     this.activeTab = "export";
-    this.cloneSourceCollapsed = null;
+    // The source block starts expanded: the operator picks files there.
+    this.cloneSourceCollapsed = false;
     this.massRates = {};
     this.massAutoRates = {};
     this.massSearch = "";

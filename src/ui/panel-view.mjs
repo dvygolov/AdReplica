@@ -116,14 +116,21 @@ export class PanelView {
       dom.root.querySelectorAll("[data-report-kind]").forEach((card) => {
         card.classList.toggle("sk-hidden", card.dataset.reportKind !== active);
       });
-      if (state.cloneSourceCollapsed === null && state.clonePackage) {
-        state.cloneSourceCollapsed = true;
+      // Never collapse the source block on its own: the operator needs the
+      // campaign selects or the JSON drop zone to be reachable.
+      if (state.cloneSourceCollapsed === null) {
+        state.cloneSourceCollapsed = false;
       }
       if (dom.cloneSourceBody) {
         dom.cloneSourceBody.classList.toggle(
           "sk-hidden",
           Boolean(state.cloneSourceCollapsed),
         );
+      }
+      if (dom.cloneCollapseButton) {
+        dom.cloneCollapseButton.textContent = state.cloneSourceCollapsed
+          ? "▸"
+          : "▾";
       }
       if (dom.cloneSummary) {
         dom.cloneSummary.classList.toggle(

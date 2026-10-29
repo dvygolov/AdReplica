@@ -846,12 +846,14 @@ export function buildStudioStyles(appId) {
     `;
 }
 
-/** Source switch: campaign from Ads Manager versus a JSON package on disk. */
+/** Source switch: one track with a sliding knob, not two separate buttons. */
 export const SOURCE_SWITCH_STYLES = `
-.sk-srcswitch { display: inline-flex; gap: 3px; padding: 3px; margin: 0 0 10px; background: #171717; border: 1px solid #2e2e2e; border-radius: 11px; }
-.sk-srcswitch-btn { height: 32px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: #8f8f8f; font: inherit; cursor: pointer; }
-.sk-srcswitch-btn:hover { background: #262626; color: #ffd400; }
-.sk-srcswitch-btn.is-on { background: #ffd400; color: #111; font-weight: 600; }
+.sk-srcswitch { position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; align-items: stretch; gap: 0; padding: 3px; margin: 0 0 10px; background: #141414; border: 1px solid #2e2e2e; border-radius: 999px; }
+.sk-srcswitch::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 999px; background: #ffd400; transition: left .18s ease; }
+.sk-srcswitch[data-kind="json"]::before { left: 50%; }
+.sk-srcswitch-btn { position: relative; z-index: 1; height: 32px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: #8f8f8f; font: inherit; white-space: nowrap; cursor: pointer; }
+.sk-srcswitch-btn.is-on { color: #111; font-weight: 600; }
+.sk-srcswitch-btn:not(.is-on):hover { color: #ffd400; }
 .sk-drop { display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 14px; margin-bottom: 8px; border: 1.5px dashed #3a3a3a; border-radius: 11px; background: #1a1a1a; color: #8f8f8f; text-align: center; cursor: pointer; }
 .sk-drop:hover { border-color: #ffd400; }
 .sk-drop b { color: #ececec; font-weight: 600; }

@@ -156,7 +156,7 @@ export class PanelController {
             <section class="sk-card">
               <h3 class="sk-sec">
                 ${t("clone.s1")}
-                <button type="button" class="sk-info" id="${APP_ID}-clone-collapse" data-always-enabled title="${t("clone.collapse")}">±</button>
+                <button type="button" class="sk-info" id="${APP_ID}-clone-collapse" data-always-enabled title="${t("clone.collapse")}">▾</button>
               </h3>
               <div class="sk-summary sk-hidden" id="${APP_ID}-clone-summary"></div>
               <div class="sk-srcswitch" id="${APP_ID}-clone-source-switch"><button type="button" class="sk-srcswitch-btn" data-source-kind="campaign">${t("source.campaign")}</button><button type="button" class="sk-srcswitch-btn" data-source-kind="json">${t("source.json")}</button></div>
@@ -621,6 +621,7 @@ export class PanelController {
       const isJson = kind === "json";
       state.cloneSourceKind = isJson ? "json" : "campaign";
       if (dom.cloneSourceSwitch) {
+        dom.cloneSourceSwitch.dataset.kind = state.cloneSourceKind;
         dom.cloneSourceSwitch
           .querySelectorAll("[data-source-kind]")
           .forEach((button) => {
@@ -690,6 +691,7 @@ export class PanelController {
         const kind = button.dataset.sourceKind;
         if (kind === state.cloneSourceKind) return;
         applyCloneSourceKind(kind, { reset: true });
+        state.cloneSourceCollapsed = false;
         state.cloneJsonFileName = "";
         renderUI();
       });
