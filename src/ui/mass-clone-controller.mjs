@@ -307,25 +307,27 @@ export class MassCloneController {
         if (!accountId) return;
         this.pickFor(accountId, { selected: input.checked });
       });
-      // Page pickers are listboxes, not native selects: the page avatar matters.
-      list.addEventListener("click", (event) => {
-        const toggle = event.target.closest("[data-mass-page-toggle]");
-        if (toggle) {
-          const accountId = toggle.dataset.massPageToggle;
-          state.massOpenPageMenu =
-            String(state.massOpenPageMenu || "") === accountId ? "" : accountId;
-          this.dependencies.massCloneView.render();
-          return;
-        }
-        const pick = event.target.closest("[data-mass-page-pick]");
-        if (pick) {
-          state.massOpenPageMenu = "";
-          this.pickFor(pick.dataset.massPagePick, {
-            pageId: pick.dataset.pageId || "",
-          });
-        }
-      });
     }
+    // Page pickers are listboxes, not native selects: the page avatar matters.
+    // The open listbox is reparented to the panel root so the table scroll cannot
+    // clip it, so these clicks must be caught on the root, not on the tbody.
+    root.addEventListener("click", (event) => {
+      const toggle = event.target.closest("[data-mass-page-toggle]");
+      if (toggle) {
+        const accountId = toggle.dataset.massPageToggle;
+        state.massOpenPageMenu =
+          String(state.massOpenPageMenu || "") === accountId ? "" : accountId;
+        this.dependencies.massCloneView.render();
+        return;
+      }
+      const pick = event.target.closest("[data-mass-page-pick]");
+      if (pick) {
+        state.massOpenPageMenu = "";
+        this.pickFor(pick.dataset.massPagePick, {
+          pageId: pick.dataset.pageId || "",
+        });
+      }
+    });
     if (dom.cloneMaster) {
       dom.cloneMaster.addEventListener("change", () => {
         this.setAllTargets(dom.cloneMaster.checked);
