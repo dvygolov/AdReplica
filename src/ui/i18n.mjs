@@ -75,7 +75,11 @@ const DICT = {
     "opt.noPixel": "Auto",
     "opt.noPixelHint": "Reuse the existing pixel or create a new one",
     "opt.noCatalog": "Auto",
-    "opt.noCatalogHint": "Catalog from the source package",
+    "opt.noCatalogHint":
+      "Auto — the catalog from the source package, only if this cabinet can see it",
+    "opt.noCatalogs": "No catalogs",
+    "opt.noCatalogsHint":
+      "This cabinet has no catalogs, so a catalog campaign cannot be cloned here: open a cabinet that can see the source catalog, or copy the catalog into its Business Manager first.",
     "opt.copyCatalog": "Copy to BM {bm}",
     "opt.autoPage": "Auto (page from source)",
     "opt.autoPageShort": "Auto",
@@ -225,7 +229,11 @@ const DICT = {
     "opt.noPixelHint":
       "Переиспользовать существующий пиксель или создать новый",
     "opt.noCatalog": "Авто",
-    "opt.noCatalogHint": "Каталог из источника",
+    "opt.noCatalogHint":
+      "Авто — каталог из пакета-источника, но только если этот кабинет его видит",
+    "opt.noCatalogs": "Нет каталогов",
+    "opt.noCatalogsHint":
+      "В кабинете нет ни одного каталога, поэтому кампанию с каталогом сюда склонировать нельзя: нужен кабинет, который видит исходный каталог, либо сначала скопировать каталог в его Business Manager.",
     "opt.copyCatalog": "Копировать в BM {bm}",
     "opt.autoPage": "Авто (страница из источника)",
     "opt.autoPageShort": "Авто",

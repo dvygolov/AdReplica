@@ -115,6 +115,9 @@ export class MassCloneView {
     const { state } = this.dependencies;
     const catalogs = state.massCatalogs?.[accountId] || [];
     const business = state.massCatalogBusiness?.[accountId];
+    if (!catalogs.length) {
+      return `<option value="" selected>${escapeHtml(t("opt.noCatalogs"))}</option>`;
+    }
     const head = `<option value="" ${selectedCatalogId ? "" : "selected"}>${escapeHtml(
       t("opt.noCatalog"),
     )}</option>`;
@@ -218,8 +221,10 @@ export class MassCloneView {
       (sum, adset) => sum + Number(adset?.daily_budget || 0),
       0,
     );
-    const stat = (value, label) =>
-      `<div class="sk-stat"><b>${escapeHtml(String(value))}</b><span>${escapeHtml(
+    const stat = (value, label, hint = "") =>
+      `<div class="sk-stat"${
+        hint ? ` title="${escapeHtml(hint)}"` : ""
+      }><b>${escapeHtml(String(value))}</b><span>${escapeHtml(
         label,
       )}</span></div>`;
     box.innerHTML = [
@@ -234,7 +239,13 @@ export class MassCloneView {
         `${currency ? `${currency} ` : ""}${(budget / 100).toFixed(2)}`,
         t("stat.budget"),
       ),
-      stat(catalogs.length, statLabel("stat.catalogs", catalogs.length)),
+      stat(
+        catalogs.length,
+        statLabel("stat.catalogs", catalogs.length),
+        catalogs
+          .map((catalog) => `${catalog.name || "—"} · ${catalog.id}`)
+          .join("\n"),
+      ),
     ].join("");
 
     if (dom.cloneSummary) {
@@ -335,7 +346,9 @@ export class MassCloneView {
             )}" aria-label="${escapeHtml(t("chip.personal"))}">&#9679;</span>`;
         const catalogCell = catalogColumn
           ? `<td><select class="sk-cat" title="${escapeHtml(
-              t("opt.noCatalogHint"),
+              (state.massCatalogs?.[accountId] || []).length
+                ? t("opt.noCatalogHint")
+                : t("opt.noCatalogsHint"),
             )}" data-mass-catalog="${escapeHtml(
               accountId,
             )}" ${state.massRunning ? "disabled" : ""}>${this.catalogOptions(
