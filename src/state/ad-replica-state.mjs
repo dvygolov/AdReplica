@@ -37,6 +37,7 @@ export class AdReplicaState {
     this.cloneSourceAccountId = "";
     this.cloneSourceCampaignId = "";
     this.cloneSourceCampaigns = [];
+    this.cloneSourceKind = "campaign";
     this.cloneTargetAccountId = "";
     this.clonePackage = null;
     this.clonePackageLoading = false;

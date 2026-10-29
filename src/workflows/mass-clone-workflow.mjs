@@ -361,7 +361,16 @@ export class MassCloneWorkflow {
       await this.dependencies.initializeSession();
     }
     if (state.massRunning) return false;
-    if (!state.cloneSourceAccountId || !state.cloneSourceCampaignId) {
+    const jsonSource = state.cloneSourceKind === "json";
+    if (jsonSource) {
+      if (!state.clonePackage) {
+        log(
+          "warn",
+          "Load a JSON package in the Clone tab before starting the transfer.",
+        );
+        return false;
+      }
+    } else if (!state.cloneSourceAccountId || !state.cloneSourceCampaignId) {
       log("warn", "Pick a source account and campaign in the Clone tab first.");
       return false;
     }

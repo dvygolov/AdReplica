@@ -20,6 +20,11 @@ const DICT = {
     "tab.clone": "Clone",
 
     "field.account": "Ad account",
+    "source.campaign": "Ads Manager campaign",
+    "source.json": "JSON file",
+    "source.jsonPick": "Drop a JSON file or choose one",
+    "source.jsonHint": "campaign · adSets · ads · creatives · media · catalogs",
+    "source.jsonLoaded": "Loaded file",
     "field.sourceAccount": "Source ad account",
     "field.campaign": "Campaign",
     "field.sourceCampaign": "Source campaign",
@@ -179,6 +184,11 @@ const DICT = {
     "tab.clone": "Клон",
 
     "field.account": "Рекламный кабинет",
+    "source.campaign": "Кампания в Ads Manager",
+    "source.json": "JSON-файл",
+    "source.jsonPick": "Перетащите JSON или выберите файл",
+    "source.jsonHint": "campaign · adSets · ads · creatives · media · catalogs",
+    "source.jsonLoaded": "Загружен файл",
     "field.sourceAccount": "Кабинет-источник",
     "field.campaign": "Кампания",
     "field.sourceCampaign": "Кампания-источник",

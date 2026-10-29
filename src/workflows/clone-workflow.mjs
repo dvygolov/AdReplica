@@ -24,6 +24,32 @@ export class CloneWorkflow {
       this.dependencies.mappingController;
     const { refreshCloneSourceContext } = this.dependencies.campaignController;
     const { fetchCampaignExportPackage } = this.dependencies.campaignExporter;
+    if (state.cloneSourceKind === "json") {
+      // A file is already parsed before this point: nothing to export, only the
+      // target-side page/pixel/catalog context has to catch up.
+      if (!state.clonePackage) {
+        log(
+          "warn",
+          "No JSON package is loaded; pick a file in the Clone tab first.",
+        );
+        state.clonePackageLoading = false;
+        return null;
+      }
+      state.clonePackageLoading = true;
+      renderCloneMappings();
+      try {
+        enforceCloneModeConstraints();
+        await refreshCloneTargetContext();
+        log(
+          "info",
+          `Using the JSON package ${state.clonePackage.source?.campaignName || ""} (${(state.clonePackage.ads || []).length} ads).`,
+        );
+        return state.clonePackage;
+      } finally {
+        state.clonePackageLoading = false;
+        renderCloneMappings();
+      }
+    }
     if (!state.cloneSourceAccountId || !state.cloneSourceCampaignId) {
       state.clonePackageLoading = false;
       return null;

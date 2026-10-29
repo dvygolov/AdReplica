@@ -1,4 +1,4 @@
-import { buildStudioStyles } from "./styles-studio.mjs";
+import { SOURCE_SWITCH_STYLES, buildStudioStyles } from "./styles-studio.mjs";
 
 export function buildAdReplicaStyles(appId) {
   return `
@@ -497,5 +497,6 @@ export function buildAdReplicaStyles(appId) {
         overflow: auto;
       }
       ${buildStudioStyles(appId)}
+      ${SOURCE_SWITCH_STYLES}
     `;
 }

@@ -6,6 +6,8 @@ import {
   appMarkSvg,
 } from "../app/constants.mjs";
 import { buildAdReplicaStyles } from "./styles.mjs";
+import { readClonePackageFromJson } from "../domain/package.mjs";
+import { buildDefaultCloneCampaignName } from "../domain/names.mjs";
 import { FLAGS, getLang, setLang, t } from "./i18n.mjs";
 
 /** PanelController. Dependencies are supplied by the application composition root. */
@@ -158,7 +160,9 @@ export class PanelController {
                 <button type="button" class="sk-info" id="${APP_ID}-clone-collapse" data-always-enabled title="${t("clone.collapse")}">±</button>
               </h3>
               <div class="sk-summary sk-hidden" id="${APP_ID}-clone-summary"></div>
+              <div class="sk-srcswitch" id="${APP_ID}-clone-source-switch"><button type="button" class="sk-srcswitch-btn" data-source-kind="campaign">${t("source.campaign")}</button><button type="button" class="sk-srcswitch-btn" data-source-kind="json">${t("source.json")}</button></div>
               <div id="${APP_ID}-clone-source-body">
+              
               <div class="sk-row sk-row-source">
                 <label class="sk-field sk-source-account">
                   <span>${t("field.sourceAccount")}</span>
@@ -169,6 +173,7 @@ export class PanelController {
                   <select id="${APP_ID}-clone-source-campaign"></select>
                 </label>
               </div>
+              <div class="sk-hidden" id="${APP_ID}-clone-json-pane"><label class="sk-drop" id="${APP_ID}-clone-json-drop"><input type="file" accept="application/json,.json" id="${APP_ID}-clone-json-file" /><b>${t("source.jsonPick")}</b><span>${t("source.jsonHint")}</span></label><div class="sk-hint" id="${APP_ID}-clone-json-name"></div></div>
               <div class="sk-stats" id="${APP_ID}-clone-package-summary"></div>
               <div class="sk-row">
                 <label class="sk-field sk-grow">
@@ -278,6 +283,12 @@ export class PanelController {
     dom.cloneSourceCampaignSelect = root.querySelector(
       `#${APP_ID}-clone-source-campaign`,
     );
+    dom.cloneSourceSwitch = root.querySelector(
+      `#${APP_ID}-clone-source-switch`,
+    );
+    dom.cloneJsonPane = root.querySelector(`#${APP_ID}-clone-json-pane`);
+    dom.cloneJsonFile = root.querySelector(`#${APP_ID}-clone-json-file`);
+    dom.cloneJsonName = root.querySelector(`#${APP_ID}-clone-json-name`);
     dom.clonePackageSummary = root.querySelector(
       `#${APP_ID}-clone-package-summary`,
     );
@@ -593,6 +604,84 @@ export class PanelController {
       state.importAsDraft = val === "DRAFT";
       state.importStatus = val === "DRAFT" ? "PAUSED" : val;
     });
+    const applyCloneSourceKind = (kind, { reset = false } = {}) => {
+      const isJson = kind === "json";
+      state.cloneSourceKind = isJson ? "json" : "campaign";
+      if (dom.cloneSourceSwitch) {
+        dom.cloneSourceSwitch
+          .querySelectorAll("[data-source-kind]")
+          .forEach((button) => {
+            button.classList.toggle(
+              "is-on",
+              button.dataset.sourceKind === state.cloneSourceKind,
+            );
+          });
+      }
+      dom.cloneSourceAccountSelect
+        ?.closest(".sk-row")
+        ?.classList.toggle("sk-hidden", isJson);
+      dom.cloneJsonPane?.classList.toggle("sk-hidden", !isJson);
+      if (dom.cloneJsonName) {
+        dom.cloneJsonName.textContent = state.cloneJsonFileName
+          ? `${t("source.jsonLoaded")}: ${state.cloneJsonFileName}`
+          : "";
+      }
+      if (reset) {
+        state.clonePackage = null;
+        state.clonePageMappings = {};
+        state.clonePixelMappings = {};
+        state.cloneCatalogMappings = {};
+      }
+    };
+
+    applyCloneSourceKind(state.cloneSourceKind);
+
+    if (dom.cloneSourceSwitch) {
+      dom.cloneSourceSwitch.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-source-kind]");
+        if (!button) return;
+        const kind = button.dataset.sourceKind;
+        if (kind === state.cloneSourceKind) return;
+        applyCloneSourceKind(kind, { reset: true });
+        state.cloneJsonFileName = "";
+        renderUI();
+      });
+    }
+
+    if (dom.cloneJsonFile) {
+      dom.cloneJsonFile.addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          const packageData = readClonePackageFromJson(
+            await file.text(),
+            file.name,
+          );
+          state.clonePackage = packageData;
+          state.cloneJsonFileName = file.name;
+          state.cloneSourceAccountId = packageData.source.accountId;
+          state.cloneSourceCampaignId = packageData.source.campaignId;
+          state.cloneCampaignName =
+            buildDefaultCloneCampaignName(packageData.source.campaignName) ||
+            state.cloneCampaignName;
+          state.clonePageMappings = {};
+          state.clonePixelMappings = {};
+          state.cloneCatalogMappings = {};
+          log(
+            "info",
+            `JSON package loaded: ${file.name} (${packageData.ads.length} ads, ${packageData.adsets.length} adsets).`,
+          );
+          renderUI();
+          await ensureClonePackageLoaded();
+          renderUI();
+        } catch (error) {
+          state.clonePackage = null;
+          log("error", "The JSON package could not be read.", String(error));
+          renderUI();
+        }
+      });
+    }
+
     dom.cloneSourceAccountSelect.addEventListener("change", async (event) => {
       state.cloneSourceAccountId = event.target.value;
       state.cloneSourceCampaignId = "";

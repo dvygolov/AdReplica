@@ -397,3 +397,60 @@ export function resolveSourceProductSetCatalogId(packageData, productSetId) {
   }
   return candidateCatalogIds.size === 1 ? [...candidateCatalogIds][0] : "";
 }
+
+/**
+ * Turns a JSON file into the same package shape the exporter produces, so the
+ * import pipeline cannot tell where a package came from.
+ *
+ * A file missing the campaign or the ads is rejected: cloning nothing is worse
+ * than a clear error, and the operator still has the file on disk.
+ */
+export function readClonePackageFromJson(text, fileName = "") {
+  let data;
+  try {
+    data = JSON.parse(String(text || ""));
+  } catch (error) {
+    throw new Error(`The JSON file is not valid JSON: ${error.message}`);
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("The JSON file does not contain a package object.");
+  }
+  if (!data.campaign || typeof data.campaign !== "object") {
+    throw new Error("The package has no campaign object.");
+  }
+  if (!Array.isArray(data.ads) || !data.ads.length) {
+    throw new Error("The package contains no ads.");
+  }
+  const source =
+    data.source && typeof data.source === "object" ? data.source : {};
+  return {
+    ...data,
+    source: {
+      ...source,
+      accountId: String(source.accountId || ""),
+      accountName: String(source.accountName || source.accountId || ""),
+      campaignId: String(source.campaignId || data.campaign.id || ""),
+      campaignName: String(
+        source.campaignName ||
+          data.campaign.name ||
+          fileName ||
+          data.campaign.id ||
+          "",
+      ),
+      origin: String(source.origin || "json"),
+    },
+    adsets: Array.isArray(data.adsets) ? data.adsets : [],
+    ads: data.ads,
+    creatives: Array.isArray(data.creatives) ? data.creatives : [],
+    catalogs: Array.isArray(data.catalogs) ? data.catalogs : [],
+    productSets: Array.isArray(data.productSets) ? data.productSets : [],
+    files: Array.isArray(data.files) ? data.files : [],
+    _downloadQueue: Array.isArray(data._downloadQueue)
+      ? data._downloadQueue
+      : [],
+    fileNameMap:
+      data.fileNameMap && typeof data.fileNameMap === "object"
+        ? data.fileNameMap
+        : {},
+  };
+}
