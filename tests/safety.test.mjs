@@ -508,6 +508,95 @@ test("selecting an existing target catalog is read-only", async () => {
   assert.equal(writes, 0);
   assert.equal(result.catalogMappings["100001"], "200001");
 });
+test("auto catalog mode reuses the source catalog when the cabinet can see it", async () => {
+  const service = new CatalogMappingService({
+    state: { importAccountId: "A" },
+    logging,
+    graphClient: { graphGetAll: async () => [] },
+    accountContextService: { invalidateAccountContextCache() {} },
+    catalogCopyService: {
+      copyCatalogToTargetBusiness: async () => assert.fail("must not copy"),
+      copyCatalogIntoExistingTarget: async () => assert.fail("must not copy"),
+    },
+  });
+  const plan = await service.planCatalogMappingsForImport(
+    { ...fixture(), catalogs: [{ id: "100001" }] },
+    { business: { id: "bm" }, catalogs: [{ id: "100001", name: "Same" }] },
+    {},
+  );
+  assert.equal(plan[0].mode, "reuse");
+  assert.equal(plan[0].targetId, "100001");
+  assert.equal(plan[0].autoStep, "same-catalog");
+});
+
+test("auto catalog mode creates a catalog in the business manager when the source is invisible", async () => {
+  const copied = [];
+  const service = new CatalogMappingService({
+    state: { importAccountId: "A" },
+    logging,
+    graphClient: { graphGetAll: async () => [] },
+    accountContextService: { invalidateAccountContextCache() {} },
+    catalogCopyService: {
+      copyCatalogToTargetBusiness: async (sourceId) => {
+        copied.push(sourceId);
+        return { targetCatalogId: "555", productSetIdMap: { s1: "t1" } };
+      },
+      copyCatalogIntoExistingTarget: async () =>
+        assert.fail("must not copy into"),
+    },
+  });
+  const result = await service.prepareCatalogMappingsForImport(
+    { ...fixture(), catalogs: [{ id: "100001" }] },
+    { business: { id: "bm", name: "BM" }, catalogs: [{ id: "200001" }] },
+    {},
+  );
+  assert.deepEqual(copied, ["100001"]);
+  assert.equal(result.catalogMappings["100001"], "555");
+});
+
+test("auto catalog mode copies products into an existing catalog when there is no business manager", async () => {
+  const copied = [];
+  const service = new CatalogMappingService({
+    state: { importAccountId: "A" },
+    logging,
+    graphClient: { graphGetAll: async () => [] },
+    accountContextService: { invalidateAccountContextCache() {} },
+    catalogCopyService: {
+      copyCatalogToTargetBusiness: async () =>
+        assert.fail("no BM to copy into"),
+      copyCatalogIntoExistingTarget: async (sourceId, targetId) => {
+        copied.push([sourceId, targetId]);
+        return { targetCatalogId: targetId, productSetIdMap: {} };
+      },
+    },
+  });
+  const result = await service.prepareCatalogMappingsForImport(
+    { ...fixture(), catalogs: [{ id: "100001" }] },
+    { catalogs: [{ id: "200001", name: "Existing" }] },
+    {},
+  );
+  assert.deepEqual(copied, [["100001", "200001"]]);
+  assert.equal(result.catalogMappings["100001"], "200001");
+});
+
+test("auto catalog mode fails with an explicit message when nothing is available", async () => {
+  const service = new CatalogMappingService({
+    state: { importAccountId: "A" },
+    logging,
+    graphClient: { graphGetAll: async () => [] },
+    accountContextService: { invalidateAccountContextCache() {} },
+    catalogCopyService: {},
+  });
+  await assert.rejects(
+    service.planCatalogMappingsForImport(
+      { ...fixture(), catalogs: [{ id: "100001" }] },
+      { catalogs: [] },
+      {},
+    ),
+    /no Business Manager to create a copy/,
+  );
+});
+
 test("invalid later catalog mapping prevents an earlier copy", async () => {
   let writes = 0;
   const service = new CatalogMappingService({

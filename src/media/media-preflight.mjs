@@ -19,6 +19,11 @@ export class MediaPreflight {
       this.runMediaPreflightAndApplyDecision.bind(this);
   }
 
+  /** Thumbnails are cosmetic: Meta fills one in, so a missing file is not fatal. */
+  isOptionalMediaSlot(slot) {
+    return /thumbnail/i.test(String(slot?.slotKind || ""));
+  }
+
   getPackageSourceAccountId(packageData) {
     return String(
       packageData?.source?.accountId || packageData?.sourceAccountId || "",
@@ -191,6 +196,11 @@ export class MediaPreflight {
         issues.push(
           buildMediaPreflightIssue(slot, "creative is missing from package"),
         );
+        continue;
+      }
+      // A video thumbnail is never required: Meta generates one when the clone
+      // does not carry a custom preview, so a missing file must not block the ad.
+      if (this.isOptionalMediaSlot(slot)) {
         continue;
       }
 

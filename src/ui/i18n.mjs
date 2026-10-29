@@ -76,10 +76,10 @@ const DICT = {
     "opt.noPixelHint": "Reuse the existing pixel or create a new one",
     "opt.noCatalog": "Auto",
     "opt.noCatalogHint":
-      "Auto — the catalog from the source package, only if this cabinet can see it",
+      "Auto: the same catalog when this cabinet can see it. Otherwise a copy is created in its Business Manager. Otherwise the products are copied into the first catalog the cabinet already has.",
     "opt.noCatalogs": "No catalogs",
     "opt.noCatalogsHint":
-      "This cabinet has no catalogs, so a catalog campaign cannot be cloned here: open a cabinet that can see the source catalog, or copy the catalog into its Business Manager first.",
+      "This cabinet has no catalogs and no Business Manager to create one, so a catalog campaign cannot be cloned here.",
     "opt.copyCatalog": "Copy to BM {bm}",
     "opt.copyInto": "Copy data into: {name}",
     "opt.catalogReuseGroup": "Use a catalog",
@@ -233,10 +233,10 @@ const DICT = {
       "Переиспользовать существующий пиксель или создать новый",
     "opt.noCatalog": "Авто",
     "opt.noCatalogHint":
-      "Авто — каталог из пакета-источника, но только если этот кабинет его видит",
+      "Авто: тот же каталог, если кабинет его видит. Иначе создаётся копия в его Business Manager. Иначе товары копируются в первый доступный каталог кабинета.",
     "opt.noCatalogs": "Нет каталогов",
     "opt.noCatalogsHint":
-      "В кабинете нет ни одного каталога, поэтому кампанию с каталогом сюда склонировать нельзя: нужен кабинет, который видит исходный каталог, либо сначала скопировать каталог в его Business Manager.",
+      "В кабинете нет каталогов и нет Business Manager, где можно создать каталог, поэтому кампанию с каталогом сюда не перенести.",
     "opt.copyCatalog": "Копировать в BM {bm}",
     "opt.copyInto": "Копировать данные в: {name}",
     "opt.catalogReuseGroup": "Использовать каталог",

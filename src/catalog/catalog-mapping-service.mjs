@@ -188,6 +188,37 @@ export class CatalogMappingService {
     return nextProductSetMappings;
   }
 
+  /**
+   * Resolves what "Auto" means for one source catalog. The order mirrors what
+   * an operator does by hand: use the same catalog when the cabinet can see it,
+   * otherwise create a copy in the cabinet's Business Manager, otherwise push
+   * the source data into a catalog the cabinet already has.
+   */
+  resolveAutoCatalogPlan(sourceId, targets, targetContext) {
+    if (targets.has(sourceId)) {
+      return { mode: "reuse", targetId: sourceId, autoStep: "same-catalog" };
+    }
+    if (targetContext?.business?.id) {
+      return {
+        mode: "copy-new",
+        targetId: "__copy__",
+        autoStep: "new-catalog",
+      };
+    }
+    const firstTarget = [...targets.values()][0];
+    if (firstTarget?.id) {
+      return {
+        mode: "copy-existing",
+        targetId: String(firstTarget.id),
+        autoStep: "copy-into-existing",
+      };
+    }
+    throw new Error(
+      `Catalog ${sourceId} is not available in this cabinet, there is no Business Manager to create a copy, ` +
+        "and the cabinet has no catalog to copy the products into.",
+    );
+  }
+
   async planCatalogMappingsForImport(
     packageData,
     targetContext,
@@ -200,29 +231,47 @@ export class CatalogMappingService {
     for (const catalog of getSourceCatalogsFromPackage(packageData)) {
       const sourceId = String(catalog.id);
       const selected = String(catalogMappings?.[sourceId] || "");
-      const mode =
-        selected === "__copy__"
-          ? "copy-new"
-          : selected.startsWith("__copy_into__:")
-            ? "copy-existing"
-            : "reuse";
-      const targetId =
-        mode === "copy-existing"
-          ? selected.slice("__copy_into__:".length)
-          : selected;
-      if (mode === "copy-new") {
-        if (!targetContext?.business?.id)
+      const isAuto = !selected || selected === "__auto__";
+      let mode;
+      let targetId;
+      let autoStep = "";
+      if (isAuto) {
+        const resolved = this.resolveAutoCatalogPlan(
+          sourceId,
+          targets,
+          targetContext,
+        );
+        mode = resolved.mode;
+        targetId = resolved.targetId;
+        autoStep = resolved.autoStep;
+      } else {
+        mode =
+          selected === "__copy__"
+            ? "copy-new"
+            : selected.startsWith("__copy_into__:")
+              ? "copy-existing"
+              : "reuse";
+        targetId =
+          mode === "copy-existing"
+            ? selected.slice("__copy_into__:".length)
+            : selected;
+        if (mode === "copy-new") {
+          if (!targetContext?.business?.id)
+            throw new Error(
+              `No target Business Manager for catalog ${sourceId}.`,
+            );
+        } else if (!targets.has(targetId)) {
           throw new Error(
-            `No target Business Manager for catalog ${sourceId}.`,
+            `Select an accessible target catalog for ${sourceId}.`,
           );
-      } else if (!targets.has(targetId)) {
-        throw new Error(`Select an accessible target catalog for ${sourceId}.`);
+        }
       }
       plan.push({
         sourceId,
         sourceName: catalog.name || sourceId,
         mode,
         targetId,
+        autoStep,
         targetName:
           targets.get(targetId)?.name ||
           targetContext?.business?.name ||
@@ -275,18 +324,26 @@ export class CatalogMappingService {
     } = this;
     const { copyCatalogToTargetBusiness, copyCatalogIntoExistingTarget } =
       this.dependencies.catalogCopyService;
-    await this.planCatalogMappingsForImport(
+    const plan = await this.planCatalogMappingsForImport(
       packageData,
       targetContext,
       catalogMappings,
     );
-    const sourceCatalogs = getSourceCatalogsFromPackage(packageData);
+    const { log } = this.dependencies.logging;
     const nextCatalogMappings = { ...(catalogMappings || {}) };
     let productSetMappings = {};
     const copiedCatalogIds = new Set();
-    for (const catalog of sourceCatalogs) {
-      const sourceId = String(catalog.id);
-      if (nextCatalogMappings[sourceId] === "__copy__") {
+    for (const item of plan) {
+      const sourceId = item.sourceId;
+      if (item.autoStep) {
+        log(
+          "info",
+          `Catalog ${sourceId}: auto mode chose ${item.autoStep} (${
+            item.targetName || item.targetId
+          }).`,
+        );
+      }
+      if (item.mode === "copy-new") {
         const copied = await copyCatalogToTargetBusiness(
           sourceId,
           targetContext,
@@ -298,17 +355,17 @@ export class CatalogMappingService {
         invalidateAccountContextCache(state.importAccountId);
         continue;
       }
-      if (String(nextCatalogMappings[sourceId]).startsWith("__copy_into__:")) {
-        nextCatalogMappings[sourceId] = nextCatalogMappings[sourceId].slice(
-          "__copy_into__:".length,
-        );
+      if (item.mode === "copy-existing") {
+        nextCatalogMappings[sourceId] = item.targetId;
         const copied = await copyCatalogIntoExistingTarget(
           sourceId,
-          nextCatalogMappings[sourceId],
+          item.targetId,
           packageData,
         );
         Object.assign(productSetMappings, copied.productSetIdMap);
+        continue;
       }
+      nextCatalogMappings[sourceId] = item.targetId;
     }
     productSetMappings = await enrichFallbackProductSetMappings(
       packageData,
