@@ -326,8 +326,24 @@ export class MassCloneController {
         this.pickFor(pick.dataset.massPagePick, {
           pageId: pick.dataset.pageId || "",
         });
+        return;
+      }
+      if (state.massOpenPageMenu) {
+        state.massOpenPageMenu = "";
+        this.dependencies.massCloneView.render();
       }
     });
+    // A click on the Ads Manager page also closes the open page listbox.
+    if (!this.outsidePagePopClick) {
+      this.outsidePagePopClick = (event) => {
+        if (!state.massOpenPageMenu) return;
+        if (event.target?.closest?.("[data-mass-page-toggle], .sk-fp-pop"))
+          return;
+        state.massOpenPageMenu = "";
+        this.dependencies.massCloneView.render();
+      };
+      document.addEventListener("click", this.outsidePagePopClick);
+    }
     if (dom.cloneMaster) {
       dom.cloneMaster.addEventListener("change", () => {
         this.setAllTargets(dom.cloneMaster.checked);

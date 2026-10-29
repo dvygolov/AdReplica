@@ -269,6 +269,11 @@ export class MassCloneView {
       )}</td></tr>`;
       return;
     }
+    // The open listbox is reparented to the panel root, so a plain innerHTML
+    // rebuild would leave the old copy on screen. Drop any strays first.
+    dom.root
+      ?.querySelectorAll(":scope > .sk-fp-pop")
+      .forEach((node) => node.remove());
     const selection = state.massTargets || {};
     const sourceCurrency = this.sourceCurrency();
     const rates = state.massRates || {};
