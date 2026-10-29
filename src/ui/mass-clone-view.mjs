@@ -195,8 +195,12 @@ export class MassCloneView {
     if (!box) return;
     const data = state.clonePackage;
     if (!data) {
+      // One calm line across the whole stats grid: the narrow grid cell made
+      // this notice wrap into a tall column.
       box.innerHTML = state.clonePackageLoading
-        ? `<div class="sk-empty">${escapeHtml(t("clone.loading"))}</div>`
+        ? `<div class="sk-stat sk-stat-note"><span class="sk-spin-dot" aria-hidden="true"></span><span>${escapeHtml(
+            t("clone.loading"),
+          )}</span></div>`
         : "";
       return;
     }

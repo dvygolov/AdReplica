@@ -213,6 +213,33 @@ export function buildStudioStyles(appId) {
         gap: 6px;
         margin: 10px 0 8px;
       }
+      #${appId} .sk-stat-note {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 12px;
+        border-style: dashed;
+        background: #181818;
+        color: #9a9a9a;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #${appId} .sk-stat-note > span:last-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #${appId} .sk-spin-dot {
+        flex: 0 0 auto;
+        width: 13px;
+        height: 13px;
+        border: 2px solid rgba(255, 212, 0, 0.22);
+        border-top-color: #ffd400;
+        border-radius: 50%;
+        animation: sk-spin 0.8s linear infinite;
+      }
       #${appId} .sk-stat {
         background: #1a1a1a;
         border: 1px solid #333;
@@ -434,6 +461,33 @@ export function buildStudioStyles(appId) {
       #${appId} details.sk-logs > summary::-webkit-details-marker { display: none; }
       /* compact rhythm + readable secondary text */
       #${appId} .sk-card { padding: 10px 12px 12px; margin-bottom: 10px; }
+      #${appId} .sk-stat-note {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 12px;
+        border-style: dashed;
+        background: #181818;
+        color: #9a9a9a;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #${appId} .sk-stat-note > span:last-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #${appId} .sk-spin-dot {
+        flex: 0 0 auto;
+        width: 13px;
+        height: 13px;
+        border: 2px solid rgba(255, 212, 0, 0.22);
+        border-top-color: #ffd400;
+        border-radius: 50%;
+        animation: sk-spin 0.8s linear infinite;
+      }
       #${appId} .sk-stat { padding: 6px 8px; }
       #${appId} .sk-stat b { font-size: 13px; }
       #${appId} .sk-stat span { font-size: 9.5px; color: #a0a0a0; }
