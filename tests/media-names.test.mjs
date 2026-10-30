@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { mediaBaseName } from "../src/domain/package.mjs";
 import { CloneWorkflow } from "../src/workflows/clone-workflow.mjs";
+import { ImageService } from "../src/media/image-service.mjs";
 
 test("media names are compared without the extension", () => {
   assert.equal(mediaBaseName("tel__image_01.jpg"), "tel__image_01");
@@ -37,4 +38,36 @@ test("a local webp fills the .jpg slot instead of a remote copy", async () => {
     "a slot without a local file keeps the server-side copy",
   );
   assert.equal(files.has("tel__image_01.webp"), false, "no duplicate entry");
+});
+
+function imageService() {
+  return new ImageService({
+    logging: { log: () => {} },
+    downloadService: {
+      getMediaFileName: (file) => file.name,
+      isRemoteMediaFile: () => false,
+    },
+  });
+}
+
+const webpHead = () =>
+  new Uint8Array([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56,
+    0x50, 0x38, 0x20,
+  ]);
+const jpegHead = () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+
+test("a .jpg whose bytes are WebP is transcoded", async () => {
+  const service = imageService();
+  const disguised = new Blob([webpHead()], { type: "image/jpeg" });
+  disguised.name = "tel__image_01.jpg";
+  assert.equal(await service.shouldTranscodeImageForMeta(disguised), true);
+
+  const jpeg = new Blob([jpegHead()], { type: "image/jpeg" });
+  jpeg.name = "tel__image_01.jpg";
+  assert.equal(await service.shouldTranscodeImageForMeta(jpeg), false);
+
+  const webp = new Blob([webpHead()], { type: "image/webp" });
+  webp.name = "tel__image_01.webp";
+  assert.equal(await service.shouldTranscodeImageForMeta(webp), true);
 });
