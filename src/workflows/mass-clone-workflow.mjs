@@ -312,7 +312,8 @@ export class MassCloneWorkflow {
     // Meta sometimes rejects a freshly written draft ad with a publishing error
     // that clears once the ad is written again. Roll the draft back and retry
     // the target once instead of dropping it from the batch.
-    const transient = isTransientFragmentFailure(report?.validation?.errors);
+    const transient =
+      !state.massStop && isTransientFragmentFailure(report?.validation?.errors);
     if (!transient && report?.validation?.errors?.length) {
       log(
         "info",
@@ -366,7 +367,15 @@ export class MassCloneWorkflow {
     if (this.dependencies.initializeSession) {
       await this.dependencies.initializeSession();
     }
-    if (state.massRunning) return false;
+    if (state.massRunning) {
+      log(
+        state.massStopping ? "warn" : "info",
+        state.massStopping
+          ? "Mass clone is still stopping: the current account is being cleaned up. Start again when it finishes."
+          : "A mass clone is already running.",
+      );
+      return false;
+    }
     const jsonSource = state.cloneSourceKind === "json";
     if (jsonSource) {
       if (!state.clonePackage) {
@@ -440,9 +449,15 @@ export class MassCloneWorkflow {
       return failed === 0 && done > 0;
     } finally {
       state.massRunning = false;
+      state.massStopping = false;
       state.massActiveAccountId = "";
       this.dependencies.renderMassClone?.();
       this.dependencies.onMassFinished?.();
+      if (state.refreshAfterRun) {
+        // The refresh button asked for a clean interface once the cleanup ended.
+        state.refreshAfterRun = false;
+        window.AdReplica?.refresh?.();
+      }
     }
   }
 }

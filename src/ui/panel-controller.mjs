@@ -74,6 +74,7 @@ export class PanelController {
               <button type="button" data-lang="en" data-always-enabled title="${t("lang.en")}" aria-pressed="true">${FLAGS.en}</button>
             </div>
             <button id="${APP_ID}-log-toggle" class="sk-icon sk-log-toggle" data-always-enabled title="${t("btn.log")}" aria-label="${t("btn.log")}" aria-expanded="false">&#9776;</button>
+            <button id="${APP_ID}-refresh" class="sk-icon sk-refresh" data-always-enabled title="${t("btn.refresh")}" aria-label="${t("btn.refresh")}">&#8635;</button>
             <button id="${APP_ID}-service" class="sk-icon" data-always-enabled title="${t("btn.service")}" aria-label="${t("btn.service")}" aria-expanded="false">&#9881;</button>
             <button id="${APP_ID}-minimize" class="sk-icon sk-minimize" data-always-enabled title="${t("btn.minimize")}" aria-label="${t("btn.minimize")}">&#x2013;</button>
             <button id="${APP_ID}-close" class="sk-icon sk-close" data-always-enabled title="${t("btn.close")}" aria-label="${t("btn.close")}">&#x2715;</button>
@@ -322,6 +323,7 @@ export class PanelController {
     dom.cloneTargetsBody = root.querySelector(`#${APP_ID}-clone-targets-body`);
     dom.cloneMaster = root.querySelector(`#${APP_ID}-clone-master`);
     dom.cloneSearch = root.querySelector(`#${APP_ID}-clone-search`);
+    dom.refreshButton = root.querySelector(`#${APP_ID}-refresh`);
     dom.cloneTargetsNote = root.querySelector(`#${APP_ID}-clone-targets-note`);
     dom.cloneRunCard = root.querySelector(`#${APP_ID}-clone-run-card`);
     dom.cloneFooter = root.querySelector(`#${APP_ID}-clone-footer`);
@@ -574,6 +576,26 @@ export class PanelController {
       );
       document.addEventListener("click", () => {
         dom.macrosPop?.classList.add("sk-hidden");
+      });
+    }
+    if (dom.refreshButton) {
+      dom.refreshButton.addEventListener("click", () => {
+        const busyWithRun = Boolean(state.massRunning || state.operationActive);
+        if (busyWithRun) {
+          const confirmed =
+            typeof window.confirm === "function"
+              ? window.confirm(t("refresh.confirm"))
+              : false;
+          if (!confirmed) return;
+          // Stop the current account and let the workflow reload the panel when
+          // its cleanup finishes, so no orphaned writes survive the refresh.
+          state.massStop = true;
+          state.refreshAfterRun = true;
+          log("warn", t("refresh.busy"));
+          renderUI();
+          return;
+        }
+        this.reloadInterface();
       });
     }
     if (dom.cloneCollapseButton) {
@@ -876,6 +898,18 @@ export class PanelController {
     log("info", "UI ready. Connecting session...");
     if (!window.__ADREPLICA_QA_SUPPRESS_AUTO_INIT__) {
       initializeSession().catch(() => {});
+    }
+  }
+
+  /** Hard reload of the panel: a fresh instance with the same page session. */
+  reloadInterface() {
+    const api = window.AdReplica;
+    if (api?.refresh) {
+      api.refresh();
+      return;
+    }
+    if (api?.destroy?.() !== false) {
+      location.reload();
     }
   }
 

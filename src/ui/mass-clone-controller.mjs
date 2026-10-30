@@ -194,8 +194,13 @@ export class MassCloneController {
     const { log } = this.dependencies.logging;
     if (!state.massRunning) return;
     state.massStop = true;
+    // The workflow finishes the current account (it rolls the partial draft
+    // back), which can take a while. Unlock the interface right away instead of
+    // leaving every control disabled until the cleanup ends.
+    state.massStopping = true;
     log("warn", "Mass clone will stop after the current account.");
     this.dependencies.massCloneView.render();
+    this.dependencies.panelView?.renderUI?.();
   }
 
   /** Clears the previous run so the tab returns to selection. */

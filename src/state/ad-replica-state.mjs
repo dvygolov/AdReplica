@@ -71,6 +71,10 @@ export class AdReplicaState {
     this.cloneCurrency = "";
     this.massRunning = false;
     this.massStop = false;
+    // Set while a stop request is being honoured: the UI unlocks immediately
+    // even though the workflow is still cleaning up the current account.
+    this.massStopping = false;
+    this.refreshAfterRun = false;
     this.massResults = [];
     this.activeTab = "export";
     // The source block starts expanded: the operator picks files there.

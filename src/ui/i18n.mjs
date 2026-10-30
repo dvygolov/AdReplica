@@ -9,6 +9,11 @@ const DICT = {
     ver: "build {version}",
     "btn.service": "Service",
     "btn.log": "Log panel",
+    "btn.refresh": "Reload the interface",
+    "refresh.busy":
+      "Stopping the run first; the interface reloads after the current account.",
+    "refresh.confirm":
+      "A clone is still running. Stop it and reload the interface?",
     "btn.close": "Close",
     "btn.minimize": "Collapse",
     "btn.restore": "Open AdReplica",
@@ -189,6 +194,11 @@ const DICT = {
     ver: "сборка {version}",
     "btn.service": "Сервис",
     "btn.log": "Панель лога",
+    "btn.refresh": "Перезагрузить интерфейс",
+    "refresh.busy":
+      "Сначала останавливаем прогон — интерфейс перезагрузится после текущего кабинета.",
+    "refresh.confirm":
+      "Клонирование ещё идёт. Остановить его и перезагрузить интерфейс?",
     "btn.close": "Закрыть",
     "btn.minimize": "Свернуть",
     "btn.restore": "Открыть AdReplica",

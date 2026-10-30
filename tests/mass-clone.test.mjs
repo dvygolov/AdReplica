@@ -340,6 +340,32 @@ test("retry re-selects only the failed accounts", async () => {
   assert.equal(state.massTargets["333"].selected, false);
 });
 
+test("stopping a run unlocks the interface immediately", async () => {
+  const { MassCloneController } =
+    await import("../src/ui/mass-clone-controller.mjs");
+  const state = { accounts: ACCOUNTS, massRunning: true, massStop: false };
+  let renders = 0;
+  const controller = new MassCloneController({
+    state,
+    dom: {},
+    logging: { log: () => {} },
+    massCloneView: { render: () => {} },
+    panelView: {
+      renderUI: () => {
+        renders += 1;
+      },
+    },
+  });
+  controller.stopMassClone();
+  assert.equal(state.massStop, true, "the workflow is asked to stop");
+  assert.equal(
+    state.massStopping,
+    true,
+    "the UI knows the stop is in progress",
+  );
+  assert.equal(renders, 1, "the panel re-renders without waiting for cleanup");
+});
+
 test("retry does nothing when the last run had no failures", async () => {
   const { MassCloneController } =
     await import("../src/ui/mass-clone-controller.mjs");

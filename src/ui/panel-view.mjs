@@ -48,7 +48,7 @@ export class PanelView {
         state.busy ||
         state.loadingSession ||
         state.operationActive ||
-        state.massRunning ||
+        (state.massRunning && !state.massStopping) ||
         state.versionLoading ||
         (element === dom.importModeSelect && importRequiresDraftOnly()) ||
         (element === dom.cloneModeSelect && cloneRequiresDraftOnly());

@@ -795,6 +795,8 @@ export function buildStudioStyles(appId) {
         font-size: 12px;
         font-family: inherit;
       }
+      #${appId} .sk-refresh { font-size: 16px; line-height: 1; }
+      #${appId} .sk-refresh:hover { color: #ffd400; }
       /* The target header is split: title on the left, search filling the rest. */
       #${appId} .sk-sec-split { align-items: center; }
       #${appId} .sk-sec-split .sk-sec-title { flex: 0 0 auto; }
