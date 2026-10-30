@@ -795,6 +795,10 @@ export function buildStudioStyles(appId) {
         font-size: 12px;
         font-family: inherit;
       }
+      /* The target header is split: title on the left, search filling the rest. */
+      #${appId} .sk-sec-split { align-items: center; }
+      #${appId} .sk-sec-split .sk-sec-title { flex: 0 0 auto; }
+      #${appId} .sk-sec-split .sk-search { flex: 1 1 auto; width: auto; margin-left: auto; }
       #${appId} .sk-search::placeholder { color: #7d7d7d; }
       #${appId} .sk-search:focus { outline: none; border-color: #ffd400; }
       #${appId} .sk-note {

@@ -218,7 +218,8 @@ export class PanelController {
             </section>
 
             <section class="sk-card">
-              <h3 class="sk-sec">${t("clone.s2")}
+              <h3 class="sk-sec sk-sec-split">
+                <span class="sk-sec-title">${t("clone.s2")}</span>
                 <input type="search" class="sk-search" id="${APP_ID}-clone-search" placeholder="${t("clone.search")}" aria-label="${t("clone.search")}" />
               </h3>
               <div class="sk-scroll">
