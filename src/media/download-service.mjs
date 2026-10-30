@@ -115,8 +115,15 @@ export class DownloadService {
   }
 
   triggerDownload(fileName, blob) {
+    // Firefox (and Camoufox) previews image MIME types in a new tab even when
+    // the anchor carries `download`, so the export both saved the file and
+    // littered the window with tabs. An opaque blob type keeps it a plain save.
+    const payload =
+      blob && blob.type && blob.type !== "application/octet-stream"
+        ? new Blob([blob], { type: "application/octet-stream" })
+        : blob;
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
+    link.href = URL.createObjectURL(payload);
     link.download = fileName;
     link.style.display = "none";
     document.body.appendChild(link);
