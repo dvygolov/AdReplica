@@ -1,8 +1,6 @@
 import { buildDefaultCloneCampaignName } from "../domain/names.mjs";
-import {
-  getSourceCatalogsFromPackage,
-  mediaBaseName,
-} from "../domain/package.mjs";
+import { getSourceCatalogsFromPackage } from "../domain/package.mjs";
+import { assignLocalFiles } from "../media/media-matching.mjs";
 import { withConvertedBudgets } from "../domain/currency.mjs";
 import { normalizeImportOptions } from "../domain/options.mjs";
 
@@ -118,26 +116,27 @@ export class CloneWorkflow {
     const { log } = this.dependencies.logging;
     const { createRemoteMediaFile } = this.dependencies.downloadService;
     const files = new Map();
+    const queue = packageData?._downloadQueue || [];
     // The operator's files are matched by name without the extension: an export
     // names a slot `.jpg` while Meta served WebP, so `tel__image_01.webp` must
-    // fill the `tel__image_01.jpg` slot instead of a remote copy being tried.
-    const localByBase = new Map();
-    const usedLocals = new Set();
-    for (const [fileName, file] of state.cloneMediaFiles || []) {
-      localByBase.set(mediaBaseName(fileName), { fileName, file });
-    }
-    for (const file of packageData?._downloadQueue || []) {
-      const local = localByBase.get(mediaBaseName(file.fileName));
+    // fill the `tel__image_01.jpg` slot. A package that needs one file still
+    // works when the operator dropped it under a different name.
+    const expectedNames = queue.map((file) => file.fileName);
+    const { picked, used } = assignLocalFiles(
+      expectedNames,
+      state.cloneMediaFiles || new Map(),
+    );
+    for (const file of queue) {
+      const local = picked.get(file.fileName);
       if (local) {
-        files.set(file.fileName, local.file);
-        usedLocals.add(local.fileName);
+        files.set(file.fileName, local);
         continue;
       }
       log("info", `Preparing server-side media copy for ${file.fileName}...`);
       files.set(file.fileName, createRemoteMediaFile(file));
     }
     for (const [fileName, file] of state.cloneMediaFiles || []) {
-      if (usedLocals.has(fileName) || files.has(fileName)) continue;
+      if (used.has(fileName) || files.has(fileName)) continue;
       files.set(fileName, file);
     }
     return files;

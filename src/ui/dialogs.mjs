@@ -129,7 +129,7 @@ export class Dialogs {
         <div style="background:#111827;color:#f9fafb;width:min(760px,100%);max-height:86vh;overflow:auto;border:1px solid #374151;border-radius:8px;padding:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);font-family:Arial,sans-serif;">
           <div style="font-size:17px;font-weight:800;margin-bottom:8px;">Media preflight found unavailable creative media</div>
           <div style="font-size:13px;color:#d1d5db;margin-bottom:12px;">
-            Checked ${escapeHtml(String(summary.adsChecked || 0))} ad(s) and ${escapeHtml(String(summary.mediaChecked || 0))} media item(s). ${escapeHtml(String(issues.length))} issue(s) need a decision before copying.
+            Checked ${escapeHtml(String(summary.adsChecked || 0))} ad(s) and ${escapeHtml(String(summary.mediaChecked || 0))} media item(s). ${escapeHtml(String(issues.length))} issue(s) need a decision before copying. A source image can only be reused when this session can open the account it was exported from \u2014 drop the creative files into "Creatives and media" to upload them again into the target account.
           </div>
           <ol style="font-size:12px;line-height:1.35;margin:0 0 14px 18px;padding:0;">${rows}</ol>
           ${more}
