@@ -9,13 +9,20 @@ export function isOptionalMediaSlot(slot) {
   return /thumbnail/i.test(String(slot?.slotKind || ""));
 }
 
-export function matchMediaSlots({ slots = [], files = new Map(), overrides = new Map() } = {}) {
+export function matchMediaSlots({
+  slots = [],
+  files = new Map(),
+  overrides = new Map(),
+  fileHashes = new Map(),
+} = {}) {
   const names = [...files.keys()].sort();
   let matched = 0;
   let missing = 0;
   const rows = slots.map((slot) => {
     const chosen =
-      overrides.get(slot.key) || files.get(String(slot.expectedFileName || ""));
+      overrides.get(slot.key) ||
+      (slot.expectedSha256 ? fileHashes.get(slot.expectedSha256) : null) ||
+      files.get(String(slot.expectedFileName || ""));
     const optional = isOptionalMediaSlot(slot);
     const status = chosen ? "matched" : optional ? "optional" : "missing";
     if (status === "matched") matched += 1;

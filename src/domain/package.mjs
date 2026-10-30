@@ -2,6 +2,19 @@ import { getSourcePageId } from "./creative.mjs";
 import { CATALOG_ID_KEYS, PRODUCT_SET_ID_KEYS } from "./constants.mjs";
 import { isSyntheticProductSetName, rankProductSetMeta } from "./catalog.mjs";
 import { deepClone } from "../utils/object.mjs";
+import { normalizeAccountId } from "./ids.mjs";
+
+export function canReuseSourceAssetFeedId(packageData, targetAccountId) {
+  const sourceAccountId = normalizeAccountId(
+    packageData?.source?.accountId || packageData?.sourceAccountId,
+  );
+  const normalizedTargetId = normalizeAccountId(targetAccountId);
+  return Boolean(
+    sourceAccountId &&
+    normalizedTargetId &&
+    sourceAccountId === normalizedTargetId,
+  );
+}
 
 export function hasCarouselAttachmentMedia(raw) {
   const attachments = raw?.object_story_spec?.link_data?.child_attachments;
@@ -453,4 +466,12 @@ export function readClonePackageFromJson(text, fileName = "") {
         ? data.fileNameMap
         : {},
   };
+}
+
+/** Lower-cased file name without its extension: `tel__image_01.jpg` -> `tel__image_01`. */
+export function mediaBaseName(fileName) {
+  return String(fileName || "")
+    .replace(/\.[^.\\/]+$/, "")
+    .trim()
+    .toLowerCase();
 }

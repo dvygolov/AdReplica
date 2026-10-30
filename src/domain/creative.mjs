@@ -437,6 +437,59 @@ export function materializePageMappedPackage(packageData, pageMappings) {
   return next;
 }
 
+export function remapCreativeSequence(sequence, creativeMap) {
+  const resolveId = (sourceId) => {
+    const key = String(sourceId ?? "");
+    if (!key) throw new Error("Creative sequence contains an empty creative ID.");
+    let mapped =
+      creativeMap instanceof Map
+        ? (creativeMap.get(sourceId) ?? creativeMap.get(key))
+        : creativeMap?.[key];
+    if (mapped && typeof mapped === "object") {
+      mapped = mapped.id || mapped.creative_id || mapped.creativeId;
+    }
+    if (!mapped) {
+      throw new Error(
+        `Creative sequence references source creative ${key}, but no target creative was created.`,
+      );
+    }
+    return String(mapped);
+  };
+  const remap = (value) => {
+    if (Array.isArray(value)) return value.map(remap);
+    if (value && typeof value === "object") {
+      const next = { ...value };
+      for (const key of ["creative_id", "creativeId", "id"]) {
+        if (
+          next[key] !== undefined &&
+          next[key] !== null &&
+          typeof next[key] !== "object"
+        ) {
+          next[key] = resolveId(next[key]);
+        }
+      }
+      return next;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+        try {
+          return remap(JSON.parse(trimmed));
+        } catch (error) {
+          if (error instanceof SyntaxError) {
+            // A plain creative ID can theoretically start with a bracket only
+            // in malformed input; the resolver below produces a clearer error.
+          } else {
+            throw error;
+          }
+        }
+      }
+    }
+    return resolveId(value);
+  };
+  return remap(sequence);
+}
+
 export function replacePixelIdsInUrlTags(urlTags, pixelMappings) {
   let next = String(urlTags || "");
   for (const [sourceId, targetId] of Object.entries(pixelMappings || {})) {

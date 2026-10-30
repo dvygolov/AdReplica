@@ -6,9 +6,13 @@ import {
   getSourcePageId,
   materializePageMappedPackage,
   materializePixelMappedPackage,
+  remapCreativeSequence,
   resolveMutuallyExclusiveStoryImageFields,
 } from "../domain/creative.mjs";
-import { materializeCatalogMappedPackage } from "../domain/package.mjs";
+import {
+  canReuseSourceAssetFeedId,
+  materializeCatalogMappedPackage,
+} from "../domain/package.mjs";
 import { createDraftImportTransaction } from "../domain/draft-values.mjs";
 import { normalizeImportOptions } from "../domain/options.mjs";
 import { OperationReport } from "../operations/operation-report.mjs";
@@ -43,8 +47,13 @@ export class ImportWorkflow {
     const { shiftPackageScheduleForImport } = this.dependencies.scheduleService;
     const { resolveCreativeImport, resolveCreativeDraftPayload } =
       this.dependencies.creativeService;
-    const { createCampaign, createAdset, createAd, activateCampaign } =
-      this.dependencies.directWriter;
+    const {
+      createCampaign,
+      createAdset,
+      createAd,
+      updateAdsetCreativeSequence,
+      activateCampaign,
+    } = this.dependencies.directWriter;
     const { getCurrentDraftId } = this.dependencies.draftRepository;
     const { rollbackDraftImport } = this.dependencies.draftRecovery;
     const { ensureDraftInstagramIdentityParity, logDraftValidation } =
@@ -93,6 +102,27 @@ export class ImportWorkflow {
       resetPageIdentityProvisionCache();
       enforceImportModeConstraints();
       report.mode = state.importAsDraft ? "DRAFT" : state.importStatus;
+      const crossAccountAssetFeeds = (state.importPackage.adsets || []).filter(
+        (adset) =>
+          adset.asset_feed_id &&
+          !canReuseSourceAssetFeedId(
+            state.importPackage,
+            state.importAccountId,
+          ),
+      );
+      if (crossAccountAssetFeeds.length) {
+        const message = `${crossAccountAssetFeeds.length} source asset_feed_id value(s) will not be copied; Meta will derive the target asset feed from asset_feed_spec.`;
+        report.notice(message, { stage: "dynamic_creative" });
+        log("warn", message);
+      }
+      const sequencedAdsets = (state.importPackage.adsets || []).filter(
+        (adset) => adset.creative_sequence,
+      );
+      if (state.importAsDraft && sequencedAdsets.length) {
+        const message = `${sequencedAdsets.length} creative_sequence value(s) cannot be preserved in DRAFT mode because inline draft creatives have no standalone target IDs. The sequence is omitted; review it after publishing.`;
+        report.notice(message, { stage: "dynamic_creative" });
+        log("warn", message);
+      }
       if (importOptions.pageMappings) {
         state.importPageMappings = {
           ...state.importPageMappings,
@@ -458,6 +488,19 @@ export class ImportWorkflow {
             "The campaign was only partially imported; it remains paused.",
           );
           return false;
+        }
+        for (const adset of sequencedAdsets) {
+          const targetAdsetId = adsetMap.get(String(adset.id));
+          if (!targetAdsetId) {
+            throw new Error(
+              `Cannot remap creative_sequence: target ad set for ${adset.id} was not created.`,
+            );
+          }
+          const targetSequence = remapCreativeSequence(
+            adset.creative_sequence,
+            creativeMap,
+          );
+          await updateAdsetCreativeSequence(targetAdsetId, targetSequence);
         }
         if (state.importStatus === "ACTIVE")
           await activateCampaign(newCampaignId);

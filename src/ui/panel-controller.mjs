@@ -8,6 +8,7 @@ import {
 import { buildAdReplicaStyles } from "./styles.mjs";
 import { readClonePackageFromJson } from "../domain/package.mjs";
 import { buildDefaultCloneCampaignName } from "../domain/names.mjs";
+import { indexMediaFilesBySha256 } from "../media/media-hashes.mjs";
 import { FLAGS, getLang, setLang, t } from "./i18n.mjs";
 
 /** PanelController. Dependencies are supplied by the application composition root. */
@@ -694,18 +695,34 @@ export class PanelController {
     // Creatives for a JSON package: the operator drops the files exported next
     // to the package, and every media slot is matched by the expected name.
     if (dom.cloneMediaInput) {
-      dom.cloneMediaInput.addEventListener("change", (event) => {
+      dom.cloneMediaInput.addEventListener("change", async (event) => {
         const files = [...(event.target.files || [])];
         if (!files.length) return;
-        for (const file of files) {
-          state.cloneMediaFiles.set(file.name, file);
+        this.dependencies.panelView.setBusy(true);
+        try {
+          const hashes = await indexMediaFilesBySha256(files, {
+            onError: (file, error) =>
+              log(
+                "warn",
+                `Could not hash ${file.name}; filename matching will be used.`,
+                String(error?.message || error),
+              ),
+          });
+          for (const file of files) {
+            state.cloneMediaFiles.set(file.name, file);
+          }
+          for (const [hash, file] of hashes) {
+            state.cloneMediaHashes.set(hash, file);
+          }
+          log(
+            "info",
+            `Creative files selected: ${files.length}; SHA-256 indexed: ${hashes.size} (${files.map((file) => file.name).join(", ")}).`,
+          );
+          event.target.value = "";
+          renderUI();
+        } finally {
+          this.dependencies.panelView.setBusy(false);
         }
-        log(
-          "info",
-          `Creative files selected: ${files.length} (${files.map((file) => file.name).join(", ")}).`,
-        );
-        event.target.value = "";
-        renderUI();
       });
     }
 

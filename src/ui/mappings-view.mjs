@@ -355,6 +355,7 @@ export class MappingsView {
       slots,
       files: state.cloneMediaFiles || new Map(),
       overrides: state.cloneMediaOverrides || new Map(),
+      fileHashes: state.cloneMediaHashes || new Map(),
     });
     const rows = result.rows
       .map(({ slot, chosen, status, optional }) => {

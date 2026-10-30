@@ -497,6 +497,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       get mappingController() {
         return services.mappingController;
       },
+      get panelView() {
+        return services.panelView;
+      },
     });
   services.creativeMedia =
     overrides.creativeMedia ||

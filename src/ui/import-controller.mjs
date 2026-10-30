@@ -1,3 +1,5 @@
+import { indexMediaFilesBySha256 } from "../media/media-hashes.mjs";
+
 /** ImportController. Dependencies are supplied by the application composition root. */
 export class ImportController {
   constructor(dependencies) {
@@ -53,8 +55,24 @@ export class ImportController {
     const { log } = this.dependencies.logging;
     const { renderImportMappings } = this.dependencies.mappingsView;
     const files = [...(event.target.files || [])];
-    state.importMediaFiles = new Map(files.map((file) => [file.name, file]));
-    renderImportMappings();
-    log("info", `Media files loaded: ${files.length}`);
+    this.dependencies.panelView?.setBusy(true);
+    try {
+      state.importMediaHashes = await indexMediaFilesBySha256(files, {
+        onError: (file, error) =>
+          log(
+            "warn",
+            `Could not hash ${file.name}; filename matching will be used.`,
+            String(error?.message || error),
+          ),
+      });
+      state.importMediaFiles = new Map(files.map((file) => [file.name, file]));
+      renderImportMappings();
+      log(
+        "info",
+        `Media files loaded: ${files.length}; SHA-256 indexed: ${state.importMediaHashes.size}.`,
+      );
+    } finally {
+      this.dependencies.panelView?.setBusy(false);
+    }
   }
 }

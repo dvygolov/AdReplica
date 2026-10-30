@@ -1,5 +1,8 @@
 import { buildDefaultCloneCampaignName } from "../domain/names.mjs";
-import { getSourceCatalogsFromPackage } from "../domain/package.mjs";
+import {
+  getSourceCatalogsFromPackage,
+  mediaBaseName,
+} from "../domain/package.mjs";
 import { withConvertedBudgets } from "../domain/currency.mjs";
 import { normalizeImportOptions } from "../domain/options.mjs";
 
@@ -115,13 +118,26 @@ export class CloneWorkflow {
     const { log } = this.dependencies.logging;
     const { createRemoteMediaFile } = this.dependencies.downloadService;
     const files = new Map();
+    // The operator's files are matched by name without the extension: an export
+    // names a slot `.jpg` while Meta served WebP, so `tel__image_01.webp` must
+    // fill the `tel__image_01.jpg` slot instead of a remote copy being tried.
+    const localByBase = new Map();
+    const usedLocals = new Set();
+    for (const [fileName, file] of state.cloneMediaFiles || []) {
+      localByBase.set(mediaBaseName(fileName), { fileName, file });
+    }
     for (const file of packageData?._downloadQueue || []) {
+      const local = localByBase.get(mediaBaseName(file.fileName));
+      if (local) {
+        files.set(file.fileName, local.file);
+        usedLocals.add(local.fileName);
+        continue;
+      }
       log("info", `Preparing server-side media copy for ${file.fileName}...`);
       files.set(file.fileName, createRemoteMediaFile(file));
     }
-    // Files the operator dropped in for a JSON package are used as they are;
-    // they win over a remote copy because they are the intended creative.
     for (const [fileName, file] of state.cloneMediaFiles || []) {
+      if (usedLocals.has(fileName) || files.has(fileName)) continue;
       files.set(fileName, file);
     }
     return files;
@@ -216,6 +232,7 @@ export class CloneWorkflow {
         catalogMappings: state.cloneCatalogMappings,
         mediaFiles,
         mediaOverrides: new Map(state.cloneMediaOverrides || []),
+        mediaHashes: new Map(state.cloneMediaHashes || []),
         asDraft: state.cloneAsDraft,
         status: state.cloneAsDraft ? "PAUSED" : state.cloneStatus,
         preserveSchedule: true,

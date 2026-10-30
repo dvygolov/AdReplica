@@ -10,6 +10,7 @@ export class ImageService {
     this.replaceFileExtension = this.replaceFileExtension.bind(this);
     this.shouldTranscodeImageForMeta =
       this.shouldTranscodeImageForMeta.bind(this);
+    this.detectImageFormat = this.detectImageFormat.bind(this);
     this.loadImageElementFromBlob = this.loadImageElementFromBlob.bind(this);
     this.transcodeImageFileForMeta = this.transcodeImageFileForMeta.bind(this);
     this.tryUploadRemoteImageCopy = this.tryUploadRemoteImageCopy.bind(this);
@@ -56,7 +57,41 @@ export class ImageService {
       : `${name}${safeExtension}`;
   }
 
-  shouldTranscodeImageForMeta(file) {
+  /** Reads the first bytes of a file and reports the real image format. */
+  async detectImageFormat(file) {
+    try {
+      const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+      if (
+        head.length >= 12 &&
+        head[0] === 0x52 &&
+        head[1] === 0x49 &&
+        head[2] === 0x46 &&
+        head[3] === 0x46 &&
+        head[8] === 0x57 &&
+        head[9] === 0x45 &&
+        head[10] === 0x42 &&
+        head[11] === 0x50
+      ) {
+        return "webp";
+      }
+      if (head[0] === 0xff && head[1] === 0xd8) return "jpeg";
+      if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e)
+        return "png";
+      if (head[0] === 0x47 && head[1] === 0x49 && head[2] === 0x46)
+        return "gif";
+      return "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  /**
+   * Meta serves creatives as WebP whatever the export named them, and the
+   * `adimages` endpoint rejects those bytes. Decide by the file content, not by
+   * its name or MIME type, so a `tel__image_01.jpg` that is really WebP is
+   * converted before upload.
+   */
+  async shouldTranscodeImageForMeta(file) {
     const { getMediaFileName, isRemoteMediaFile } =
       this.dependencies.downloadService;
     const { getFileExtension } = this;
@@ -64,10 +99,13 @@ export class ImageService {
       return false;
     }
     const fileName = getMediaFileName(file);
-    return (
+    if (
       String(file.type || "").toLowerCase() === "image/webp" ||
       getFileExtension(fileName) === ".webp"
-    );
+    ) {
+      return true;
+    }
+    return (await this.detectImageFormat(file)) === "webp";
   }
 
   loadImageElementFromBlob(blob) {
@@ -80,7 +118,11 @@ export class ImageService {
       };
       image.onerror = () => {
         URL.revokeObjectURL(url);
-        reject(new Error("Failed to decode image."));
+        reject(
+          new Error(
+            `Failed to decode image ${blob.name || blob.type || ""}: Meta returned a non-image payload (the download may be an error page).`,
+          ),
+        );
       };
       image.src = url;
     });
@@ -94,7 +136,7 @@ export class ImageService {
       shouldTranscodeImageForMeta,
       loadImageElementFromBlob,
     } = this;
-    if (!shouldTranscodeImageForMeta(file)) {
+    if (!(await shouldTranscodeImageForMeta(file))) {
       return file;
     }
     const image = await loadImageElementFromBlob(file);

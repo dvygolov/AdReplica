@@ -27,6 +27,7 @@ export class AdReplicaState {
     this.importPackage = null;
     this.importMediaFiles = new Map();
     this.importMediaOverrides = new Map();
+    this.importMediaHashes = new Map();
     this.importPageMappings = {};
     this.importPixelMappings = {};
     this.importCatalogMappings = {};
@@ -45,6 +46,7 @@ export class AdReplicaState {
     this.cloneJsonFileName = "";
     this.cloneMediaFiles = new Map();
     this.cloneMediaOverrides = new Map();
+    this.cloneMediaHashes = new Map();
     this.cloneTargetAccountId = "";
     this.clonePackage = null;
     this.clonePackageLoading = false;

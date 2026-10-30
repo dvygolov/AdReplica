@@ -8,18 +8,21 @@ import {
   getSourcePagesFromPackage,
   getSourcePixelsFromPackage,
 } from "../domain/package.mjs";
+import { getPackageMediaSha256 } from "./media-hashes.mjs";
 
 /** MediaSlots. Dependencies are supplied by the application composition root. */
 export class MediaSlots {
   constructor(dependencies) {
     this.dependencies = dependencies;
     this.getCreativeMediaSlots = this.getCreativeMediaSlots.bind(this);
+    this.getMediaSha256ForFile = this.getMediaSha256ForFile.bind(this);
     this.getMediaSlotsFromPackage = this.getMediaSlotsFromPackage.bind(this);
     this.getImportSourcePages = this.getImportSourcePages.bind(this);
     this.getImportSourcePixels = this.getImportSourcePixels.bind(this);
     this.getImportMediaSlots = this.getImportMediaSlots.bind(this);
     this.getSharedMediaOverrideKey = this.getSharedMediaOverrideKey.bind(this);
     this.getDefaultMediaFile = this.getDefaultMediaFile.bind(this);
+    this.findMediaFileByBaseName = this.findMediaFileByBaseName.bind(this);
     this.recoverSlotMediaFromSource =
       this.recoverSlotMediaFromSource.bind(this);
     this.resolveImportedMediaFile = this.resolveImportedMediaFile.bind(this);
@@ -103,7 +106,10 @@ export class MediaSlots {
 
     const osp = raw.object_story_spec || {};
     if (raw.object_story_id) {
-      return slots;
+      return slots.map((slot) => ({
+        ...slot,
+        expectedSha256: this.getMediaSha256ForFile(slot.expectedFileName),
+      }));
     }
     if (osp.video_data?.video_id) {
       const videoId = String(osp.video_data.video_id);
@@ -179,7 +185,17 @@ export class MediaSlots {
         }
       });
     }
-    return slots;
+    return slots.map((slot) => ({
+      ...slot,
+      expectedSha256: this.getMediaSha256ForFile(slot.expectedFileName),
+    }));
+  }
+
+  getMediaSha256ForFile(fileName) {
+    return getPackageMediaSha256(
+      this.dependencies.state.importPackage,
+      fileName,
+    );
   }
 
   getMediaSlotsFromPackage(packageData) {
@@ -235,16 +251,44 @@ export class MediaSlots {
     return `expected:${String(expectedFileName || "")}`;
   }
 
+  /** First file in the map whose name matches ignoring the extension. */
+  findMediaFileByBaseName(mediaFiles, fileName) {
+    if (!mediaFiles || typeof mediaFiles.keys !== "function") return null;
+    const base = String(fileName || "")
+      .replace(/\.[^.\\/]+$/, "")
+      .toLowerCase();
+    if (!base) return null;
+    for (const key of mediaFiles.keys()) {
+      const keyBase = String(key || "")
+        .replace(/\.[^.\\/]+$/, "")
+        .toLowerCase();
+      if (keyBase === base) return mediaFiles.get(key);
+    }
+    return null;
+  }
+
   getDefaultMediaFile(
     slot,
     mediaOverrides = this.dependencies.state.importMediaOverrides,
     mediaFiles = this.dependencies.state.importMediaFiles,
+    mediaHashes = this.dependencies.state.importMediaHashes,
   ) {
     const { getSharedMediaOverrideKey } = this;
+    const expectedSha256 =
+      slot.expectedSha256 || this.getMediaSha256ForFile(slot.expectedFileName);
+    // Exports name slots `.jpg` while Meta serves WebP, so a local
+    // `tel__image_01.webp` still satisfies the `tel__image_01.jpg` slot. A hash
+    // match stays stronger than any name match.
+    const byBase = this.findMediaFileByBaseName(
+      mediaFiles,
+      slot.expectedFileName,
+    );
     return (
       mediaOverrides.get(slot.key) ||
       mediaOverrides.get(getSharedMediaOverrideKey(slot.expectedFileName)) ||
+      (expectedSha256 ? mediaHashes?.get(expectedSha256) : null) ||
       mediaFiles.get(slot.expectedFileName) ||
+      byBase ||
       null
     );
   }
@@ -321,10 +365,14 @@ export class MediaSlots {
     const { state } = this.dependencies;
     const { getSharedMediaOverrideKey } = this;
     const mappedKey = (fnMap && fnMap[originalKey]) || originalKey;
+    const expectedSha256 =
+      this.getMediaSha256ForFile(mappedKey) ||
+      this.getMediaSha256ForFile(originalKey);
     return (
       state.importMediaOverrides.get(mediaKey) ||
       state.importMediaOverrides.get(getSharedMediaOverrideKey(mappedKey)) ||
       state.importMediaOverrides.get(getSharedMediaOverrideKey(originalKey)) ||
+      (expectedSha256 ? state.importMediaHashes?.get(expectedSha256) : null) ||
       state.importMediaFiles.get(mappedKey) ||
       state.importMediaFiles.get(originalKey) ||
       null

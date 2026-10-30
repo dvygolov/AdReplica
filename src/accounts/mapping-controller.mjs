@@ -203,6 +203,10 @@ export class MappingController {
       options.mediaOverrides instanceof Map
         ? new Map(options.mediaOverrides)
         : new Map();
+    state.importMediaHashes =
+      options.mediaHashes instanceof Map
+        ? new Map(options.mediaHashes)
+        : new Map();
     state.importAsDraft = options.asDraft ?? true;
     state.importStatus = options.status ?? "PAUSED";
     state.importPreserveSchedule = options.preserveSchedule ?? false;

@@ -31,7 +31,8 @@ Then open Facebook Ads Manager and click the bookmark.
 
 ## Features
 
-- Export campaign JSON and related media for repeatable imports and comparisons.
+- Export campaign JSON and related media for repeatable imports and comparisons; media manifests carry real MIME names and SHA-256 hashes.
+- Match imported media by file contents even after manual renaming, while keeping filename compatibility for older packages.
 - Import into draft, paused, or active mode through Ads Manager Graph/draft flows.
 - Clone source campaigns into another ad account without saving intermediate files.
 - Remap Facebook Pages, Page Backed Instagram identities, pixels, catalogs, and product sets.

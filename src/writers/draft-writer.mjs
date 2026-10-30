@@ -17,6 +17,7 @@ import {
 } from "../domain/draft-values.mjs";
 import { deepClone } from "../utils/object.mjs";
 import { resolveMutuallyExclusiveStoryImageFields } from "../domain/creative.mjs";
+import { canReuseSourceAssetFeedId } from "../domain/package.mjs";
 import {
   isGenericAdCreativeCreateFailure,
   summarizeCreativePayload,
@@ -220,7 +221,10 @@ export class DraftWriter {
     if (adset.destination_type) {
       values.push(draftItem("destination_type", adset.destination_type));
     }
-    if (adset.asset_feed_id) {
+    if (
+      adset.asset_feed_id &&
+      canReuseSourceAssetFeedId(state.importPackage, accountId)
+    ) {
       values.push(draftItem("asset_feed_id", adset.asset_feed_id));
     }
     for (const [field, value] of Object.entries({
@@ -265,13 +269,6 @@ export class DraftWriter {
     }
     if (adset.pacing_type && !hasAdsetDayParting(adset)) {
       values.push(draftJsonItem("pacing_type", adset.pacing_type));
-    }
-    if (
-      adset.creative_sequence !== undefined &&
-      adset.creative_sequence !== null &&
-      adset.creative_sequence !== ""
-    ) {
-      values.push(draftValueItem("creative_sequence", adset.creative_sequence));
     }
     if (adset.dynamic_ad_voice) {
       values.push(draftItem("dynamic_ad_voice", adset.dynamic_ad_voice));

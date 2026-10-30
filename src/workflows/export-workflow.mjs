@@ -1,5 +1,6 @@
 import { sleep } from "../utils/object.mjs";
 import { sanitizeFileName } from "../utils/string.mjs";
+import { sha256Blob } from "../media/media-hashes.mjs";
 
 /** ExportWorkflow. Dependencies are supplied by the application composition root. */
 export class ExportWorkflow {
@@ -29,22 +30,7 @@ export class ExportWorkflow {
         state.exportAccountId,
         state.exportCampaignId,
       );
-      const jsonBlob = new Blob(
-        [
-          JSON.stringify(
-            {
-              ...packageData,
-              _downloadQueue: undefined,
-            },
-            null,
-            2,
-          ),
-        ],
-        { type: "application/json" },
-      );
-
       const jsonFileName = `${sanitizeFileName(packageData.source.campaignName)}.json`;
-      triggerDownload(jsonFileName, jsonBlob);
       if (state.operationReport) {
         state.operationReport.campaignName = packageData.source.campaignName;
         state.operationReport.exported = {
@@ -61,11 +47,13 @@ export class ExportWorkflow {
       for (const file of packageData._downloadQueue) {
         log("info", `Downloading ${file.fileName}...`);
         let blob;
+        let sha256 = "";
         try {
           if (!file.sourceUrl) {
             throw new Error("No source URL.");
           }
           blob = await downloadFile(file.sourceUrl, file.fileName);
+          sha256 = await sha256Blob(blob);
         } catch (downloadError) {
           const decision = await askMediaDownloadFailureDecision(
             file,
@@ -102,10 +90,55 @@ export class ExportWorkflow {
             `Meta served ${file.fileName} as ${savedName}; saving it under the real format.`,
           );
         }
+        const manifestEntry = packageData.files.find(
+          (item) => item.fileName === file.fileName,
+        );
+        if (manifestEntry) {
+          manifestEntry.originalFileName = file.fileName;
+          manifestEntry.fileName = savedName;
+          manifestEntry.mediaId = `sha256:${sha256}`;
+          manifestEntry.sha256 = sha256;
+          manifestEntry.mimeType = blob.type || "application/octet-stream";
+          manifestEntry.sourceId = file.sourceId || "";
+          manifestEntry.sourceKind = file.sourceKind || "";
+        }
+        for (const [originalName, friendlyName] of Object.entries(
+          packageData.fileNameMap || {},
+        )) {
+          if (friendlyName === file.fileName) {
+            packageData.fileNameMap[originalName] = savedName;
+          }
+        }
         triggerDownload(savedName, blob);
         downloadedMediaCount += 1;
         await sleep(250);
       }
+
+      for (const failed of failedDownloads) {
+        const manifestEntry = packageData.files.find(
+          (item) => item.fileName === failed.fileName,
+        );
+        if (manifestEntry) {
+          manifestEntry.missing = true;
+          manifestEntry.exportError = failed.error;
+        }
+      }
+      // Write the package last: its filenames and hashes now describe the bytes
+      // that were actually saved, including Meta's JPEG-to-WebP responses.
+      const jsonBlob = new Blob(
+        [
+          JSON.stringify(
+            {
+              ...packageData,
+              _downloadQueue: undefined,
+            },
+            null,
+            2,
+          ),
+        ],
+        { type: "application/json" },
+      );
+      triggerDownload(jsonFileName, jsonBlob);
 
       if (packageData.warnings.length) {
         packageData.warnings.forEach((warning) => log("warn", warning));

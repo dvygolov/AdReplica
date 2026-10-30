@@ -9,6 +9,7 @@ import {
   normalizeScheduleValue,
 } from "../domain/schedule.mjs";
 import { deepClone } from "../utils/object.mjs";
+import { canReuseSourceAssetFeedId } from "../domain/package.mjs";
 
 /** DirectWriter. Dependencies are supplied by the application composition root. */
 export class DirectWriter {
@@ -17,6 +18,8 @@ export class DirectWriter {
     this.createCampaign = this.createCampaign.bind(this);
     this.createAdset = this.createAdset.bind(this);
     this.createAd = this.createAd.bind(this);
+    this.updateAdsetCreativeSequence =
+      this.updateAdsetCreativeSequence.bind(this);
     this.activateCampaign = this.activateCampaign.bind(this);
   }
 
@@ -96,7 +99,10 @@ export class DirectWriter {
     if (adset.destination_type) {
       body.destination_type = adset.destination_type;
     }
-    if (adset.asset_feed_id) {
+    if (
+      adset.asset_feed_id &&
+      canReuseSourceAssetFeedId(state.importPackage, accountId)
+    ) {
       body.asset_feed_id = adset.asset_feed_id;
     }
     for (const [field, value] of Object.entries({
@@ -139,13 +145,6 @@ export class DirectWriter {
     }
     if (adset.pacing_type && !hasAdsetDayParting(adset)) {
       body.pacing_type = adset.pacing_type;
-    }
-    if (
-      adset.creative_sequence !== undefined &&
-      adset.creative_sequence !== null &&
-      adset.creative_sequence !== ""
-    ) {
-      body.creative_sequence = adset.creative_sequence;
     }
     if (adset.dynamic_ad_voice) {
       body.dynamic_ad_voice = adset.dynamic_ad_voice;
@@ -217,6 +216,13 @@ export class DirectWriter {
       parentId: String(adsetId),
     });
     return String(json.id);
+  }
+
+  async updateAdsetCreativeSequence(adsetId, creativeSequence) {
+    await this.dependencies.graphClient.graphFetch(String(adsetId), {
+      method: "POST",
+      body: { creative_sequence: creativeSequence },
+    });
   }
 
   async activateCampaign(campaignId) {
