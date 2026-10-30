@@ -204,6 +204,8 @@ export class CampaignController {
       }
       renderUI();
       log("info", `Campaigns found: ${state.exportCampaigns.length}`);
+      // The first campaign is preselected: show its package without a click.
+      void this.loadExportPreview();
     } catch (error) {
       log("error", "Failed to load campaigns.", String(error));
     } finally {

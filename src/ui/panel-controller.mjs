@@ -662,6 +662,10 @@ export class PanelController {
       }
     };
 
+    // A stored export campaign deserves its stats straight away.
+    if (state.exportAccountId && state.exportCampaignId) {
+      void loadExportPreview();
+    }
     applyCloneSourceKind(state.cloneSourceKind);
 
     // Creatives for a JSON package: the operator drops the files exported next
