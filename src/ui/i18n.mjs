@@ -134,6 +134,7 @@ const DICT = {
     "job.cancelled": "cancelled",
 
     "export.hint": "Export saves the campaign JSON and its media files.",
+    "export.loading": "Loading the campaign package…",
     "import.hint": "Import recreates the campaign in the selected account.",
     "import.json": "Export JSON file",
 
@@ -316,6 +317,7 @@ const DICT = {
     "job.cancelled": "отменён",
 
     "export.hint": "Экспорт сохраняет JSON кампании и её медиафайлы.",
+    "export.loading": "Загружаем пакет кампании…",
     "import.hint": "Импорт воссоздаёт кампанию в выбранном кабинете.",
     "import.json": "JSON-файл экспорта",
 

@@ -37,6 +37,7 @@ export class PanelController {
       refreshCloneSourceContext,
       loadCloneSourceCampaigns,
       loadExportCampaigns,
+      loadExportPreview,
     } = this.dependencies.campaignController;
     const { exportSelectedCampaign } = this.dependencies.exportWorkflow;
     const { massCloneController } = this.dependencies;
@@ -103,6 +104,7 @@ export class PanelController {
                   <select id="${APP_ID}-export-campaign"></select>
                 </label>
               </div>
+              <div class="sk-stats" id="${APP_ID}-export-package-summary"></div>
               <div class="sk-bar">
                 <div class="sk-hint">${t("export.hint")}</div>
                 <div class="sk-bar-right">
@@ -281,6 +283,9 @@ export class PanelController {
     dom.exportAccountSelect = root.querySelector(`#${APP_ID}-export-account`);
     dom.importAccountSelect = root.querySelector(`#${APP_ID}-import-account`);
     dom.exportCampaignSelect = root.querySelector(`#${APP_ID}-export-campaign`);
+    dom.exportPackageSummary = root.querySelector(
+      `#${APP_ID}-export-package-summary`,
+    );
     dom.importMappings = root.querySelector(`#${APP_ID}-import-mappings`);
     dom.importCampaignName = root.querySelector(
       `#${APP_ID}-import-campaign-name`,
@@ -586,9 +591,13 @@ export class PanelController {
       state.exportAccountId = event.target.value;
       state.exportCampaignId = "";
       state.exportCampaigns = [];
+      state.exportPreview = null;
+      state.exportPreviewKey = "";
       renderUI();
       if (state.exportAccountId) {
         await loadExportCampaigns();
+        // The first campaign is preselected, so show its package right away.
+        void loadExportPreview();
       }
     });
     dom.importAccountSelect.addEventListener("change", async (event) => {
@@ -599,6 +608,7 @@ export class PanelController {
     dom.exportCampaignSelect.addEventListener("change", (event) => {
       state.exportCampaignId = event.target.value;
       renderButtons();
+      void loadExportPreview();
     });
     root
       .querySelector(`#${APP_ID}-import-json`)

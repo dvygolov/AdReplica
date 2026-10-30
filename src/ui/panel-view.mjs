@@ -88,6 +88,7 @@ export class PanelView {
       renderCloneMappings,
       renderCloneMedia,
     } = this.dependencies.mappingsView;
+    const { renderExportSource } = this.dependencies.massCloneView;
     const {
       importRequiresDraftOnly,
       cloneRequiresDraftOnly,
@@ -203,6 +204,7 @@ export class PanelView {
     renderImportMappings();
     renderCloneMappings();
     renderCloneMedia();
+    renderExportSource();
     this.dependencies.massCloneView.render();
     renderButtons();
   }

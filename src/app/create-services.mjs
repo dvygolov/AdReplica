@@ -344,6 +344,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       get cloneWorkflow() {
         return services.cloneWorkflow;
       },
+      get campaignExporter() {
+        return services.campaignExporter;
+      },
     });
   services.campaignExporter =
     overrides.campaignExporter ||

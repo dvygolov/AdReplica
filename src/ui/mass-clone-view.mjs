@@ -11,6 +11,51 @@ const JOB_LABELS = {
   cancelled: "job.cancelled",
 };
 
+/**
+ * Package stats shared by the Clone source block and the Export tab, so both
+ * screens describe a campaign the same way.
+ */
+export function buildPackageStatsHtml(data) {
+  const adsets = Array.isArray(data?.adsets) ? data.adsets : [];
+  const ads = Array.isArray(data?.ads) ? data.ads : [];
+  const media = Array.isArray(data?._downloadQueue) ? data._downloadQueue : [];
+  const creatives = new Set(
+    ads.map((ad) => ad?.creative?.id || ad?.creative_id || "").filter(Boolean),
+  );
+  const catalogs = Array.isArray(data?.catalogs) ? data.catalogs : [];
+  const currency = String(
+    data?.source?.currency || data?.campaign?.currency || "",
+  ).toUpperCase();
+  const budget = adsets.reduce(
+    (sum, adset) => sum + Number(adset?.daily_budget || 0),
+    0,
+  );
+  const stat = (value, label, hint = "") =>
+    `<div class="sk-stat"${
+      hint ? ` title="${escapeHtml(hint)}"` : ""
+    }><b>${escapeHtml(String(value))}</b><span>${escapeHtml(label)}</span></div>`;
+  return [
+    stat(adsets.length, statLabel("stat.adsets", adsets.length)),
+    stat(ads.length, statLabel("stat.ads", ads.length)),
+    stat(
+      creatives.size || ads.length,
+      statLabel("stat.creatives", creatives.size || ads.length),
+    ),
+    stat(media.length, statLabel("stat.media", media.length)),
+    stat(
+      `${currency ? `${currency} ` : ""}${(budget / 100).toFixed(2)}`,
+      t("stat.budget"),
+    ),
+    stat(
+      catalogs.length,
+      statLabel("stat.catalogs", catalogs.length),
+      catalogs
+        .map((catalog) => `${catalog.name || "—"} · ${catalog.id}`)
+        .join("\n"),
+    ),
+  ].join("");
+}
+
 /** Renders the clone tab: target table with per-account page/pixel/catalog and the run screen. */
 export class MassCloneView {
   constructor(dependencies) {
@@ -19,6 +64,7 @@ export class MassCloneView {
     this.renderTargets = this.renderTargets.bind(this);
     this.renderProgress = this.renderProgress.bind(this);
     this.renderSource = this.renderSource.bind(this);
+    this.renderExportSource = this.renderExportSource.bind(this);
   }
 
   /**
@@ -205,6 +251,24 @@ export class MassCloneView {
     </td>`;
   }
 
+  /** Export tab: the same stats, with its own loading line. */
+  renderExportSource() {
+    const { state, dom } = this.dependencies;
+    const box = dom.exportPackageSummary;
+    if (!box) return;
+    if (state.exportPreviewLoading) {
+      box.innerHTML = `<div class="sk-stat sk-stat-note"><span class="sk-spin-dot" aria-hidden="true"></span><span>${escapeHtml(
+        t("export.loading"),
+      )}</span></div>`;
+      return;
+    }
+    if (!state.exportPreview) {
+      box.innerHTML = "";
+      return;
+    }
+    box.innerHTML = buildPackageStatsHtml(state.exportPreview);
+  }
+
   renderSource() {
     const { state, dom } = this.dependencies;
     const box = dom.clonePackageSummary;
@@ -220,48 +284,18 @@ export class MassCloneView {
         : "";
       return;
     }
-    const adsets = Array.isArray(data.adsets) ? data.adsets : [];
-    const ads = Array.isArray(data.ads) ? data.ads : [];
-    const media = Array.isArray(data._downloadQueue) ? data._downloadQueue : [];
-    const creatives = new Set(
-      ads
-        .map((ad) => ad?.creative?.id || ad?.creative_id || "")
-        .filter(Boolean),
-    );
-    const catalogs = Array.isArray(data.catalogs) ? data.catalogs : [];
-    const currency = this.sourceCurrency();
-    const budget = adsets.reduce(
-      (sum, adset) => sum + Number(adset?.daily_budget || 0),
-      0,
-    );
-    const stat = (value, label, hint = "") =>
-      `<div class="sk-stat"${
-        hint ? ` title="${escapeHtml(hint)}"` : ""
-      }><b>${escapeHtml(String(value))}</b><span>${escapeHtml(
-        label,
-      )}</span></div>`;
-    box.innerHTML = [
-      stat(adsets.length, statLabel("stat.adsets", adsets.length)),
-      stat(ads.length, statLabel("stat.ads", ads.length)),
-      stat(
-        creatives.size || ads.length,
-        statLabel("stat.creatives", creatives.size || ads.length),
-      ),
-      stat(media.length, statLabel("stat.media", media.length)),
-      stat(
-        `${currency ? `${currency} ` : ""}${(budget / 100).toFixed(2)}`,
-        t("stat.budget"),
-      ),
-      stat(
-        catalogs.length,
-        statLabel("stat.catalogs", catalogs.length),
-        catalogs
-          .map((catalog) => `${catalog.name || "—"} · ${catalog.id}`)
-          .join("\n"),
-      ),
-    ].join("");
+    box.innerHTML = buildPackageStatsHtml(data);
 
     if (dom.cloneSummary) {
+      const adsets = Array.isArray(data.adsets) ? data.adsets : [];
+      const ads = Array.isArray(data.ads) ? data.ads : [];
+      const currency = String(
+        data?.source?.currency || data?.campaign?.currency || "",
+      ).toUpperCase();
+      const budget = adsets.reduce(
+        (sum, adset) => sum + Number(adset?.daily_budget || 0),
+        0,
+      );
       const campaignName =
         data.campaign?.name ||
         state.cloneCampaignName ||

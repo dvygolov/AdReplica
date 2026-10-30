@@ -10,8 +10,7 @@ export class DownloadService {
     this.createRemoteMediaFile = this.createRemoteMediaFile.bind(this);
     this.getUrlDiagnosticLabel = this.getUrlDiagnosticLabel.bind(this);
     this.downloadFile = this.downloadFile.bind(this);
-    this.triggerBrowserNativeDownload =
-      this.triggerBrowserNativeDownload.bind(this);
+    this.getFileNameForBlob = this.getFileNameForBlob.bind(this);
     this.triggerDownload = this.triggerDownload.bind(this);
   }
 
@@ -90,20 +89,29 @@ export class DownloadService {
     );
   }
 
-  triggerBrowserNativeDownload(file) {
-    if (!file?.sourceUrl || !document.body) {
-      return false;
-    }
-    const link = document.createElement("a");
-    link.href = file.sourceUrl;
-    link.download = file.fileName || file.name || "";
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => link.remove(), 1500);
-    return true;
+  /**
+   * Meta serves creatives as WebP even when the export names them `.jpg`, and
+   * browsers then save a `.webp` file under a `.jpg` name. Rename the file to
+   * what the bytes actually are, so the folder matches reality.
+   */
+  getFileNameForBlob(fileName, blob) {
+    const name = String(fileName || "media");
+    const type = String(blob?.type || "").toLowerCase();
+    const byType = {
+      "image/webp": ".webp",
+      "image/jpeg": ".jpg",
+      "image/jpg": ".jpg",
+      "image/png": ".png",
+      "image/gif": ".gif",
+      "video/mp4": ".mp4",
+      "video/quicktime": ".mov",
+      "video/webm": ".webm",
+    };
+    const wanted = byType[type];
+    if (!wanted) return name;
+    const match = name.match(/^(.*?)(\.[A-Za-z0-9]{2,5})?$/);
+    const base = (match?.[1] || name).trim() || "media";
+    return `${base}${wanted}`;
   }
 
   triggerDownload(fileName, blob) {

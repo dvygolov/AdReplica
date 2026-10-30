@@ -20,7 +20,6 @@ export class Dialogs {
   }
 
   askMediaDownloadFailureDecision(file, error) {
-    const { triggerBrowserNativeDownload } = this.dependencies.downloadService;
     const fileName = file?.fileName || file?.name || "media file";
     const details = [
       `File: ${fileName}`,
@@ -29,8 +28,6 @@ export class Dialogs {
       file?.sourceId ? `Source ID: ${file.sourceId}` : "",
       `Error: ${String(error?.message || error || "unknown error")}`,
     ].filter(Boolean);
-    const canTryBrowserDownload = Boolean(file?.sourceUrl && document.body);
-
     if (!document.body) {
       return Promise.resolve(
         window.confirm(
@@ -59,9 +56,8 @@ export class Dialogs {
         <div style="width:min(520px,calc(100vw - 32px));background:#111827;color:#f9fafb;border:1px solid rgba(255,255,255,.18);border-radius:8px;box-shadow:0 24px 70px rgba(0,0,0,.35);padding:18px;">
           <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Can't download creative</div>
           <div style="font-size:13px;line-height:1.45;white-space:pre-wrap;color:#d1d5db;margin-bottom:14px;">${escapeHtml(details.join("\n"))}</div>
-          <div style="font-size:13px;color:#f9fafb;margin-bottom:14px;">Try browser download, or continue downloading the remaining files?</div>
+          <div style="font-size:13px;color:#f9fafb;margin-bottom:14px;">Continue with the remaining media files, or stop the export?</div>
           <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
-            ${canTryBrowserDownload ? '<button type="button" data-choice="browser" style="padding:7px 12px;border-radius:6px;border:1px solid #fbbf24;background:#fbbf24;color:#1f2937;font-weight:700;cursor:pointer;">Browser download</button>' : ""}
             <button type="button" data-choice="yes" style="padding:7px 12px;border-radius:6px;border:1px solid #22c55e;background:#22c55e;color:#052e16;font-weight:700;cursor:pointer;">Yes</button>
             <button type="button" data-choice="no" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.24);background:#1f2937;color:#f9fafb;font-weight:700;cursor:pointer;">No</button>
             <button type="button" data-choice="cancel" style="padding:7px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.24);background:transparent;color:#f9fafb;font-weight:700;cursor:pointer;">Cancel</button>
@@ -83,19 +79,11 @@ export class Dialogs {
         const target = event.target instanceof Element ? event.target : null;
         const button = target?.closest("button[data-choice]");
         if (!button) return;
-        const choice = button.dataset.choice || "cancel";
-        if (choice === "browser") {
-          triggerBrowserNativeDownload(file);
-        }
-        cleanup(choice);
+        cleanup(button.dataset.choice || "cancel");
       });
       document.addEventListener("keydown", onKeydown);
       document.body.appendChild(overlay);
-      overlay
-        .querySelector(
-          "button[data-choice='browser'],button[data-choice='yes']",
-        )
-        ?.focus();
+      overlay.querySelector("button[data-choice='yes']")?.focus();
     });
   }
 

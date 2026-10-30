@@ -7,6 +7,7 @@ export class CampaignController {
     this.loadCampaignsIntoState = this.loadCampaignsIntoState.bind(this);
     this.loadCloneSourceCampaigns = this.loadCloneSourceCampaigns.bind(this);
     this.loadExportCampaigns = this.loadExportCampaigns.bind(this);
+    this.loadExportPreview = this.loadExportPreview.bind(this);
   }
 
   async refreshCloneSourceContext() {
@@ -107,6 +108,56 @@ export class CampaignController {
       log("error", "Failed to load clone source campaigns.", String(error));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * The export tab shows the same package stats as the clone tab, so the
+   * operator sees what the JSON will contain before writing any files.
+   * The package is cached per account+campaign: re-picking the same pair is free.
+   */
+  async loadExportPreview() {
+    const { state } = this.dependencies;
+    const { log } = this.dependencies.logging;
+    const { renderUI } = this.dependencies.panelView;
+    const exporter = this.dependencies.campaignExporter;
+    const accountId = String(state.exportAccountId || "");
+    const campaignId = String(state.exportCampaignId || "");
+    if (!accountId || !campaignId || !exporter?.fetchCampaignExportPackage) {
+      state.exportPreview = null;
+      state.exportPreviewKey = "";
+      renderUI();
+      return;
+    }
+    const key = `${accountId}:${campaignId}`;
+    if (state.exportPreviewKey === key && state.exportPreview) {
+      renderUI();
+      return;
+    }
+    state.exportPreview = null;
+    state.exportPreviewKey = key;
+    state.exportPreviewLoading = true;
+    renderUI();
+    try {
+      const preview = await exporter.fetchCampaignExportPackage(
+        accountId,
+        campaignId,
+      );
+      if (state.exportPreviewKey !== key) return;
+      state.exportPreview = preview;
+    } catch (error) {
+      if (state.exportPreviewKey !== key) return;
+      state.exportPreview = null;
+      log(
+        "warn",
+        "Could not build the export preview for this campaign.",
+        String(error),
+      );
+    } finally {
+      if (state.exportPreviewKey === key) {
+        state.exportPreviewLoading = false;
+        renderUI();
+      }
     }
   }
 

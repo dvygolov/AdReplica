@@ -37,6 +37,10 @@ export class AdReplicaState {
     this.cloneSourceAccountId = "";
     this.cloneSourceCampaignId = "";
     this.cloneSourceCampaigns = [];
+    // Export tab preview: the package stats shown before the files are written.
+    this.exportPreview = null;
+    this.exportPreviewKey = "";
+    this.exportPreviewLoading = false;
     this.cloneSourceKind = "campaign";
     this.cloneJsonFileName = "";
     this.cloneMediaFiles = new Map();

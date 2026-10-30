@@ -14,7 +14,7 @@ export class ExportWorkflow {
     const { setBusy } = this.dependencies.panelView;
     const { initializeSession } = this.dependencies.sessionService;
     const { fetchCampaignExportPackage } = this.dependencies.campaignExporter;
-    const { getUrlDiagnosticLabel, downloadFile, triggerDownload } =
+    const { downloadFile, getFileNameForBlob, triggerDownload } =
       this.dependencies.downloadService;
     const { askMediaDownloadFailureDecision } = this.dependencies.dialogs;
     if (!state.exportAccountId || !state.exportCampaignId) {
@@ -57,7 +57,6 @@ export class ExportWorkflow {
       await sleep(150);
 
       const failedDownloads = [];
-      const browserNativeDownloads = [];
       let downloadedMediaCount = 0;
       for (const file of packageData._downloadQueue) {
         log("info", `Downloading ${file.fileName}...`);
@@ -72,26 +71,6 @@ export class ExportWorkflow {
             file,
             downloadError,
           );
-          if (decision === "browser") {
-            state.operationReport?.issue(
-              `Browser download needs verification: ${file.fileName}`,
-              { uncertain: true },
-            );
-            browserNativeDownloads.push({
-              fileName: file.fileName,
-              type: file.type || "",
-              sourceKind: file.sourceKind || "",
-              sourceId: file.sourceId || "",
-              error: String(downloadError?.message || downloadError),
-            });
-            log(
-              "warn",
-              `Opened browser-native download after fetch failed: ${file.fileName}.`,
-              `${getUrlDiagnosticLabel(file.sourceUrl)} | ${String(downloadError?.message || downloadError)}`,
-            );
-            await sleep(250);
-            continue;
-          }
           state.operationReport?.skip(
             { name: file.fileName },
             String(downloadError),
@@ -116,7 +95,14 @@ export class ExportWorkflow {
             `Export ${action} after failed media download: ${file.fileName}. ${String(downloadError?.message || downloadError)}`,
           );
         }
-        triggerDownload(file.fileName, blob);
+        const savedName = getFileNameForBlob(file.fileName, blob);
+        if (savedName !== file.fileName) {
+          log(
+            "info",
+            `Meta served ${file.fileName} as ${savedName}; saving it under the real format.`,
+          );
+        }
+        triggerDownload(savedName, blob);
         downloadedMediaCount += 1;
         await sleep(250);
       }
@@ -138,20 +124,11 @@ export class ExportWorkflow {
           failedDownloads,
         );
       }
-      if (browserNativeDownloads.length) {
-        log(
-          "warn",
-          `Browser-native downloads opened for ${browserNativeDownloads.length} media file(s); browser may choose its own filename for cross-origin files.`,
-          browserNativeDownloads,
-        );
-      }
-      const openedMediaCount =
-        downloadedMediaCount + browserNativeDownloads.length;
       log(
         "info",
-        `Export complete. Files downloaded by AdReplica: ${downloadedMediaCount + 1}/${packageData.files.length + 1}. Browser-native media opened: ${browserNativeDownloads.length}. Total media handled: ${openedMediaCount}/${packageData.files.length}`,
+        `Export complete. Files downloaded by AdReplica: ${downloadedMediaCount + 1}/${packageData.files.length + 1}. Total media handled: ${downloadedMediaCount}/${packageData.files.length}`,
       );
-      return !failedDownloads.length && !browserNativeDownloads.length;
+      return !failedDownloads.length;
     } catch (error) {
       state.operationReport?.issue(String(error), {
         uncertain: Boolean(error?.uncertain),
