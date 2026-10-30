@@ -1,3 +1,5 @@
+import { getSourceCatalogsFromPackage } from "../domain/package.mjs";
+
 /** Binds the clone tab: target selection, per-account page/pixel/catalog, run, reset. */
 export class MassCloneController {
   constructor(dependencies) {
@@ -92,7 +94,15 @@ export class MassCloneController {
     const service = this.dependencies.accountContextService;
     if (!service?.fetchAccountContext) return null;
     try {
-      return await service.fetchAccountContext(accountId);
+      // A package without catalogs must not produce Business Manager notes in
+      // the log: they read as if something were wrong with the target account.
+      const packageData = this.dependencies.state?.clonePackage;
+      const needsCatalogs = packageData
+        ? getSourceCatalogsFromPackage(packageData).length > 0
+        : true;
+      return await service.fetchAccountContext(accountId, {
+        quiet: !needsCatalogs,
+      });
     } catch (error) {
       this.dependencies.logging.log(
         "warn",

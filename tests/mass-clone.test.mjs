@@ -378,14 +378,14 @@ test("a transient draft publishing error retries the target once", async () => {
       state.lastOperationReport = {
         status: "partial",
         created: [{ type: "ad", id: "a-t", draftId: "draft-t" }],
-        issues: [{ message: "No Payment Method" }],
+        issues: [{ message: "Draft publishing error, retry the write" }],
         validation: {
           invalid: 1,
           errors: [
             {
               ad_object_type: "ad",
               active_errors: [
-                { error_type: "AD_DRAFT_PUBLISHING", error_code: 1359188 },
+                { error_type: "AD_DRAFT_PUBLISHING", error_code: 999 },
               ],
             },
           ],
@@ -409,6 +409,53 @@ test("a transient draft publishing error retries the target once", async () => {
   assert.ok(
     deleted.includes("draft:111:draft-t"),
     "the broken draft is cleared",
+  );
+});
+
+test("a missing payment method is not retried", async () => {
+  const { workflow, state, calls } = createHarness();
+  workflow.dependencies.runOperation = async () => {
+    calls.push({ accountId: state.cloneTargetAccountId });
+    state.lastOperationReport = {
+      status: "partial",
+      created: [{ type: "ad", id: "a-t", draftId: "draft-t" }],
+      issues: [
+        {
+          message:
+            "L2A5: ad account has no payment method (Meta error 1359188): No Payment Method.",
+        },
+      ],
+      validation: {
+        invalid: 1,
+        errors: [
+          {
+            ad_object_type: "ad",
+            active_errors: [
+              {
+                error_type: "AD_DRAFT_PUBLISHING",
+                error_code: 1359188,
+                error_summary: "No Payment Method",
+              },
+            ],
+          },
+        ],
+      },
+    };
+    return false;
+  };
+  await workflow.run();
+  const byAccount = new Map();
+  for (const call of calls) {
+    byAccount.set(call.accountId, (byAccount.get(call.accountId) || 0) + 1);
+  }
+  for (const [accountId, count] of byAccount) {
+    assert.equal(count, 1, `act_${accountId} is tried exactly once`);
+  }
+  const failed = state.massResults.filter((row) => row.status === "failed");
+  assert.ok(failed.length >= 1, "the billing target is reported as failed");
+  assert.ok(
+    failed.every((row) => row.retried !== true),
+    "no billing target is retried",
   );
 });
 

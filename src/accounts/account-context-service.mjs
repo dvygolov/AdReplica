@@ -14,7 +14,8 @@ export class AccountContextService {
       this.invalidateAccountContextCache.bind(this);
   }
 
-  async fetchAdAccountBusiness(accountId) {
+  async fetchAdAccountBusiness(accountId, options = {}) {
+    const { quiet = false } = options;
     const { log } = this.dependencies.logging;
     const { graphFetch } = this.dependencies.graphClient;
     const normalizedAccountId = String(accountId || "").replace(/^act_/, "");
@@ -45,10 +46,12 @@ export class AccountContextService {
           source: "owner_business",
         };
       }
-      log(
-        "info",
-        `No Business Manager is visible on act_${normalizedAccountId}; catalog campaign clone/import will be blocked for this target.`,
-      );
+      if (!quiet) {
+        log(
+          "info",
+          `No Business Manager is visible on act_${normalizedAccountId}; catalog campaign clone/import will be blocked for this target.`,
+        );
+      }
       return null;
     } catch (error) {
       const level = isPermissionDeniedGraphError(error) ? "info" : "warn";
@@ -192,7 +195,10 @@ export class AccountContextService {
     );
   }
 
-  async fetchAccountContext(accountId) {
+  async fetchAccountContext(accountId, options = {}) {
+    // `quiet` silences the catalog chatter (no Business Manager, expanded list)
+    // for packages that carry no catalogs at all.
+    const { quiet = false } = options;
     const { state } = this.dependencies;
     const { log } = this.dependencies.logging;
     const { graphGetAll, graphPageGetAll } = this.dependencies.graphClient;
@@ -240,12 +246,14 @@ export class AccountContextService {
     const pixels = await graphGetAll(`act_${normalizedAccountId}/adspixels`, {
       fields: "id,name",
     });
-    const business = await fetchAdAccountBusiness(normalizedAccountId);
+    const business = await fetchAdAccountBusiness(normalizedAccountId, {
+      quiet,
+    });
     const businessCatalogs = await fetchBusinessCatalogs(business?.id || "");
     const eligibleCatalogs =
       await fetchEligibleCatalogsForAccount(normalizedAccountId);
     const catalogs = mergeCatalogLists(businessCatalogs, eligibleCatalogs);
-    if (eligibleCatalogs.length > businessCatalogs.length) {
+    if (!quiet && eligibleCatalogs.length > businessCatalogs.length) {
       log(
         "info",
         `Expanded target catalog list for act_${normalizedAccountId} via dpa_eligible_product_catalogs: ${businessCatalogs.length} -> ${catalogs.length}.`,

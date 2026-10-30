@@ -95,10 +95,17 @@ const FRAGMENT_ERROR_HINTS = new Map([
 ]);
 
 /**
- * Meta sometimes flags a freshly written draft ad with a publishing error
- * (for example `No Payment Method`, code 1359188) that clears on the next
- * validation pass. Those are worth one re-check; permission errors are not.
+ * Publishing errors that clear on their own are worth one re-check. Billing and
+ * permission errors never do: Meta keeps rejecting the same draft, so a retry
+ * only repeats the failure and doubles the created objects.
  */
+const NON_RETRYABLE_FRAGMENT_CODES = new Set([
+  1359188, // No Payment Method
+  1487194, // permission / invalid token
+  1815199, // ad account disabled
+]);
+const NON_RETRYABLE_FRAGMENT_HINTS = [/no payment method/i, /payment method/i];
+
 export function isTransientFragmentFailure(fragments) {
   const list = Array.isArray(fragments) ? fragments : [];
   if (!list.length) return false;
@@ -109,9 +116,13 @@ export function isTransientFragmentFailure(fragments) {
     if (!errors.length) return false;
     return errors.every((error) => {
       const code = Number(error?.error_code);
+      if (NON_RETRYABLE_FRAGMENT_CODES.has(code)) return false;
+      const text = `${error?.error_summary || ""} ${error?.error_description || ""}`;
+      if (NON_RETRYABLE_FRAGMENT_HINTS.some((hint) => hint.test(text))) {
+        return false;
+      }
       const type = String(error?.error_type || "");
-      if (code === 1487194) return false;
-      return type === "AD_DRAFT_PUBLISHING" || code === 1359188;
+      return type === "AD_DRAFT_PUBLISHING";
     });
   });
 }

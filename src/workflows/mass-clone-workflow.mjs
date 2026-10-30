@@ -313,6 +313,12 @@ export class MassCloneWorkflow {
     // that clears once the ad is written again. Roll the draft back and retry
     // the target once instead of dropping it from the batch.
     const transient = isTransientFragmentFailure(report?.validation?.errors);
+    if (!transient && report?.validation?.errors?.length) {
+      log(
+        "info",
+        `Mass clone: ${target.name} will not be retried; Meta rejects this draft for a reason a retry cannot fix (billing or permissions).`,
+      );
+    }
     if (transient) {
       log(
         "info",

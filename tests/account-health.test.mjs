@@ -142,14 +142,46 @@ test("fragment errors are deduplicated and empty input is safe", () => {
   assert.equal(duplicated.length, 1);
 });
 
-test("publishing errors that clear on a re-check are treated as transient", () => {
+test("a missing payment method is never treated as transient", () => {
   assert.equal(
     isTransientFragmentFailure([
       {
         ad_object_type: "ad",
         active_errors: [
-          { error_type: "AD_DRAFT_PUBLISHING", error_code: 1359188 },
+          {
+            error_type: "AD_DRAFT_PUBLISHING",
+            error_code: 1359188,
+            error_summary: "No Payment Method",
+          },
         ],
+      },
+    ]),
+    false,
+    "a billing error repeats identically, so it must not be retried",
+  );
+  assert.equal(
+    isTransientFragmentFailure([
+      {
+        ad_object_type: "ad",
+        active_errors: [
+          {
+            error_type: "AD_DRAFT_PUBLISHING",
+            error_summary: "No Payment Method",
+          },
+        ],
+      },
+    ]),
+    false,
+    "the message alone is enough to block the retry",
+  );
+});
+
+test("publishing errors that clear on a re-check are treated as transient", () => {
+  assert.equal(
+    isTransientFragmentFailure([
+      {
+        ad_object_type: "ad",
+        active_errors: [{ error_type: "AD_DRAFT_PUBLISHING", error_code: 999 }],
       },
     ]),
     true,
