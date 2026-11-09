@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { DownloadService } from "../src/media/download-service.mjs";
+import { CatalogDiscovery } from "../src/catalog/catalog-discovery.mjs";
 
 const service = new DownloadService({ logging: { log: () => {} } });
 
@@ -60,4 +61,66 @@ test("the failure dialog offers no browser download", async () => {
     "utf8",
   );
   assert.ok(!source.includes('data-choice="browser"'));
+});
+
+test("DPA hints recover a catalog creative that has no direct Graph references", () => {
+  const discovery = new CatalogDiscovery({ logging: { log() {} } });
+  const result = discovery.filterDpaCatalogHintsToPackageReferences(
+    {
+      campaign: {},
+      adsets: [],
+      ads: [],
+      creatives: [
+        {
+          id: "creative",
+          raw: { object_story_spec: { template_data: {} } },
+        },
+      ],
+    },
+    {
+      catalogs: [{ id: "1036526192410153", name: "hu_par_27" }],
+      productSets: [
+        {
+          id: "1606763334582799",
+          name: "All Products",
+          product_catalog: { id: "1036526192410153" },
+        },
+      ],
+    },
+  );
+  assert.equal(result.catalogs.length, 1);
+  assert.equal(result.catalogs[0].name, "hu_par_27");
+  assert.equal(result.productSets.length, 1);
+});
+
+test("a product_set_id without a catalog ID does not hide DPA catalog hints", () => {
+  const discovery = new CatalogDiscovery({ logging: { log() {} } });
+  const result = discovery.filterDpaCatalogHintsToPackageReferences(
+    {
+      campaign: {},
+      adsets: [],
+      ads: [],
+      creatives: [
+        {
+          id: "creative",
+          raw: {
+            product_set_id: "1606763334582799",
+            object_story_spec: { template_data: {} },
+          },
+        },
+      ],
+    },
+    {
+      catalogs: [{ id: "1036526192410153", name: "hu_par_27" }],
+      productSets: [
+        {
+          id: "2419700891847790",
+          name: "All Products",
+          product_catalog: { id: "1036526192410153" },
+        },
+      ],
+    },
+  );
+  assert.equal(result.catalogs.length, 1);
+  assert.equal(result.catalogs[0].id, "1036526192410153");
 });

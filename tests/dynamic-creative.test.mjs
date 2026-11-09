@@ -10,6 +10,7 @@ import {
   stripAssetFeedLabelIdsForImport,
 } from "../src/domain/creative.mjs";
 import { CreativeMedia } from "../src/creative/creative-media.mjs";
+import { CreativeValidator } from "../src/creative/creative-validator.mjs";
 import { createServices } from "../src/app/create-services.mjs";
 
 const logging = { log() {} };
@@ -103,10 +104,9 @@ test("creative sequence remaps arrays, JSON and object references", () => {
     "new-2",
     "new-1",
   ]);
-  assert.deepEqual(
-    remapCreativeSequence([{ creative_id: "old-1" }], map),
-    [{ creative_id: "new-1" }],
-  );
+  assert.deepEqual(remapCreativeSequence([{ creative_id: "old-1" }], map), [
+    { creative_id: "new-1" },
+  ]);
   assert.throws(
     () => remapCreativeSequence(["missing"], map),
     /no target creative was created/,
@@ -170,7 +170,11 @@ test("dynamic creative golden fixture keeps languages and rules but no source me
   stripAssetFeedLabelIdsForImport(afs);
   const payload = buildImportedCreativePayload(raw);
   assert.equal(payload.asset_feed_spec.bodies.length, 9);
-  assert.deepEqual(payload.asset_feed_spec.locales, ["en_US", "ru_RU", "de_DE"]);
+  assert.deepEqual(payload.asset_feed_spec.locales, [
+    "en_US",
+    "ru_RU",
+    "de_DE",
+  ]);
   assert.equal(
     payload.asset_feed_spec.asset_customization_rules[0].body_label.name,
     "ru",
@@ -184,7 +188,7 @@ test("dynamic creative golden fixture keeps languages and rules but no source me
   const serialized = JSON.stringify(payload);
   assert.ok(!serialized.includes("source-image"));
   assert.ok(!serialized.includes("source-video"));
-  assert.ok(!serialized.includes("label-rule\""));
+  assert.ok(!serialized.includes('label-rule"'));
 });
 
 test("direct import writes the remapped sequence after creating creatives", async () => {
@@ -257,11 +261,49 @@ test("direct import writes the remapped sequence after creating creatives", asyn
   assert.equal(createAdset.body.creative_sequence, undefined);
   const sequenceUpdate = calls.find(
     (call) =>
-      call.path === "target-adset" && call.body?.creative_sequence !== undefined,
+      call.path === "target-adset" &&
+      call.body?.creative_sequence !== undefined,
   );
   assert.deepEqual(sequenceUpdate.body.creative_sequence, ["target-creative"]);
   assert.ok(
     calls.findIndex((call) => call.path === "act_200001/ads") <
       calls.indexOf(sequenceUpdate),
   );
+});
+
+test("draft validate_only uses modern Instagram ID only in its own payload copy", async () => {
+  const payload = {
+    instagram_actor_id: "legacy-actor",
+    object_story_spec: {
+      page_id: "page",
+      instagram_user_id: "17841400000000001",
+      instagram_actor_id: "legacy-actor",
+      threads_user_id: "threads-target",
+      link_data: { link: "https://example.test" },
+    },
+  };
+  const before = structuredClone(payload);
+  let sent;
+  const validator = new CreativeValidator({
+    logging,
+    graphClient: {
+      graphFetch: async (_path, options) => {
+        sent = options.body;
+        return { success: true };
+      },
+    },
+  });
+  assert.equal(
+    await validator.validateDraftCreativePayload(
+      "account",
+      "creative",
+      payload,
+    ),
+    true,
+  );
+  assert.equal(sent.instagram_user_id, "17841400000000001");
+  assert.equal(sent.instagram_actor_id, undefined);
+  assert.equal(sent.object_story_spec.instagram_actor_id, undefined);
+  assert.equal(sent.object_story_spec.threads_user_id, "threads-target");
+  assert.deepEqual(payload, before);
 });

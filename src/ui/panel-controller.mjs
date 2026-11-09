@@ -230,6 +230,7 @@ export class PanelController {
                     <tr>
                       <th class="sk-chk"><input type="checkbox" id="${APP_ID}-clone-master" data-always-enabled /></th>
                       <th>${t("field.account")}</th>
+                      <th>${t("field.copies")}</th>
                       <th>${t("field.fanPage")}</th>
                       <th>${t("field.pixel")}</th>
                       <th class="sk-hidden" id="${APP_ID}-clone-th-catalog">${t("field.catalog")}</th>

@@ -24,6 +24,8 @@ export class CatalogDiscovery {
     const referencedProductSetIds = new Set(
       [...directRefs.productSets.keys()].map(String),
     );
+    const hasDirectReferences =
+      referencedCatalogIds.size > 0 || referencedProductSetIds.size > 0;
     const filteredProductSets = [];
 
     for (const productSet of dpaCatalogHints?.productSets || []) {
@@ -32,6 +34,7 @@ export class CatalogDiscovery {
         productSet?.product_catalog?.id || productSet?.catalog_id || "",
       );
       if (
+        !hasDirectReferences ||
         (productSetId && referencedProductSetIds.has(productSetId)) ||
         (catalogId && referencedCatalogIds.has(catalogId))
       ) {
@@ -42,12 +45,19 @@ export class CatalogDiscovery {
       }
     }
 
+    // DPA discovery recovers catalog creatives whose normal Graph export has
+    // no catalog ID. A lone product_set_id does not identify its catalog, so
+    // it must not make these DPA catalog hints look unreferenced.
     const filteredCatalogs = (dpaCatalogHints?.catalogs || []).filter(
-      (catalog) => referencedCatalogIds.has(String(catalog?.id || "")),
+      (catalog) =>
+        !referencedCatalogIds.size ||
+        referencedCatalogIds.has(String(catalog?.id || "")),
     );
 
     const skippedCatalogs = (dpaCatalogHints?.catalogs || []).filter(
-      (catalog) => !referencedCatalogIds.has(String(catalog?.id || "")),
+      (catalog) =>
+        referencedCatalogIds.size > 0 &&
+        !referencedCatalogIds.has(String(catalog?.id || "")),
     );
     if (skippedCatalogs.length) {
       log(

@@ -364,6 +364,9 @@ export function createServices({ state, dom, logger, overrides = {} }) {
       get catalogExporter() {
         return services.catalogExporter;
       },
+      get identityService() {
+        return services.identityService;
+      },
     });
   services.catalogExporter =
     overrides.catalogExporter ||

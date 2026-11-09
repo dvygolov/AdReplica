@@ -29,15 +29,43 @@ export function isSyntheticProductSetName(value) {
   return false;
 }
 
+export function isUnfilteredProductSet(item) {
+  if (!item) return false;
+  return (
+    item.filter == null ||
+    item.filter === "" ||
+    canonicalProductSetFilter(item.filter) === "{}"
+  );
+}
+
 /**
- * Meta creates an "All Products" set for every catalog by itself and rebuilds
- * it on its own, so such a set never needs a target mapping: dropping
- * product_set_id from the payload makes the ad use the whole target catalog.
+ * Meta names the set it creates for a catalog after a product-name template,
+ * e.g. "{{product.name}} 2026-11-05-8d8f0a5571ecf4ede39f097299faf461". The
+ * name alone is proof enough: operators do not create such sets by hand.
+ */
+export function isCatalogDefaultSetName(value) {
+  const name = String(value || "").trim();
+  if (!name) return false;
+  return /^all\s*products$/i.test(name) || isSyntheticProductSetName(name);
+}
+
+/**
+ * Meta creates a default "all products" set for every catalog by itself and
+ * rebuilds it on its own. Cross-catalog clones still must reference the target
+ * set ID: removing product_set_id makes Meta reject the dynamic creative.
+ *
+ * The flag is not always present in an exported package and the default set is
+ * not always called "All Products", so the name template and the catalog
+ * creation origin are checked as well.
  */
 export function isAutogenProductSet(item) {
   if (!item) return false;
   if (item.is_autogen_product_set) return true;
-  return /^all\s*products$/i.test(String(item.name || "").trim());
+  if (isCatalogDefaultSetName(item.name)) return true;
+  return (
+    String(item.original_creation_source || "") === "catalog_creation" &&
+    isUnfilteredProductSet(item)
+  );
 }
 
 export function rankProductSetMeta(item) {
@@ -181,6 +209,12 @@ export function canonicalProductSetFilter(filter) {
 }
 
 export function pickFallbackTargetProductSet(source, targets) {
+  if (isAutogenProductSet(source)) {
+    const defaults = targets.filter(
+      (item) => isAutogenProductSet(item) && isUnfilteredProductSet(item),
+    );
+    return defaults.length === 1 ? defaults[0] : null;
+  }
   const filter = canonicalProductSetFilter(source?.filter);
   const matches = targets.filter(
     (item) =>

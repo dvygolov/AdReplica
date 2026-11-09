@@ -92,6 +92,13 @@ const FRAGMENT_ERROR_HINTS = new Map([
       advice: "Add a payment method in Billing, then retry the clone.",
     },
   ],
+  [
+    1772145,
+    {
+      label: "Instagram actor is not linked to the target Facebook Page (Meta error 1772145)",
+      advice: "Retry with the current build so AdReplica recreates the target page-backed identity; do not reuse the source Instagram actor.",
+    },
+  ],
 ]);
 
 /**
@@ -102,6 +109,7 @@ const FRAGMENT_ERROR_HINTS = new Map([
 const NON_RETRYABLE_FRAGMENT_CODES = new Set([
   1359188, // No Payment Method
   1487194, // permission / invalid token
+  1772145, // Instagram actor is not linked to the target Page
   1815199, // ad account disabled
 ]);
 const NON_RETRYABLE_FRAGMENT_HINTS = [/no payment method/i, /payment method/i];

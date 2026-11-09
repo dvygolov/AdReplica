@@ -271,7 +271,8 @@ export function buildStudioStyles(appId) {
       #${appId} .sk-tbl .sk-pix,
       #${appId} .sk-tbl .sk-cat,
       #${appId} .sk-tbl .sk-fp-btn,
-      #${appId} .sk-tbl .sk-rate {
+      #${appId} .sk-tbl .sk-rate,
+      #${appId} .sk-tbl .sk-copies {
         box-sizing: border-box;
         height: 40px;
         border-radius: 8px;
@@ -719,6 +720,15 @@ export function buildStudioStyles(appId) {
       #${appId} .sk-pix { width: 112px; }
       #${appId} .sk-cat { width: 142px; }
       #${appId} .sk-tbl td select { max-width: 100%; }
+      #${appId} .sk-copies {
+        box-sizing: border-box;
+        width: 58px;
+        padding: 0 6px;
+        border: 1px solid #4a4a4a;
+        background: #232323;
+        color: #eee;
+        text-align: center;
+      }
       #${appId} .sk-cur { white-space: nowrap; }
       #${appId} .sk-cur .sk-chip { padding: 2px 6px; font-size: 11px; }
       #${appId} .sk-tbl th, #${appId} .sk-tbl td { padding: 6px 6px; }
@@ -748,6 +758,13 @@ export function buildStudioStyles(appId) {
         border-bottom: 1px solid #2a2a2a;
       }
       #${appId} .sk-mass-row span { color: #bdbdbd; }
+      #${appId} .sk-mass-message {
+        max-width: 520px;
+        margin-top: 3px;
+        color: #bdbdbd;
+        font-size: 11px;
+        white-space: normal;
+      }
       #${appId} .sk-mass-row.sk-success span { color: #7ee08c; }
       #${appId} .sk-mass-row.sk-failed span { color: #ff9a9a; }
       /* ---- collapsed: the window morphs into the mark pinned to the corner ---- */

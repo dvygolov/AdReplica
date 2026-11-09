@@ -180,6 +180,18 @@ export class CreativeValidator {
     if (!validationPayload) {
       return true;
     }
+    const instagramUserId = String(
+      validationPayload.object_story_spec?.instagram_user_id || "",
+    );
+    const hasLegacyActor = Boolean(
+      validationPayload.instagram_actor_id ||
+      validationPayload.object_story_spec?.instagram_actor_id,
+    );
+    if (/^\d+$/.test(instagramUserId) && hasLegacyActor) {
+      validationPayload.instagram_user_id = instagramUserId;
+      delete validationPayload.instagram_actor_id;
+      delete validationPayload.object_story_spec.instagram_actor_id;
+    }
     try {
       return await validateObjectStorySpecCreative(
         accountId,

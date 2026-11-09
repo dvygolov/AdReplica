@@ -32,16 +32,32 @@ export class MassCloneWorkflow {
     const selection = state.massTargets || {};
     return (state.accounts || [])
       .filter((account) => selection[account.id]?.selected)
-      .map((account) => ({
-        accountId: String(account.id),
-        name: account.name || String(account.id),
-        pixelId: String(selection[account.id]?.pixelId || ""),
-        pageId: String(selection[account.id]?.pageId || ""),
-        catalogId: String(selection[account.id]?.catalogId || ""),
-      }));
+      .flatMap((account) => {
+        const accountId = String(account.id);
+        const picked = selection[account.id] || {};
+        const requested = Math.floor(Number(picked.copies) || 1);
+        const copyCount = Math.min(100, Math.max(1, requested));
+        const copyIndexes = Array.isArray(picked.copyIndexes)
+          ? picked.copyIndexes
+              .map((value) => Math.floor(Number(value)))
+              .filter((value) => value >= 1 && value <= copyCount)
+          : [];
+        const indexes = copyIndexes.length
+          ? [...new Set(copyIndexes)]
+          : Array.from({ length: copyCount }, (_, index) => index + 1);
+        return indexes.map((copyIndex) => ({
+          accountId,
+          name: account.name || accountId,
+          pixelId: String(picked.pixelId || ""),
+          pageId: String(picked.pageId || ""),
+          catalogId: String(picked.catalogId || ""),
+          copyIndex,
+          copyCount,
+        }));
+      });
   }
 
-  /** Monotonic counter behind the {n} macro: grows with every processed target. */
+  /** Monotonic counter behind the {n} macro: grows with every campaign copy. */
   nextSequence() {
     const { state } = this.dependencies;
     state.massSequence = (Number(state.massSequence) || 0) + 1;
@@ -181,33 +197,39 @@ export class MassCloneWorkflow {
     const { log } = this.dependencies.logging;
     const { graphFetch } = this.dependencies.graphClient;
     const created = Array.isArray(report?.created) ? report.created : [];
-    // Draft-mode clones live inside a draft: deleting its fragments removes the
-    // campaign, adset and ad in one step. Deleting the ad objects directly fails
-    // because draft objects share the resolved ids of their fragments.
-    const draftId = created.find((item) => item.draftId)?.draftId;
-    if (draftId && this.dependencies.draftRepository && accountId) {
-      try {
-        const summary = await this.dependencies.draftRepository.clearDraftById(
-          accountId,
-          draftId,
-        );
-        if (summary.draftFound) {
-          log(
-            "info",
-            `Rollback deleted draft ${draftId}: ${summary.deletedCount} fragment(s).`,
-          );
-          return { deleted: summary.deletedCount, failed: summary.failedCount };
-        }
-      } catch (error) {
-        log(
-          "warn",
-          `Rollback could not clear draft ${draftId}; check the account manually.`,
-          String(error),
-        );
-      }
-    }
     let deleted = 0;
     let failed = 0;
+    // A draft can contain earlier successful copies and pre-existing work.
+    // Delete only fragments recorded for this failed operation, never the whole
+    // active draft. Draft ad objects themselves do not accept direct deletes.
+    const draftRows = created.filter(
+      (item) => item.draftId && item.fragmentId && !item.removed,
+    );
+    if (draftRows.length) {
+      const draftId = draftRows[0].draftId;
+      for (const type of ["ad", "adset", "campaign"]) {
+        for (const row of draftRows.filter((item) => item.type === type)) {
+          try {
+            await graphFetch(String(row.fragmentId), { method: "DELETE" });
+            deleted += 1;
+          } catch (error) {
+            failed += 1;
+            log(
+              "warn",
+              `Rollback could not delete draft fragment ${row.fragmentId}; check the account manually.`,
+              String(error),
+            );
+          }
+        }
+      }
+      if (deleted) {
+        log(
+          "info",
+          `Rollback deleted ${deleted} fragment(s) from draft ${draftId}.`,
+        );
+      }
+      return { deleted, failed };
+    }
     for (const type of ["ad", "adset", "campaign"]) {
       const rows = created.filter(
         (item) => item.type === type && !item.removed,
@@ -297,9 +319,14 @@ export class MassCloneWorkflow {
         index: this.nextSequence(),
       },
     );
+    row.campaignName = state.cloneCampaignName;
+    const copyLabel =
+      target.copyCount > 1
+        ? ` copy ${target.copyIndex}/${target.copyCount}`
+        : "";
     log(
       "info",
-      `Mass clone ${index + 1}/${state.massResults.length}: ${sourceName} -> ${target.name} (${target.accountId}).`,
+      `Mass clone ${index + 1}/${state.massResults.length}${copyLabel}: ${sourceName} -> ${target.name} (${target.accountId}).`,
     );
     const success = await this.runOneClone();
     let report = state.lastOperationReport || null;
@@ -400,6 +427,9 @@ export class MassCloneWorkflow {
     state.massResults = targets.map((target) => ({
       accountId: target.accountId,
       name: target.name,
+      copyIndex: target.copyIndex,
+      copyCount: target.copyCount,
+      campaignName: "",
       status: "queued",
       message: "",
       counts: null,

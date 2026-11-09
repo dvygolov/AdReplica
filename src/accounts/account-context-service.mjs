@@ -49,7 +49,7 @@ export class AccountContextService {
       if (!quiet) {
         log(
           "info",
-          `No Business Manager is visible on act_${normalizedAccountId}; catalog campaign clone/import will be blocked for this target.`,
+          `No Business Manager is visible on act_${normalizedAccountId}; creating a new catalog is unavailable, but eligible existing catalogs can still be used.`,
         );
       }
       return null;

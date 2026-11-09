@@ -125,27 +125,102 @@ test("clones every selected target sequentially and skips unusable accounts", as
   assert.equal(state.massRunning, false);
 });
 
-test("a draft-based failure is rolled back by deleting the draft fragments", async () => {
+test("a draft failure deletes only that copy's fragments", async () => {
   const { workflow, state, deleted } = createHarness({ failFor: ["222"] });
+  state.massTargets["111"].selected = false;
+  state.massTargets["333"].selected = false;
   workflow.dependencies.runOperation = async () => {
     state.lastOperationReport = {
       status: "failed",
       created: [
-        { type: "campaign", id: "c", draftId: "draft-9" },
-        { type: "adset", id: "s", draftId: "draft-9" },
-        { type: "ad", id: "a", draftId: "draft-9" },
+        {
+          type: "campaign",
+          id: "c",
+          draftId: "draft-9",
+          fragmentId: "fragment-c",
+        },
+        {
+          type: "adset",
+          id: "s",
+          draftId: "draft-9",
+          fragmentId: "fragment-s",
+        },
+        {
+          type: "ad",
+          id: "a",
+          draftId: "draft-9",
+          fragmentId: "fragment-a",
+        },
       ],
       issues: [{ message: "ambiguous failure" }],
     };
     return false;
   };
+  workflow.dependencies.draftRepository.clearDraftById = async () =>
+    assert.fail("rollback must not clear earlier copies or existing drafts");
   await workflow.run();
-  assert.ok(
-    deleted.includes("draft:222:draft-9"),
-    "the failed target draft is cleared",
+  assert.deepEqual(
+    deleted.filter((id) => id.startsWith("fragment-")),
+    ["fragment-a", "fragment-s", "fragment-c"],
   );
+  assert.ok(!deleted.includes("pre-existing-fragment"));
   const row = state.massResults.find((item) => item.accountId === "222");
   assert.deepEqual(row.rollback, { deleted: 3, failed: 0 });
+});
+
+test("copies expand into independent jobs and {n} numbers every campaign", async () => {
+  const { workflow, state, calls } = createHarness();
+  state.massTargets["111"].copies = 3;
+  state.massTargets["222"].copies = 2;
+  state.massNameTemplate = "{source} {n} — {account}";
+  await workflow.run();
+  assert.deepEqual(
+    calls.map((call) => call.accountId),
+    ["111", "111", "111", "222", "222"],
+  );
+  assert.deepEqual(
+    calls.map((call) => call.name),
+    [
+      "Source Campaign 1 — Good A",
+      "Source Campaign 2 — Good A",
+      "Source Campaign 3 — Good A",
+      "Source Campaign 4 — Good B",
+      "Source Campaign 5 — Good B",
+    ],
+  );
+  assert.deepEqual(
+    state.massResults.map((row) => [row.copyIndex, row.copyCount]),
+    [
+      [1, 3],
+      [2, 3],
+      [3, 3],
+      [1, 2],
+      [2, 2],
+      [1, 1],
+    ],
+  );
+  assert.equal(state.massResults.at(-1).status, "skipped");
+});
+
+test("copy counts are normalized and retry selection can target one copy", async () => {
+  const { workflow, state } = createHarness();
+  state.massTargets["111"].copies = 4;
+  state.massTargets["111"].copyIndexes = [2];
+  state.massTargets["222"].selected = false;
+  state.massTargets["333"].selected = false;
+  assert.deepEqual(
+    workflow.selectedTargets().map((target) => target.copyIndex),
+    [2],
+  );
+  state.massTargets["111"].copies = 0;
+  delete state.massTargets["111"].copyIndexes;
+  assert.equal(workflow.selectedTargets().length, 1, "zero falls back to one");
+  state.massTargets["111"].copies = 1000;
+  assert.equal(
+    workflow.selectedTargets().length,
+    100,
+    "runaway counts are capped",
+  );
 });
 
 test("campaign names use the template with the target account", async () => {
@@ -340,6 +415,51 @@ test("retry re-selects only the failed accounts", async () => {
   assert.equal(state.massTargets["333"].selected, false);
 });
 
+test("retry re-selects only the failed copy indexes", async () => {
+  const { MassCloneController } =
+    await import("../src/ui/mass-clone-controller.mjs");
+  const state = {
+    accounts: ACCOUNTS,
+    massRunning: false,
+    massResults: [
+      { accountId: "111", copyIndex: 1, copyCount: 3, status: "success" },
+      { accountId: "111", copyIndex: 2, copyCount: 3, status: "failed" },
+      { accountId: "111", copyIndex: 3, copyCount: 3, status: "success" },
+      { accountId: "222", copyIndex: 1, copyCount: 1, status: "success" },
+    ],
+    massTargets: {
+      111: { selected: true, copies: 3 },
+      222: { selected: true, copies: 1 },
+    },
+  };
+  const controller = new MassCloneController({
+    state,
+    dom: {},
+    logging: { log: () => {} },
+    massCloneView: { render: () => {} },
+    massCloneWorkflow: { run: async () => true },
+  });
+  await controller.retryFailed();
+  assert.deepEqual(state.massTargets["111"].copyIndexes, [2]);
+  assert.equal(state.massTargets["111"].selected, true);
+  assert.equal(state.massTargets["222"].selected, false);
+});
+
+test("a manual run clears the previous per-copy retry filter", async () => {
+  const { MassCloneController } =
+    await import("../src/ui/mass-clone-controller.mjs");
+  const state = {
+    massRunning: false,
+    massTargets: { 111: { selected: true, copies: 3, copyIndexes: [2] } },
+  };
+  const controller = new MassCloneController({
+    state,
+    massCloneWorkflow: { run: async () => true },
+  });
+  await controller.runMassClone();
+  assert.equal(state.massTargets["111"].copyIndexes, undefined);
+});
+
 test("stopping a run unlocks the interface immediately", async () => {
   const { MassCloneController } =
     await import("../src/ui/mass-clone-controller.mjs");
@@ -403,7 +523,14 @@ test("a transient draft publishing error retries the target once", async () => {
     if (attempt === 1) {
       state.lastOperationReport = {
         status: "partial",
-        created: [{ type: "ad", id: "a-t", draftId: "draft-t" }],
+        created: [
+          {
+            type: "ad",
+            id: "a-t",
+            draftId: "draft-t",
+            fragmentId: "fragment-t",
+          },
+        ],
         issues: [{ message: "Draft publishing error, retry the write" }],
         validation: {
           invalid: 1,
@@ -433,8 +560,8 @@ test("a transient draft publishing error retries the target once", async () => {
   assert.equal(first.retried, true);
   assert.equal(calls.length, 3, "one retry plus the second target");
   assert.ok(
-    deleted.includes("draft:111:draft-t"),
-    "the broken draft is cleared",
+    deleted.includes("fragment-t"),
+    "only the broken draft fragment is cleared",
   );
 });
 

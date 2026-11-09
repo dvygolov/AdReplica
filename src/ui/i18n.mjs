@@ -25,6 +25,7 @@ const DICT = {
     "tab.clone": "Clone",
 
     "field.account": "Ad account",
+    "field.copies": "Copies",
     "media.statusMissing": "missing",
     "media.statusOptional": "optional",
     "media.colCreative": "creative",
@@ -150,7 +151,7 @@ const DICT = {
     "macros.accountId": "target account id",
     "macros.currency": "target account currency",
     "macros.mode": "clone mode (DRAFT / PAUSED / ACTIVE)",
-    "macros.index": "sequence number of the target (1, 2, 3 …)",
+    "macros.index": "global campaign copy number (1, 2, 3 …)",
     "macros.date": "today, YYYY-MM-DD",
 
     "risk.noBm": "no BM",
@@ -210,6 +211,7 @@ const DICT = {
     "tab.clone": "Клон",
 
     "field.account": "Рекламный кабинет",
+    "field.copies": "Копий",
     "media.statusMissing": "не хватает",
     "media.statusOptional": "необязательно",
     "media.colCreative": "креатив",
@@ -338,7 +340,7 @@ const DICT = {
     "macros.accountId": "id целевого кабинета",
     "macros.currency": "валюта целевого кабинета",
     "macros.mode": "режим клона (DRAFT / PAUSED / ACTIVE)",
-    "macros.index": "порядковый номер кабинета (1, 2, 3 …)",
+    "macros.index": "сквозной номер копии кампании (1, 2, 3 …)",
     "macros.date": "сегодняшняя дата, ГГГГ-ММ-ДД",
 
     "risk.noBm": "нет БМ",
@@ -442,16 +444,16 @@ function ruForm(n, forms) {
   return forms[2];
 }
 
-/** "Clone to 3 accounts" with correct Russian plural. */
+/** "Clone 3 campaigns" with correct Russian plural. */
 export function cloneToLabel(count) {
   if (lang === "ru") {
-    return `Клонировать в ${count} ${ruForm(count, [
-      "кабинет",
-      "кабинета",
-      "кабинетов",
+    return `Клонировать ${count} ${ruForm(count, [
+      "кампанию",
+      "кампании",
+      "кампаний",
     ])}`;
   }
-  return `Clone to ${count} account${Number(count) === 1 ? "" : "s"}`;
+  return `Clone ${count} campaign${Number(count) === 1 ? "" : "s"}`;
 }
 
 /** Compact plural form for the collapsed summary line. */

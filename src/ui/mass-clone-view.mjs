@@ -324,7 +324,7 @@ export class MassCloneView {
     if (dom.cloneCatalogHead) {
       dom.cloneCatalogHead.classList.toggle("sk-hidden", !catalogColumn);
     }
-    const columns = 4 + (catalogColumn ? 1 : 0);
+    const columns = 6 + (catalogColumn ? 1 : 0);
     if (!accounts.length) {
       body.innerHTML = `<tr><td colspan="${columns}" class="sk-empty">${escapeHtml(
         t("clone.targetsNone"),
@@ -418,6 +418,12 @@ export class MassCloneView {
               ? `<span class="sk-chip">${escapeHtml(t("chip.source"))}</span>`
               : ""
           }</span></td>
+          <td><input type="number" class="sk-copies" data-mass-copies="${escapeHtml(
+            accountId,
+          )}" min="1" max="100" step="1" value="${Math.min(
+            100,
+            Math.max(1, Math.floor(Number(picked.copies) || 1)),
+          )}" ${state.massRunning ? "disabled" : ""} /></td>
           ${this.pageCell(accountId, picked)}
           <td><select class="sk-pix" title="${escapeHtml(
             t("opt.noPixelHint"),
@@ -518,8 +524,10 @@ export class MassCloneView {
         const detail = row.counts
           ? ` · campaign ${row.counts.campaign}, ad set ${row.counts.adset}, ad ${row.counts.ad}`
           : "";
+        const copy =
+          row.copyCount > 1 ? ` · ${row.copyIndex}/${row.copyCount}` : "";
         return `<div class="sk-job sk-${escapeHtml(row.status)}">
-          <div><b>${escapeHtml(row.name || row.accountId)}</b>
+          <div><b>${escapeHtml(row.name || row.accountId)}${escapeHtml(copy)}</b>
             <div class="sk-job-ph">${escapeHtml(
               t(JOB_LABELS[row.status] || row.status),
             )}${escapeHtml(detail)}${row.retried ? " · retried" : ""}</div>
@@ -543,9 +551,18 @@ export class MassCloneView {
     this.renderTargets();
     this.renderProgress();
     const total = this.targetAccounts().length;
-    const count = Object.values(state.massTargets || {}).filter(
+    const selected = Object.values(state.massTargets || {}).filter(
       (item) => item.selected,
-    ).length;
+    );
+    const count = selected.length;
+    const campaignCount = selected.reduce(
+      (sum, item) =>
+        sum +
+        (Array.isArray(item.copyIndexes) && item.copyIndexes.length
+          ? item.copyIndexes.length
+          : Math.min(100, Math.max(1, Math.floor(Number(item.copies) || 1)))),
+      0,
+    );
     if (dom.cloneTargetsNote) {
       const hidden = this.hiddenNoPayment();
       dom.cloneTargetsNote.textContent = hidden
@@ -561,8 +578,8 @@ export class MassCloneView {
     if (dom.cloneRunButton) {
       dom.cloneRunButton.textContent = state.massRunning
         ? t("run.running")
-        : count
-          ? cloneToLabel(count)
+        : campaignCount
+          ? cloneToLabel(campaignCount)
           : t("btn.clone");
     }
     if (dom.massStopButton) {

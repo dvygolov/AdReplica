@@ -61,7 +61,16 @@ export class DraftValidation {
     if (!pageId) {
       return null;
     }
-    const needsActorId = !String(osp.instagram_actor_id || "");
+    const identitySource = String(
+      this.dependencies.identityService.getPageIdentityHint(pageId)?.source ||
+        "",
+    );
+    const usesLinkedInstagram = [
+      "instagram_business_account",
+      "connected_instagram_account",
+    ].includes(identitySource);
+    const needsActorId =
+      !usesLinkedInstagram && !String(osp.instagram_actor_id || "");
     const needsDestinationSpec =
       Boolean(creative.asset_feed_spec) &&
       !creative.destination_spec?.native_commerce_experience?.shop
@@ -230,7 +239,10 @@ export class DraftValidation {
       );
       const actorResolved = Boolean(
         identity?.instagramActorId ||
-        creative.object_story_spec?.instagram_actor_id,
+        creative.object_story_spec?.instagram_actor_id ||
+        ["instagram_business_account", "connected_instagram_account"].includes(
+          identity?.source,
+        ),
       );
       const stillNeedsActorId = affected.needsActorId && !actorResolved;
       const stillNeedsDestinationSpec =

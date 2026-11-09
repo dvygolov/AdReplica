@@ -8,6 +8,7 @@ import {
   getVideoThumbnailOriginalName,
   hasAssetFeedCustomVideoThumbnail,
   hasStandaloneCustomVideoThumbnail,
+  getSourcePageId,
 } from "../domain/creative.mjs";
 import {
   getSourceCatalogsFromPackage,
@@ -555,6 +556,34 @@ export class CampaignExporter {
       getSourceProductSetsFromPackage(provisionalPackage),
     );
     const catalogExports = await fetchCatalogExportsForPackage(sourceCatalogs);
+    const pageIdentities = [];
+    const sourcePageIds = [
+      ...new Set(
+        creatives.map((creative) => getSourcePageId(creative)).filter(Boolean),
+      ),
+    ];
+    for (const pageId of sourcePageIds) {
+      try {
+        const identity =
+          await this.dependencies.identityService?.inspectSourcePageIdentity(
+            pageId,
+            accountId,
+          );
+        if (identity) {
+          pageIdentities.push(identity);
+          log(
+            "info",
+            `Source page ${pageId} Instagram identity: ${identity.type}.`,
+          );
+        }
+      } catch (error) {
+        log(
+          "warn",
+          `Could not identify Instagram identity type for source page ${pageId}.`,
+          String(error),
+        );
+      }
+    }
 
     const dedupedFiles = new Map();
     for (const item of downloadQueue) {
@@ -580,6 +609,7 @@ export class CampaignExporter {
       catalogs: sourceCatalogs,
       productSets: sourceProductSets,
       catalogExports,
+      pageIdentities,
       fileNameMap,
       files: [...dedupedFiles.values()].map((item) => ({
         type: item.type,

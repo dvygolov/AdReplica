@@ -127,13 +127,18 @@ export class ReportView {
         }),
       )}</div>
       <div class="sk-mass-list">${rows
-        .map(
-          (row) =>
-            `<div class="sk-mass-row sk-${escapeHtml(row.status)}">
-              <b>${escapeHtml(row.name || row.accountId)}</b>
+        .map((row) => {
+          const copy =
+            row.copyCount > 1 ? ` · ${row.copyIndex}/${row.copyCount}` : "";
+          return `<div class="sk-mass-row sk-${escapeHtml(row.status)}">
+              <div><b>${escapeHtml(row.name || row.accountId)}${escapeHtml(copy)}</b>${
+                row.message
+                  ? `<div class="sk-mass-message">${escapeHtml(row.message)}</div>`
+                  : ""
+              }</div>
               <span>${escapeHtml(t(`job.${row.status}`) || row.status)}</span>
-            </div>`,
-        )
+            </div>`;
+        })
         .join("")}</div>
       <div class="sk-actions">
         <button data-action="close" class="sk-primary">${escapeHtml(t("report.ok"))}</button>

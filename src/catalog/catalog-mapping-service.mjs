@@ -139,16 +139,6 @@ export class CatalogMappingService {
       if (!sourceCatalogId) {
         continue;
       }
-      if (isAutogenProductSet(sourceProductSet)) {
-        // Meta rebuilds "All Products" in every catalog, so drop the reference
-        // and let the ad target the whole target catalog.
-        nextProductSetMappings[sourceProductSetId] = "";
-        log(
-          "info",
-          `Product set ${sourceProductSetId} (${sourceProductSet.name || "All Products"}) is auto-generated: dropping it so the ad uses the whole target catalog.`,
-        );
-        continue;
-      }
       const targetCatalogId = String(
         catalogMappings?.[sourceCatalogId] || sourceCatalogId || "",
       );
@@ -293,19 +283,34 @@ export class CatalogMappingService {
       (item) => item.mode === "reuse" && item.sourceId !== item.targetId,
     )) {
       const referencedSets = getReferencedProductSetIds(packageData);
-      for (const set of getSourceProductSetsFromPackage(packageData)) {
-        if (isAutogenProductSet(set)) continue;
-        if (!referencedSets.has(String(set.id))) continue;
-        if (
+      const missingSets = getSourceProductSetsFromPackage(packageData).filter(
+        (set) =>
+          referencedSets.has(String(set.id)) &&
+          !sets[String(set.id)] &&
           resolveSourceProductSetCatalogId(packageData, set.id) ===
-            item.sourceId &&
-          !sets[String(set.id)]
-        ) {
-          throw new Error(
-            `No equivalent product set for ${set.name || set.id} in ${item.targetName}. Choose explicit catalog copying.`,
-          );
-        }
+            item.sourceId,
+      );
+      if (!missingSets.length) {
+        continue;
       }
+      const targetSets = await this.fetchTargetCatalogProductSets(
+        item.targetId,
+      );
+      const inventory = targetSets.length
+        ? `${targetSets.length} product set(s): ${targetSets
+            .slice(0, 5)
+            .map((set) => `"${set.name || set.id}" (${set.id})`)
+            .join(", ")}${targetSets.length > 5 ? ", ..." : ""}`
+        : "no product sets at all";
+      const describeSet = (set) => `"${set.name || set.id}" (${set.id})`;
+      const requested =
+        missingSets.length === 1
+          ? describeSet(missingSets[0])
+          : `${missingSets.length} sets (${missingSets.map(describeSet).join(", ")})`;
+      throw new Error(
+        `No equivalent product set for ${requested} in target catalog "${item.targetName}" (${item.targetId}): the target catalog has ${inventory}. ` +
+          "Choose explicit catalog copying, or select a target catalog that already has a matching product set.",
+      );
     }
     return plan;
   }

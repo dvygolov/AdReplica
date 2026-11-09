@@ -51,6 +51,7 @@ export class CatalogExporter {
         "capability",
         "cpas_category_product_set_id",
         "original_creation_source",
+        "is_autogen_product_set",
         "product_catalog{id,name,vertical,catalog_item_type}",
       ].join(","),
       limit: 200,

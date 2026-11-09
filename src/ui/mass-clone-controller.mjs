@@ -153,6 +153,11 @@ export class MassCloneController {
   async runMassClone() {
     const { state } = this.dependencies;
     if (state.massRunning) return false;
+    // A manual run always means every configured copy. Only retryFailed()
+    // restricts the next run to the failed copy indexes.
+    for (const picked of Object.values(state.massTargets || {})) {
+      delete picked.copyIndexes;
+    }
     return this.dependencies.massCloneWorkflow.run();
   }
 
@@ -171,15 +176,28 @@ export class MassCloneController {
       );
       return false;
     }
-    const wanted = new Set(failed.map((row) => String(row.accountId)));
+    const wanted = new Map();
+    for (const row of failed) {
+      const accountId = String(row.accountId);
+      if (!wanted.has(accountId)) wanted.set(accountId, []);
+      if (row.copyIndex) wanted.get(accountId).push(row.copyIndex);
+    }
     state.massTargets ||= {};
     for (const account of state.accounts || []) {
       const accountId = String(account.id);
       const current = state.massTargets[accountId] || {};
+      const copyIndexes = wanted.get(accountId);
       state.massTargets[accountId] = {
         ...current,
-        selected: wanted.has(accountId),
+        selected: Boolean(copyIndexes),
+        copyIndexes,
       };
+      if (copyIndexes?.length) {
+        state.massTargets[accountId].copies = Math.max(
+          Number(current.copies) || 1,
+          ...copyIndexes,
+        );
+      }
     }
     log(
       "info",
@@ -210,6 +228,9 @@ export class MassCloneController {
     state.massResults = [];
     state.massActiveAccountId = "";
     state.massSequence = 0;
+    for (const picked of Object.values(state.massTargets || {})) {
+      delete picked.copyIndexes;
+    }
     this.dependencies.massCloneView.render();
   }
 
@@ -221,6 +242,7 @@ export class MassCloneController {
       state.massTargets[accountId] = {
         ...(state.massTargets[accountId] || {}),
         selected,
+        copyIndexes: undefined,
       };
     }
     this.dependencies.massCloneView.render();
@@ -233,6 +255,9 @@ export class MassCloneController {
       ...(state.massTargets[accountId] || {}),
       ...patch,
     };
+    if (Object.prototype.hasOwnProperty.call(patch, "copies")) {
+      delete state.massTargets[accountId].copyIndexes;
+    }
     this.dependencies.massCloneView.render();
   }
 
@@ -265,6 +290,15 @@ export class MassCloneController {
       list.addEventListener("change", (event) => {
         const input = event.target;
         if (!(input instanceof HTMLInputElement)) return;
+        const copiesAccountId = input.dataset.massCopies;
+        if (copiesAccountId) {
+          const copies = Math.min(
+            100,
+            Math.max(1, Math.floor(Number(input.value) || 1)),
+          );
+          this.pickFor(copiesAccountId, { copies });
+          return;
+        }
         const rateAccountId = input.dataset.massRate;
         if (rateAccountId) {
           const value = Number(input.value);

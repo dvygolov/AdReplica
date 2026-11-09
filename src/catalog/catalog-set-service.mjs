@@ -26,20 +26,21 @@ export class CatalogSetService {
     );
     const productSetIdMap = {};
     for (const set of sourceProductSets) {
-      const setName = String(set.name || "");
       const filter = remapProductSetFilter(set.filter, productIdMap);
       // Meta creates an unfiltered set with every catalog. Missing filter alone
       // is not proof of equivalence: require the catalog-created origin too.
       const isCatalogDefault = (item) =>
-        item.original_creation_source === "catalog_creation" &&
-        (item.filter == null || item.filter === "");
+        (item.filter == null || item.filter === "") &&
+        (item.original_creation_source === "catalog_creation" ||
+          // Meta can report the source catalog's own default as "unknown".
+          String(item.name || "").toLowerCase() === "all products");
+      const canonicalFilter = canonicalProductSetFilter(filter);
       const existing = existingSets.find(
         (item) =>
           (isCatalogDefault(set) && isCatalogDefault(item)) ||
-          (item.name === setName &&
-            canonicalProductSetFilter(filter) !== null &&
-            canonicalProductSetFilter(item.filter) ===
-              canonicalProductSetFilter(filter)),
+          // Meta rejects duplicate filters even under a different name.
+          (canonicalFilter !== null &&
+            canonicalProductSetFilter(item.filter) === canonicalFilter),
       );
       if (existing) {
         productSetIdMap[String(set.id)] = String(existing.id);

@@ -78,6 +78,10 @@ export function createDebugApi(services, state) {
         itemName,
         accountId,
       ),
+    inspectPageIdentity: (pageId, accountId = "") =>
+      services.identityService.fetchPageIdentitySnapshot(pageId, accountId),
+    inspectSourcePageIdentity: (pageId, accountId = "") =>
+      services.identityService.inspectSourcePageIdentity(pageId, accountId),
     privateMutation: (docId, friendlyName, variables) =>
       services.privateGraphqlClient.privateGraphqlMutation(
         docId,

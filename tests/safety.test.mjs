@@ -430,6 +430,39 @@ test("same-name product set with different filter is never overwritten", async (
   assert.equal(calls.length, 1);
   assert.match(calls[0].body.name, /AdReplica/);
 });
+test("product sets with equivalent filters are reused even under another name", async () => {
+  let writes = 0;
+  const service = new CatalogSetService({
+    logging,
+    graphClient: {
+      graphGetAll: async () => [
+        {
+          id: "existing",
+          name: "Different name",
+          filter: '{"brand":{"eq":"same"}}',
+        },
+      ],
+      graphFetch: async () => {
+        writes += 1;
+        return { id: "duplicate" };
+      },
+    },
+  });
+  const result = await service.copyCatalogProductSets(
+    [
+      {
+        id: "source",
+        name: "Source name",
+        filter: { brand: { eq: "same" } },
+      },
+    ],
+    "target",
+    {},
+  );
+  assert.deepEqual(result, { source: "existing" });
+  assert.equal(writes, 0);
+});
+
 test("catalog copying reuses Meta's automatic default without treating unknown filters as equivalent", async () => {
   const writes = [];
   const service = new CatalogSetService({
@@ -471,6 +504,40 @@ test("catalog copying reuses Meta's automatic default without treating unknown f
   assert.deepEqual(writes[1].body.filter, '{"brand":{"eq":"new"}}');
 });
 
+test("Meta's unfiltered All Products set maps to the target catalog default", async () => {
+  let writes = 0;
+  const service = new CatalogSetService({
+    logging,
+    graphClient: {
+      graphGetAll: async () => [
+        {
+          id: "target-default",
+          name: "All Products",
+          original_creation_source: "catalog_creation",
+        },
+      ],
+      graphFetch: async () => {
+        writes += 1;
+        return { id: "duplicate" };
+      },
+    },
+  });
+  const result = await service.copyCatalogProductSets(
+    [
+      {
+        id: "source-default",
+        name: "All Products",
+        original_creation_source: "unknown",
+        filter: null,
+      },
+    ],
+    "target",
+    {},
+  );
+  assert.deepEqual(result, { "source-default": "target-default" });
+  assert.equal(writes, 0);
+});
+
 test("product set matching does not silently use all-products or a lone unrelated set", () => {
   assert.equal(
     pickFallbackTargetProductSet({ name: "Sale", filter: { x: 1 } }, [
@@ -479,10 +546,140 @@ test("product set matching does not silently use all-products or a lone unrelate
     null,
   );
   assert.equal(
+    pickFallbackTargetProductSet({ id: "source", name: "All Products" }, [
+      { id: "target-default", name: "All Products", filter: {} },
+    ])?.id,
+    "target-default",
+  );
+  assert.equal(
     canonicalProductSetFilter('{"b":2,"a":1}'),
     canonicalProductSetFilter({ a: 1, b: 2 }),
   );
 });
+test("cross-catalog All Products references map to the target default instead of being dropped", async () => {
+  const service = new CatalogMappingService({
+    state: { importAccountId: "A" },
+    logging,
+    graphClient: {
+      graphGetAll: async (path) => {
+        assert.equal(path, "200001/product_sets");
+        return [{ id: "target-default", name: "All Products", filter: {} }];
+      },
+    },
+    accountContextService: { invalidateAccountContextCache() {} },
+    catalogCopyService: {},
+  });
+  const pkg = {
+    ...fixture(),
+    catalogs: [{ id: "100001" }],
+    productSets: [
+      {
+        id: "1606763334582799",
+        name: "All Products",
+        product_catalog: { id: "100001" },
+      },
+    ],
+    creatives: [
+      {
+        id: "source-creative",
+        raw: {
+          product_set_id: "1606763334582799",
+          object_story_spec: { template_data: { message: "{{product.name}}" } },
+        },
+      },
+    ],
+  };
+  const result = await service.prepareCatalogMappingsForImport(
+    pkg,
+    { catalogs: [{ id: "200001" }] },
+    { 100001: "200001" },
+  );
+  assert.equal(result.productSetMappings["1606763334582799"], "target-default");
+});
+
+test("a template-named catalog default set still maps to the target default", async () => {
+  const service = new CatalogMappingService({
+    state: { importAccountId: "A" },
+    logging,
+    graphClient: {
+      graphGetAll: async (path) => {
+        assert.equal(path, "200001/product_sets");
+        return [
+          {
+            id: "target-default",
+            name: "{{product.name}} 2026-11-02-1122334455667788aabbccddeeff0011",
+            filter: "{}",
+            original_creation_source: "catalog_creation",
+            product_catalog: { id: "200001" },
+          },
+        ];
+      },
+    },
+    accountContextService: { invalidateAccountContextCache() {} },
+    catalogCopyService: {},
+  });
+  const pkg = {
+    ...fixture(),
+    catalogs: [{ id: "100001" }],
+    productSets: [
+      {
+        id: "1606763334582799",
+        name: "{{product.name}} 2026-11-05-8d8f0a5571ecf4ede39f097299faf461",
+        product_catalog: { id: "100001" },
+        original_creation_source: "catalog_creation",
+      },
+    ],
+    creatives: [
+      {
+        id: "source-creative",
+        raw: {
+          product_set_id: "1606763334582799",
+          object_story_spec: { template_data: { message: "{{product.name}}" } },
+        },
+      },
+    ],
+  };
+  const result = await service.prepareCatalogMappingsForImport(
+    pkg,
+    { catalogs: [{ id: "200001", name: "PLZRD1 05.11 W" }] },
+    { 100001: "200001" },
+  );
+  assert.equal(result.productSetMappings["1606763334582799"], "target-default");
+});
+
+test("an empty target catalog fails with the sets it actually has", async () => {
+  const service = new CatalogMappingService({
+    state: { importAccountId: "A" },
+    logging,
+    graphClient: { graphGetAll: async () => [] },
+    accountContextService: { invalidateAccountContextCache() {} },
+    catalogCopyService: {},
+  });
+  const pkg = {
+    ...fixture(),
+    catalogs: [{ id: "100001" }],
+    productSets: [
+      {
+        id: "1606763334582799",
+        name: "sale",
+        filter: '{"brand":{"eq":"x"}}',
+        product_catalog: { id: "100001" },
+      },
+    ],
+    creatives: [
+      { id: "source-creative", raw: { product_set_id: "1606763334582799" } },
+    ],
+  };
+  await assert.rejects(
+    service.prepareCatalogMappingsForImport(
+      pkg,
+      { catalogs: [{ id: "200001", name: "PLZRD1 05.11 W" }] },
+      { 100001: "200001" },
+    ),
+    /no product sets at all[\s\S]*Choose explicit catalog copying/,
+  );
+});
+
 test("selecting an existing target catalog is read-only", async () => {
   const pkg = { ...fixture(), catalogs: [{ id: "100001" }] };
   let writes = 0;

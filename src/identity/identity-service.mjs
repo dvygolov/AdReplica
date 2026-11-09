@@ -4,6 +4,9 @@ import { PAGE_BACKED_THREADS_MUTATION_DOC_ID } from "../domain/constants.mjs";
 import { formatPrivateGraphqlError } from "../domain/graph-errors.mjs";
 import { getSourcePageId } from "../domain/creative.mjs";
 
+const PAGE_INSTAGRAM_QUERY_DOC_ID = "26393503750284892";
+const PAGE_INSTAGRAM_MUTATION_DOC_ID = "25221386390872351";
+
 /** IdentityService. Dependencies are supplied by the application composition root. */
 export class IdentityService {
   constructor(dependencies) {
@@ -29,6 +32,12 @@ export class IdentityService {
       this.ensurePageBackedThreadsIdentity.bind(this);
     this.buildIdentityHintFromInstagramObjectId =
       this.buildIdentityHintFromInstagramObjectId.bind(this);
+    this.buildIdentityFromNativeNode =
+      this.buildIdentityFromNativeNode.bind(this);
+    this.fetchLinkedInstagramIdentity =
+      this.fetchLinkedInstagramIdentity.bind(this);
+    this.fetchPageIdentitySnapshot = this.fetchPageIdentitySnapshot.bind(this);
+    this.inspectSourcePageIdentity = this.inspectSourcePageIdentity.bind(this);
     this.getKnownPageRecord = this.getKnownPageRecord.bind(this);
     this.fetchInstagramIdentityForPageRecord =
       this.fetchInstagramIdentityForPageRecord.bind(this);
@@ -202,11 +211,7 @@ export class IdentityService {
         "",
     );
     return (
-      direct ||
-      findDeepStringValue(response?.data || response, [
-        "iguser_v2_id",
-        "ig_user_id",
-      ])
+      direct || findDeepStringValue(response, ["iguser_v2_id", "ig_user_id"])
     );
   }
 
@@ -233,18 +238,14 @@ export class IdentityService {
     const { getIdentityLookupAccountId, extractPageBackedThreadsUserId } = this;
     const normalizedPageId = String(pageId || "");
     const normalizedAccountId = getIdentityLookupAccountId(accountId);
-    if (!normalizedPageId) {
-      return "";
-    }
+    if (!normalizedPageId) return "";
     const cache =
       state.pageBackedThreadsProvisionCache instanceof Map
         ? state.pageBackedThreadsProvisionCache
         : new Map();
     state.pageBackedThreadsProvisionCache = cache;
     const cacheKey = `${normalizedAccountId}:${normalizedPageId}`;
-    if (cache.has(cacheKey)) {
-      return cache.get(cacheKey);
-    }
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
 
     const provisionPromise = (async () => {
       try {
@@ -291,6 +292,202 @@ export class IdentityService {
     return buildIdentityHintFromInstagramObject(instagramObject);
   }
 
+  async buildIdentityFromNativeNode(
+    node,
+    source,
+    accountId,
+    threadsUserId = "",
+  ) {
+    const { buildIdentityHintFromInstagramObjectId } = this;
+    let instagramUserId = String(node?.id || "");
+    let instagramActorId = String(node?.legacy_instagram_user_id || "");
+    if (instagramUserId && !instagramActorId) {
+      const objectIdentity = await buildIdentityHintFromInstagramObjectId(
+        instagramUserId,
+        accountId,
+      );
+      instagramUserId = String(
+        objectIdentity?.instagramUserId || instagramUserId,
+      );
+      instagramActorId = String(objectIdentity?.instagramActorId || "");
+    }
+    if (!instagramUserId) return null;
+    if (
+      source === "AdsInstagramUsernameDataManager" &&
+      (!instagramActorId || instagramActorId === instagramUserId)
+    ) {
+      return null;
+    }
+    return {
+      instagramUserId,
+      instagramActorId:
+        instagramActorId === instagramUserId ? "" : instagramActorId,
+      threadsUserId: String(threadsUserId || ""),
+      source,
+      ...(source === "AdsInstagramUsernameDataManager"
+        ? { destinationSpec: this.buildPageBackedDestinationSpec() }
+        : {}),
+    };
+  }
+
+  async fetchLinkedInstagramIdentity(pageId, accountId = "") {
+    const { graphFetch } = this.dependencies.graphClient;
+    const {
+      buildIdentityHintFromInstagramObjectId,
+      getIdentityLookupAccountId,
+    } = this;
+    const normalizedPageId = String(pageId || "");
+    const normalizedAccountId = getIdentityLookupAccountId(accountId);
+    const fields = [
+      "connected_instagram_account",
+      "instagram_business_account",
+    ];
+    const connections = await Promise.all(
+      fields.map(async (field) => {
+        try {
+          const reply = await graphFetch(normalizedPageId, {
+            method: "GET",
+            query: {
+              __aaid: normalizedAccountId,
+              fields: `id,${field}{id}`,
+            },
+            networkRetryAttempts: 1,
+            timeoutMs: 20000,
+          });
+          if (String(reply?.id || "") !== normalizedPageId) {
+            throw new Error(`Page ID mismatch while reading ${field}.`);
+          }
+          if (!Object.prototype.hasOwnProperty.call(reply, field)) {
+            return { field, status: "omitted", id: "" };
+          }
+          if (reply[field] === null) {
+            return { field, status: "empty", id: "" };
+          }
+          const id = String(reply[field]?.id || "");
+          if (!/^\d+$/.test(id)) {
+            throw new Error(`Invalid linked Instagram ID in ${field}.`);
+          }
+          return { field, status: "linked", id };
+        } catch (error) {
+          return { field, status: "unavailable", id: "", error };
+        }
+      }),
+    );
+    const linked = connections.filter((item) => item.status === "linked");
+    const linkedIds = [...new Set(linked.map((item) => item.id))];
+    if (linkedIds.length > 1) {
+      throw new Error(
+        `Page ${normalizedPageId} returned conflicting linked Instagram IDs.`,
+      );
+    }
+    if (linkedIds.length === 1) {
+      const identity = await buildIdentityHintFromInstagramObjectId(
+        linkedIds[0],
+        normalizedAccountId,
+      );
+      if (
+        !identity?.instagramUserId ||
+        identity.instagramUserId !== linkedIds[0] ||
+        !identity.instagramActorId ||
+        identity.instagramActorId === linkedIds[0]
+      ) {
+        throw new Error(
+          `Linked Instagram ${linkedIds[0]} for Page ${normalizedPageId} did not return a verified identity pair.`,
+        );
+      }
+      identity.source = linked[0].field;
+      delete identity.destinationSpec;
+      return identity;
+    }
+    const unavailable = connections.filter(
+      (item) => item.status === "unavailable",
+    );
+    if (unavailable.length) {
+      throw new Error(
+        `Could not verify linked Instagram for Page ${normalizedPageId}: ${unavailable
+          .map((item) => `${item.field}=${item.error?.message || item.error}`)
+          .join(", ")}.`,
+      );
+    }
+    return null;
+  }
+
+  async fetchPageIdentitySnapshot(pageId, accountId = "") {
+    const { privateGraphqlRequest } = this.dependencies.privateGraphqlClient;
+    const { findDeepStringValue, buildIdentityFromNativeNode } = this;
+    const normalizedPageId = String(pageId || "");
+    const response = await privateGraphqlRequest(
+      PAGE_INSTAGRAM_QUERY_DOC_ID,
+      "AdsPageInstagramAccountStoreSourceServerQuery",
+      { ids: [normalizedPageId], skip_ibta: false, skip_pbta: false },
+      { allowPartialErrors: true },
+    );
+    let page = null;
+    for (const chunk of [response, ...(response?.__chunks || [])]) {
+      page = (chunk?.data?.pages || []).find(
+        (item) => String(item?.id || "") === normalizedPageId,
+      );
+      if (page) break;
+    }
+    if (!page) {
+      return {
+        pageId: normalizedPageId,
+        linked: null,
+        pageBacked: null,
+        threadsUserId: "",
+      };
+    }
+    const threadsUserId = String(
+      page?.page_backed_threads_accounts?.threads_user_id ||
+        findDeepStringValue(page?.page_backed_threads_accounts, [
+          "threads_user_id",
+        ]) ||
+        "",
+    );
+    const linkedNode =
+      page?.instagram_business_account ||
+      page?.bizlink_instagram_business_account ||
+      page?.connected_instagram_account ||
+      page?.instagram_accounts?.nodes?.[0] ||
+      null;
+    const linkedSource =
+      page?.instagram_business_account ||
+      page?.bizlink_instagram_business_account
+        ? "instagram_business_account"
+        : "connected_instagram_account";
+    const linked = await buildIdentityFromNativeNode(
+      linkedNode,
+      linkedSource,
+      accountId,
+      threadsUserId,
+    );
+    const pageBackedNode =
+      page?.page_backed_instagram_accounts?.nodes?.[0] || null;
+    const pageBacked = await buildIdentityFromNativeNode(
+      pageBackedNode,
+      "AdsInstagramUsernameDataManager",
+      accountId,
+      threadsUserId,
+    );
+    return { pageId: normalizedPageId, linked, pageBacked, threadsUserId };
+  }
+
+  async inspectSourcePageIdentity(pageId, accountId = "") {
+    const { fetchPageIdentitySnapshot } = this;
+    const snapshot = await fetchPageIdentitySnapshot(pageId, accountId);
+    return {
+      pageId: String(pageId || ""),
+      type: snapshot.linked
+        ? "linked"
+        : snapshot.pageBacked
+          ? "page-backed"
+          : "none",
+      hasLinkedInstagram: Boolean(snapshot.linked),
+      hasPageBackedInstagram: Boolean(snapshot.pageBacked),
+      hasThreadsIdentity: Boolean(snapshot.threadsUserId),
+    };
+  }
+
   getKnownPageRecord(pageId) {
     const { state } = this.dependencies;
     const normalizedPageId = String(pageId || "");
@@ -330,8 +527,7 @@ export class IdentityService {
     }
 
     if (
-      savedHint?.source === "AdsInstagramUsernameDataManager" &&
-      savedHint.instagramUserId &&
+      savedHint?.instagramUserId &&
       savedHint.instagramActorId &&
       String(savedHint.instagramUserId) !== String(savedHint.instagramActorId)
     ) {
@@ -368,6 +564,8 @@ export class IdentityService {
       getIdentityLookupAccountId,
       extractPageBackedInstagramObjectId,
       buildIdentityHintFromInstagramObjectId,
+      fetchLinkedInstagramIdentity,
+      fetchPageIdentitySnapshot,
       getKnownPageRecord,
     } = this;
     const { privateGraphqlMutation } = this.dependencies.privateGraphqlClient;
@@ -385,37 +583,7 @@ export class IdentityService {
     }
 
     const provisionPromise = (async () => {
-      try {
-        const response = await privateGraphqlMutation(
-          "25221386390872351",
-          "AdsPageInstagramAccountMutation",
-          {
-            page_id: normalizedPageId,
-          },
-        );
-        const returnedInstagramId =
-          extractPageBackedInstagramObjectId(response);
-        if (!returnedInstagramId) {
-          throw new Error("PBIA mutation did not return iguser_v2_id.");
-        }
-
-        let identityHint;
-        try {
-          identityHint = await buildIdentityHintFromInstagramObjectId(
-            returnedInstagramId,
-            normalizedAccountId,
-          );
-        } catch (error) {
-          if (error?.uncertain) throw error;
-          throw new Error(
-            `PBIA instagram_object lookup failed for ${returnedInstagramId}: ${formatPrivateGraphqlError(error)}`,
-          );
-        }
-        if (!identityHint) {
-          throw new Error(
-            `PBIA instagram_object ${returnedInstagramId} did not return distinct id and legacy_instagram_user_id.`,
-          );
-        }
+      const useIdentityHint = (identityHint) => {
         if (identityHint.threadsUserId) {
           page.threadsUserId = identityHint.threadsUserId;
         }
@@ -425,10 +593,83 @@ export class IdentityService {
           threadsUserId: String(
             identityHint.threadsUserId || page.threadsUserId || "",
           ),
-          source: "AdsInstagramUsernameDataManager",
+          source: identityHint.source,
         };
         savePageIdentityHint(normalizedPageId, identityHint);
         return page.instagramIdentity;
+      };
+      try {
+        const linkedIdentity = await fetchLinkedInstagramIdentity(
+          normalizedPageId,
+          normalizedAccountId,
+        );
+        if (linkedIdentity) {
+          log(
+            "info",
+            `Using linked Instagram identity for target page ${normalizedPageId}.`,
+          );
+          return useIdentityHint(linkedIdentity);
+        }
+        let snapshot = null;
+        try {
+          snapshot = await fetchPageIdentitySnapshot(
+            normalizedPageId,
+            normalizedAccountId,
+          );
+        } catch (error) {
+          log(
+            "info",
+            `Native identity lookup failed for page ${normalizedPageId}; trying PBIA provisioning.`,
+            formatPrivateGraphqlError(error),
+          );
+        }
+        if (snapshot?.linked) {
+          log(
+            "info",
+            `Using linked Instagram identity for target page ${normalizedPageId}.`,
+          );
+          return useIdentityHint(snapshot.linked);
+        }
+        if (snapshot?.pageBacked) {
+          log(
+            "info",
+            `Using existing page-backed Instagram identity for target page ${normalizedPageId}.`,
+          );
+          return useIdentityHint(snapshot.pageBacked);
+        }
+
+        const response = await privateGraphqlMutation(
+          PAGE_INSTAGRAM_MUTATION_DOC_ID,
+          "AdsPageInstagramAccountMutation",
+          { page_id: normalizedPageId },
+        );
+        const returnedInstagramId =
+          extractPageBackedInstagramObjectId(response);
+        let identityHint = returnedInstagramId
+          ? await buildIdentityHintFromInstagramObjectId(
+              returnedInstagramId,
+              normalizedAccountId,
+            )
+          : null;
+        if (identityHint) {
+          identityHint.threadsUserId ||= snapshot?.threadsUserId || "";
+          return useIdentityHint(identityHint);
+        }
+
+        // A definite empty mutation response can still mean that Meta created
+        // the identity but omitted it from the response. Re-read before failing.
+        snapshot = await fetchPageIdentitySnapshot(
+          normalizedPageId,
+          normalizedAccountId,
+        );
+        if (snapshot?.pageBacked) {
+          return useIdentityHint(snapshot.pageBacked);
+        }
+        throw new Error(
+          returnedInstagramId
+            ? `PBIA instagram_object ${returnedInstagramId} did not return distinct id and legacy_instagram_user_id.`
+            : "PBIA mutation did not return iguser_v2_id, and the page re-read found no PBIA.",
+        );
       } catch (error) {
         if (error?.uncertain) throw error;
         log(
@@ -480,40 +721,38 @@ export class IdentityService {
       itemName,
       accountId,
     );
+    if (
+      (existingInstagramUserId || existingInstagramActorId) &&
+      !identity.instagramUserId
+    ) {
+      throw new Error(
+        `Page ${pageId} has neither a linked nor a page-backed Instagram identity for ${itemName || "this creative"}; source identity IDs are never reused.`,
+      );
+    }
     if (identity.instagramUserId) {
       osp.instagram_user_id = identity.instagramUserId;
-    } else if (existingInstagramUserId) {
-      osp.instagram_user_id = existingInstagramUserId;
     } else {
       delete osp.instagram_user_id;
     }
     if (identity.instagramActorId) {
       osp.instagram_actor_id = identity.instagramActorId;
-    } else if (
-      existingInstagramActorId &&
-      existingInstagramActorId !== existingInstagramUserId
-    ) {
-      osp.instagram_actor_id = existingInstagramActorId;
     } else {
-      delete osp.instagram_actor_id;
-    }
-    if (
-      osp.instagram_actor_id &&
-      String(osp.instagram_actor_id) === String(osp.instagram_user_id || "")
-    ) {
       delete osp.instagram_actor_id;
     }
 
     let targetThreadsUserId = "";
     if (needsThreadsIdentity) {
-      const provisionedThreadsUserId = await ensurePageBackedThreadsIdentity(
-        pageId,
-        itemName,
-        accountId,
-      );
-      targetThreadsUserId = String(
-        provisionedThreadsUserId || identity.threadsUserId || "",
-      );
+      // Prefer the Threads ID attached to the resolved PBIA. Some pages omit it
+      // from that object, so provision the page-backed Threads profile as a
+      // fallback instead of failing an otherwise valid catalog clone.
+      targetThreadsUserId = String(identity.threadsUserId || "");
+      if (!targetThreadsUserId) {
+        targetThreadsUserId = await ensurePageBackedThreadsIdentity(
+          pageId,
+          itemName,
+          accountId,
+        );
+      }
       if (!targetThreadsUserId) {
         throw new Error(
           `Page ${pageId} requires a page-backed Threads identity for ${itemName || "this creative"}, but provisioning returned no target Threads ID.`,
@@ -537,8 +776,7 @@ export class IdentityService {
     if (targetThreadsUserId && hasThUserIdField) {
       osp.th_user_id = targetThreadsUserId;
     }
-    const hasUsableInstagramIdentity =
-      Boolean(osp.instagram_user_id) && Boolean(osp.instagram_actor_id);
+    const hasUsableInstagramIdentity = Boolean(osp.instagram_user_id);
     if (!hasUsableInstagramIdentity && itemName) {
       log(
         "warn",
