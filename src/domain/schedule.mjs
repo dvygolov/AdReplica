@@ -116,10 +116,12 @@ export function buildShiftedScheduleWindow(
   options = {},
 ) {
   const requireEnd = Boolean(options.requireEnd);
+  const now =
+    options.now instanceof Date ? new Date(options.now.getTime()) : new Date();
   const anchor =
     options.anchor instanceof Date
       ? new Date(options.anchor.getTime())
-      : new Date(Date.now() + 5 * 60 * 1000);
+      : new Date(now.getTime() + 5 * 60 * 1000);
   const start = parseScheduleDate(sourceStart);
   const end = parseScheduleDate(sourceEnd);
   const result = {
@@ -127,8 +129,14 @@ export function buildShiftedScheduleWindow(
     end: "",
   };
 
+  // A future start is what the source campaign was scheduled for, so keep it
+  // intact. Only a start that already passed (or is missing) moves to now,
+  // because Meta rejects a past start_time on create.
+  const keepSourceStart = Boolean(start && start.getTime() > now.getTime());
+  const effectiveStart = keepSourceStart ? start : anchor;
+
   if (start || end || requireEnd) {
-    result.start = anchor.toISOString();
+    result.start = effectiveStart.toISOString();
   }
 
   if (end && start && end.getTime() > start.getTime()) {
@@ -136,11 +144,15 @@ export function buildShiftedScheduleWindow(
     if (requireEnd) {
       durationMs = Math.max(durationMs, 25 * 60 * 60 * 1000);
     }
-    result.end = new Date(anchor.getTime() + durationMs).toISOString();
+    result.end = new Date(effectiveStart.getTime() + durationMs).toISOString();
   } else if (requireEnd) {
-    result.end = new Date(anchor.getTime() + 30 * 86400000).toISOString();
+    result.end = new Date(
+      effectiveStart.getTime() + 30 * 86400000,
+    ).toISOString();
   } else if (end && !start) {
-    result.end = new Date(anchor.getTime() + 30 * 86400000).toISOString();
+    result.end = new Date(
+      effectiveStart.getTime() + 30 * 86400000,
+    ).toISOString();
   }
 
   return result;
