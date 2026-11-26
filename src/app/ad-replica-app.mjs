@@ -30,7 +30,14 @@ export class AdReplicaApp {
       state: this.state,
       initializeSession: this.services.sessionService.initializeSession,
       createRuntime: (context) =>
-        createServices({ state: context.state, dom: {}, logger: this.logger }),
+        createServices({
+          state: context.state,
+          dom: {},
+          logger: this.logger,
+          // Keep operation network diagnostics in the root state so they
+          // survive the throwaway operation context and show up in the log export.
+          overrides: { networkDiagnostics: this.services.networkDiagnostics },
+        }),
       onChange: () => this.services.panelView.renderUI(),
       onReport: (report, options) => this.reportView.show(report, options),
     });
